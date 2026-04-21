@@ -8,13 +8,18 @@ const ENERGY_OPTIONS = [
   { value: 4, emoji: '⚡', label: 'Charged' },
 ]
 
+// Evaluated once — true on mouse/trackpad devices, false on touch-only
+const canHover = typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches
+
 // ─── Swipeable row ────────────────────────────────────────────────────────────
 function SwipeRow({ label, sublabel, confirmed, onConfirm }) {
   const [offset, setOffset] = useState(0)
   const [swiping, setSwiping] = useState(false)
-  const startX = useRef(null)
+  const startX    = useRef(null)
+  const isDragging = useRef(false)
   const THRESHOLD = 80
 
+  // ── Touch handlers ──────────────────────────────────────────────────────────
   function onTouchStart(e) {
     if (confirmed) return
     startX.current = e.touches[0].clientX
@@ -33,6 +38,34 @@ function SwipeRow({ label, sublabel, confirmed, onConfirm }) {
     startX.current = null
   }
 
+  // ── Mouse handlers ──────────────────────────────────────────────────────────
+  function onMouseDown(e) {
+    if (confirmed) return
+    startX.current   = e.clientX
+    isDragging.current = true
+    setSwiping(true)
+  }
+  function onMouseMove(e) {
+    if (confirmed || !isDragging.current || startX.current === null) return
+    const delta = Math.max(0, e.clientX - startX.current)
+    setOffset(delta)
+  }
+  function onMouseUp() {
+    if (!isDragging.current) return
+    isDragging.current = false
+    if (!confirmed && offset >= THRESHOLD) onConfirm()
+    setOffset(0)
+    setSwiping(false)
+    startX.current = null
+  }
+  function onMouseLeave() {
+    if (!isDragging.current) return
+    isDragging.current = false
+    setOffset(0)
+    setSwiping(false)
+    startX.current = null
+  }
+
   const progress = Math.min(offset / THRESHOLD, 1)
   const bg = confirmed
     ? 'var(--color-success-bg)'
@@ -45,11 +78,15 @@ function SwipeRow({ label, sublabel, confirmed, onConfirm }) {
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
+      onMouseDown={onMouseDown}
+      onMouseMove={onMouseMove}
+      onMouseUp={onMouseUp}
+      onMouseLeave={onMouseLeave}
     >
       <div
         style={{
           ...swipeStyles.inner,
-          transform: `translateX(${confirmed ? 0 : offset}px)`,
+          transform:  `translateX(${confirmed ? 0 : offset}px)`,
           transition: swiping ? 'none' : 'transform 0.25s var(--ease-out)',
         }}
       >
@@ -61,11 +98,28 @@ function SwipeRow({ label, sublabel, confirmed, onConfirm }) {
             <span style={swipeStyles.sublabel}>{sublabel}</span>
           )}
         </div>
-        <span style={{ ...swipeStyles.checkmark, opacity: confirmed ? 1 : progress }}>
-          {confirmed ? '✓' : '→'}
-        </span>
+
+        {/* Right-side action: confirm button (hover devices) or swipe arrow (touch) */}
+        {canHover ? (
+          confirmed ? (
+            <span style={{ ...swipeStyles.checkmark, opacity: 1 }}>✓</span>
+          ) : (
+            <button
+              style={swipeStyles.confirmBtn}
+              onClick={e => { e.stopPropagation(); onConfirm() }}
+              aria-label="Confirm"
+            >
+              ✓
+            </button>
+          )
+        ) : (
+          <span style={{ ...swipeStyles.checkmark, opacity: confirmed ? 1 : progress }}>
+            {confirmed ? '✓' : '→'}
+          </span>
+        )}
       </div>
-      {!confirmed && (
+
+      {!confirmed && !canHover && (
         <div style={{ ...swipeStyles.hint, opacity: offset === 0 ? 0.35 : 0 }}>
           swipe →
         </div>
@@ -110,14 +164,30 @@ const swipeStyles = {
     flexShrink: 0,
     transition: 'opacity 0.15s',
   },
+  confirmBtn: {
+    width:           '28px',
+    height:          '28px',
+    borderRadius:    '50%',
+    background:      'var(--color-accent)',
+    border:          'none',
+    color:           '#fff',
+    fontSize:        '14px',
+    fontWeight:      600,
+    cursor:          'pointer',
+    flexShrink:      0,
+    display:         'flex',
+    alignItems:      'center',
+    justifyContent:  'center',
+    transition:      'opacity 0.15s',
+  },
   hint: {
-    position:   'absolute',
-    right:      '16px',
-    top:        '50%',
-    transform:  'translateY(-50%)',
-    fontSize:   '11px',
-    color:      'var(--color-muted)',
-    transition: 'opacity 0.3s',
+    position:      'absolute',
+    right:         '16px',
+    top:           '50%',
+    transform:     'translateY(-50%)',
+    fontSize:      '11px',
+    color:         'var(--color-muted)',
+    transition:    'opacity 0.3s',
     pointerEvents: 'none',
   },
 }
