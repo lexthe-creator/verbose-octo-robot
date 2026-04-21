@@ -361,6 +361,23 @@ Used for meal slots in Ignition Brief and Home fuel gauge.
 - Reset: stops timer, restores full duration
 - Skip: ends current session immediately, fires completion logic
 
+### Task time scheduling
+Used in Home screen task rows.
+- Tapping a task row expands an inline time picker beneath it
+- Selecting a time saves via `UPDATE_TASK_TIME` dispatch: `{ taskId, time: 'HH:MM' }` — updates `tasks[id].dueTime`
+- Tasks with a scheduled time appear as dynamic items in "Today at a glance", inserted chronologically among the fixed timeline items
+- Tapping the row header again (not the picker itself) collapses the picker
+- Requires new AppContext action: `UPDATE_TASK_TIME` — see §4 dispatch table *(to be added in Step 4)*
+
+### Meal time editing
+Used in Home screen fuel gauge slots.
+- Tapping a meal slot expands an inline time range picker (start time + end time) beneath it
+- Defaults come from `meals[slot].window` as set during Morning Ignition
+- Custom times save via `UPDATE_MEAL_WINDOW` dispatch: `{ slot, startTime: 'HH:MM', endTime: 'HH:MM' }` — updates `meals[slot].startTime` and `meals[slot].endTime`
+- **State shape change required:** `meals[slot].window` (formatted string) must be split into `meals[slot].startTime: 'HH:MM'` and `meals[slot].endTime: 'HH:MM'` when Step 4 is built. AppContext initial state and MorningIgnition must be updated accordingly.
+- Late state: triggered when `currentTime > meals[slot].endTime` AND `meals[slot].eaten === false` — slot renders in terracotta
+- Requires new AppContext action: `UPDATE_MEAL_WINDOW` — see §4 dispatch table *(to be added in Step 4)*
+
 ---
 
 ## 7. Navigation & Routing
