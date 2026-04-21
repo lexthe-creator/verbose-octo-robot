@@ -205,8 +205,8 @@ Source of truth: `src/context/AppContext.jsx`. Persisted to `localStorage` under
 | `LOCK_DAY` | — | Sets `dayLockedAt` to current ISO timestamp |
 | `TOGGLE_TASK` | task `id` string | Toggles `tasks[id].done` |
 | `UPDATE_TASK_TIME` | `{ taskId, time: 'HH:MM' }` | Sets `tasks[id].scheduledTime`; task appears in timeline |
-| `MARK_MEAL_EATEN` | slot string | Sets `meals[slot].eaten` to `true` |
-| `UPDATE_MEAL_WINDOW` | `{ slot, startTime, endTime }` | Updates `meals[slot].startTime/endTime/lateAfter` |
+| `MARK_MEAL_EATEN` | slot string | Sets `meals[slot].eaten` to `true`. Used by fuel slot tap (body). Does NOT touch time fields. |
+| `UPDATE_MEAL_WINDOW` | `{ slot, startTime, endTime }` | Updates `meals[slot].startTime/endTime/lateAfter`. Used by fuel slot time editor (◷ icon). Does NOT touch `eaten`. |
 | `ADD_INBOX_ITEM` | text string | Prepends new item to `inboxItems` |
 | `REMOVE_INBOX_ITEM` | item `id` string | Filters item from `inboxItems` |
 | `INCREMENT_FOCUS_SESSIONS` | — | Increments `focusSessions` by 1 |
@@ -285,7 +285,7 @@ Exposed alongside `state` and `dispatch` via `useApp()`:
 
 ### 5.2 Home (`'home'`)
 
-**File:** `src/screens/Home.jsx` *(stub — built in Step 4)*
+**File:** `src/screens/Home.jsx`
 **Props:** `onOpenFocus`, `onOpenInbox`
 
 Layout zones top to bottom:
@@ -294,7 +294,7 @@ Layout zones top to bottom:
 2. **Burn bar** — 2px track, fills based on % of waking day elapsed (6am–11pm). Left: "X% of day gone". Right: next scheduled commitment countdown ("Tempo run in 47 min")
 3. **Today at a glance** — dark card, vertical timeline. Items: Morning ignition (done, green), Now marker (terracotta dot + "you are here"), upcoming workout (terracotta), lunch window, dinner window. Each item: time · dot · label · optional badge
 4. **3 Things** — task rows. Tap to check off. Done: strikethrough + green + reduced opacity. Overdue badge on relevant items
-5. **Fuel gauge** — 4 meal slots (Breakfast / Lunch / Snack / Dinner). States: empty (default), ok (green — ate), late (terracotta — overdue). Tap → dispatches `MARK_MEAL_EATEN`
+5. **Fuel gauge** — 4 meal slots (Breakfast / Lunch / Snack / Dinner). States: empty (default), ok (green — ate), late (terracotta — overdue). Tap slot body → dispatches `MARK_MEAL_EATEN`. Tap clock icon (◷) → expands inline time range editor which calls `updateMealWindow`. These are two distinct interactions on the same slot.
 6. **FAB** — terracotta `+` button, bottom-right above nav. Opens Inbox via `onOpenInbox()`
 
 ---
@@ -488,8 +488,8 @@ File: `.github/workflows/pages.yml`
 | 1 | Design tokens + AppContext | ✅ Done | `src/styles/tokens.css`, `src/context/AppContext.jsx` |
 | 2 | App shell + bottom nav routing | ✅ Done | `src/main.jsx`, `src/App.jsx`, `src/index.css`, `index.html`, `src/screens/*.jsx` (stubs) |
 | 3 | Morning Ignition (all 3 steps) | ✅ Done | `src/screens/MorningIgnition.jsx` |
-| 4 | Home screen (all zones) | ⬜ Next | `src/screens/Home.jsx` |
-| 5 | Focus Timer overlay | ⬜ Pending | `src/screens/FocusTimer.jsx` |
+| 4 | Home screen (all zones) | ✅ Done | `src/screens/Home.jsx` |
+| 5 | Focus Timer overlay | ⬜ Next | `src/screens/FocusTimer.jsx` |
 | 6 | Inbox | ⬜ Pending | `src/screens/Inbox.jsx` |
 | 7 | Finance (mock data) | ⬜ Pending | `src/screens/Finance.jsx` |
 | 8 | PWA manifest + GitHub Pages deploy | ⬜ Pending | `public/manifest.json`, `vite.config.js`, `.github/workflows/pages.yml` |
