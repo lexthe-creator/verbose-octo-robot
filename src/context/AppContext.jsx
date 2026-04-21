@@ -11,17 +11,17 @@ const initialState = {
 
   // Tasks (3 things)
   tasks: [
-    { id: 't1', text: 'Review project proposal', done: false, dueTime: '10:00' },
-    { id: 't2', text: 'Reply to team messages',  done: false, dueTime: '12:00' },
-    { id: 't3', text: 'Evening walk 30 min',      done: false, dueTime: '18:30' },
+    { id: 't1', text: 'Review project proposal', done: false, dueTime: '10:00', scheduledTime: null },
+    { id: 't2', text: 'Reply to team messages',  done: false, dueTime: '12:00', scheduledTime: null },
+    { id: 't3', text: 'Evening walk 30 min',      done: false, dueTime: '18:30', scheduledTime: null },
   ],
 
-  // Meals
+  // Meals — startTime/endTime in 'HH:MM' 24h format; lateAfter mirrors endTime
   meals: {
-    breakfast: { label: 'Breakfast', window: '7:00 – 9:00 AM',  eaten: false },
-    lunch:     { label: 'Lunch',     window: '12:00 – 1:30 PM', eaten: false },
-    snack:     { label: 'Snack',     window: '3:00 – 4:00 PM',  eaten: false },
-    dinner:    { label: 'Dinner',    window: '6:30 – 8:00 PM',  eaten: false },
+    breakfast: { label: 'Breakfast', startTime: '07:00', endTime: '09:00', lateAfter: '09:00', eaten: false },
+    lunch:     { label: 'Lunch',     startTime: '12:00', endTime: '14:00', lateAfter: '14:00', eaten: false },
+    snack:     { label: 'Snack',     startTime: '15:00', endTime: '17:00', lateAfter: '17:00', eaten: false },
+    dinner:    { label: 'Dinner',    startTime: '19:00', endTime: '21:00', lateAfter: '21:00', eaten: false },
   },
 
   // Workout (Runna card)
@@ -29,7 +29,7 @@ const initialState = {
     type:     'Tempo Run',
     duration: '45 min',
     pace:     '5:20 / km',
-    time:     '6:30 PM',
+    time:     '18:30',
     confirmed: false,
   },
 
@@ -53,10 +53,18 @@ function reducer(state, action) {
       return { ...state, confirmedTasks: [...state.confirmedTasks, id] };
     }
 
+    // payload: { slot, startTime, endTime } — sets default windows on confirmation
     case 'CONFIRM_MEAL': {
-      const slot = action.payload;
+      const { slot, startTime, endTime } = action.payload;
       if (state.confirmedMeals.includes(slot)) return state;
-      return { ...state, confirmedMeals: [...state.confirmedMeals, slot] };
+      return {
+        ...state,
+        confirmedMeals: [...state.confirmedMeals, slot],
+        meals: {
+          ...state.meals,
+          [slot]: { ...state.meals[slot], startTime, endTime, lateAfter: endTime },
+        },
+      };
     }
 
     case 'CONFIRM_WORKOUT':
@@ -76,6 +84,15 @@ function reducer(state, action) {
       return { ...state, tasks };
     }
 
+    // payload: { taskId, time: 'HH:MM' }
+    case 'UPDATE_TASK_TIME': {
+      const { taskId, time } = action.payload;
+      const tasks = state.tasks.map(t =>
+        t.id === taskId ? { ...t, scheduledTime: time } : t
+      );
+      return { ...state, tasks };
+    }
+
     case 'MARK_MEAL_EATEN': {
       const slot = action.payload;
       return {
@@ -83,6 +100,18 @@ function reducer(state, action) {
         meals: {
           ...state.meals,
           [slot]: { ...state.meals[slot], eaten: true },
+        },
+      };
+    }
+
+    // payload: { slot, startTime: 'HH:MM', endTime: 'HH:MM' }
+    case 'UPDATE_MEAL_WINDOW': {
+      const { slot, startTime, endTime } = action.payload;
+      return {
+        ...state,
+        meals: {
+          ...state.meals,
+          [slot]: { ...state.meals[slot], startTime, endTime, lateAfter: endTime },
         },
       };
     }
@@ -150,11 +179,18 @@ const AppContext = createContext(null);
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, undefined, loadState);
 
-  // Persist every state change
   useEffect(() => { saveState(state); }, [state]);
 
+  function updateTaskTime(taskId, time) {
+    dispatch({ type: 'UPDATE_TASK_TIME', payload: { taskId, time } });
+  }
+
+  function updateMealWindow(slot, startTime, endTime) {
+    dispatch({ type: 'UPDATE_MEAL_WINDOW', payload: { slot, startTime, endTime } });
+  }
+
   return (
-    <AppContext.Provider value={{ state, dispatch }}>
+    <AppContext.Provider value={{ state, dispatch, updateTaskTime, updateMealWindow }}>
       {children}
     </AppContext.Provider>
   );

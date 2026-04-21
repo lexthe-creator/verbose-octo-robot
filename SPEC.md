@@ -161,17 +161,18 @@ Source of truth: `src/context/AppContext.jsx`. Persisted to `localStorage` under
 
   // Tasks — the "3 things"
   tasks: [
-    { id: 't1', text: string, done: boolean, dueTime: 'HH:MM' },
-    { id: 't2', text: string, done: boolean, dueTime: 'HH:MM' },
-    { id: 't3', text: string, done: boolean, dueTime: 'HH:MM' },
+    { id: 't1', text: string, done: boolean, dueTime: 'HH:MM', scheduledTime: 'HH:MM' | null },
+    { id: 't2', text: string, done: boolean, dueTime: 'HH:MM', scheduledTime: 'HH:MM' | null },
+    { id: 't3', text: string, done: boolean, dueTime: 'HH:MM', scheduledTime: 'HH:MM' | null },
   ],
 
-  // Meals
+  // Meals — all times in 'HH:MM' 24h format
+  // lateAfter mirrors endTime; set on CONFIRM_MEAL or UPDATE_MEAL_WINDOW
   meals: {
-    breakfast: { label: 'Breakfast', window: string, eaten: boolean },
-    lunch:     { label: 'Lunch',     window: string, eaten: boolean },
-    snack:     { label: 'Snack',     window: string, eaten: boolean },
-    dinner:    { label: 'Dinner',    window: string, eaten: boolean },
+    breakfast: { label: 'Breakfast', startTime: '07:00', endTime: '09:00', lateAfter: '09:00', eaten: boolean },
+    lunch:     { label: 'Lunch',     startTime: '12:00', endTime: '14:00', lateAfter: '14:00', eaten: boolean },
+    snack:     { label: 'Snack',     startTime: '15:00', endTime: '17:00', lateAfter: '17:00', eaten: boolean },
+    dinner:    { label: 'Dinner',    startTime: '19:00', endTime: '21:00', lateAfter: '21:00', eaten: boolean },
   },
 
   // Workout
@@ -199,15 +200,26 @@ Source of truth: `src/context/AppContext.jsx`. Persisted to `localStorage` under
 |---|---|---|
 | `SET_ENERGY` | `1–4` | Sets `energyLevel` |
 | `CONFIRM_TASK` | task `id` string | Appends to `confirmedTasks` (idempotent) |
-| `CONFIRM_MEAL` | slot string | Appends to `confirmedMeals` (idempotent) |
+| `CONFIRM_MEAL` | `{ slot, startTime, endTime }` | Appends to `confirmedMeals`; sets `meals[slot].startTime/endTime/lateAfter` (idempotent) |
 | `CONFIRM_WORKOUT` | — | Sets `workoutConfirmed` + `workout.confirmed` to `true` |
 | `LOCK_DAY` | — | Sets `dayLockedAt` to current ISO timestamp |
 | `TOGGLE_TASK` | task `id` string | Toggles `tasks[id].done` |
+| `UPDATE_TASK_TIME` | `{ taskId, time: 'HH:MM' }` | Sets `tasks[id].scheduledTime`; task appears in timeline |
 | `MARK_MEAL_EATEN` | slot string | Sets `meals[slot].eaten` to `true` |
+| `UPDATE_MEAL_WINDOW` | `{ slot, startTime, endTime }` | Updates `meals[slot].startTime/endTime/lateAfter` |
 | `ADD_INBOX_ITEM` | text string | Prepends new item to `inboxItems` |
 | `REMOVE_INBOX_ITEM` | item `id` string | Filters item from `inboxItems` |
 | `INCREMENT_FOCUS_SESSIONS` | — | Increments `focusSessions` by 1 |
 | `RESET_DAY` | — | Resets to `initialState`, preserves `inboxItems` |
+
+### Context helper functions
+
+Exposed alongside `state` and `dispatch` via `useApp()`:
+
+| Function | Signature | Dispatches |
+|---|---|---|
+| `updateTaskTime` | `(taskId: string, time: 'HH:MM') => void` | `UPDATE_TASK_TIME` |
+| `updateMealWindow` | `(slot: string, startTime: 'HH:MM', endTime: 'HH:MM') => void` | `UPDATE_MEAL_WINDOW` |
 
 ---
 
@@ -367,16 +379,15 @@ Used in Home screen task rows.
 - Selecting a time saves via `UPDATE_TASK_TIME` dispatch: `{ taskId, time: 'HH:MM' }` — updates `tasks[id].dueTime`
 - Tasks with a scheduled time appear as dynamic items in "Today at a glance", inserted chronologically among the fixed timeline items
 - Tapping the row header again (not the picker itself) collapses the picker
-- Requires new AppContext action: `UPDATE_TASK_TIME` — see §4 dispatch table *(to be added in Step 4)*
+- AppContext action: `UPDATE_TASK_TIME` — see §4 dispatch table
 
 ### Meal time editing
 Used in Home screen fuel gauge slots.
 - Tapping a meal slot expands an inline time range picker (start time + end time) beneath it
 - Defaults come from `meals[slot].window` as set during Morning Ignition
 - Custom times save via `UPDATE_MEAL_WINDOW` dispatch: `{ slot, startTime: 'HH:MM', endTime: 'HH:MM' }` — updates `meals[slot].startTime` and `meals[slot].endTime`
-- **State shape change required:** `meals[slot].window` (formatted string) must be split into `meals[slot].startTime: 'HH:MM'` and `meals[slot].endTime: 'HH:MM'` when Step 4 is built. AppContext initial state and MorningIgnition must be updated accordingly.
-- Late state: triggered when `currentTime > meals[slot].endTime` AND `meals[slot].eaten === false` — slot renders in terracotta
-- Requires new AppContext action: `UPDATE_MEAL_WINDOW` — see §4 dispatch table *(to be added in Step 4)*
+- Late state: triggered when `currentTime > meals[slot].lateAfter` AND `meals[slot].eaten === false` — slot renders in terracotta
+- AppContext action: `UPDATE_MEAL_WINDOW` — see §4 dispatch table
 
 ---
 

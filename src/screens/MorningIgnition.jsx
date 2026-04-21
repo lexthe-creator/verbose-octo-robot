@@ -123,7 +123,8 @@ const swipeStyles = {
 }
 
 // ─── Meal tap slot ────────────────────────────────────────────────────────────
-function MealSlot({ slot, label, window: timeWindow, confirmed, onConfirm }) {
+function MealSlot({ label, startTime, endTime, confirmed, onConfirm }) {
+  const windowLabel = `${startTime} – ${endTime}`
   return (
     <button
       style={{
@@ -136,7 +137,7 @@ function MealSlot({ slot, label, window: timeWindow, confirmed, onConfirm }) {
       <span style={{ ...mealStyles.label, color: confirmed ? 'var(--color-success)' : 'var(--color-text)' }}>
         {confirmed ? '✓ ' : ''}{label}
       </span>
-      <span style={mealStyles.window}>{timeWindow}</span>
+      <span style={mealStyles.window}>{windowLabel}</span>
     </button>
   )
 }
@@ -161,6 +162,14 @@ const mealStyles = {
     color:    'var(--color-muted)',
     marginTop: '2px',
   },
+}
+
+// Default meal windows applied at lock time
+const MEAL_DEFAULTS = {
+  breakfast: { startTime: '07:00', endTime: '09:00' },
+  lunch:     { startTime: '12:00', endTime: '14:00' },
+  snack:     { startTime: '15:00', endTime: '17:00' },
+  dinner:    { startTime: '19:00', endTime: '21:00' },
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -193,7 +202,10 @@ export default function MorningIgnition({ onComplete }) {
   function handleLockDay() {
     dispatch({ type: 'SET_ENERGY', payload: localEnergy })
     localTasks.forEach(id => dispatch({ type: 'CONFIRM_TASK', payload: id }))
-    localMeals.forEach(slot => dispatch({ type: 'CONFIRM_MEAL', payload: slot }))
+    localMeals.forEach(slot => dispatch({
+      type: 'CONFIRM_MEAL',
+      payload: { slot, ...MEAL_DEFAULTS[slot] },
+    }))
     if (localWorkout) dispatch({ type: 'CONFIRM_WORKOUT' })
     dispatch({ type: 'LOCK_DAY' })
     setStep('locked')
@@ -291,9 +303,9 @@ export default function MorningIgnition({ onComplete }) {
             {Object.entries(state.meals).map(([slot, meal]) => (
               <MealSlot
                 key={slot}
-                slot={slot}
                 label={meal.label}
-                window={meal.window}
+                startTime={meal.startTime}
+                endTime={meal.endTime}
                 confirmed={localMeals.includes(slot)}
                 onConfirm={() => confirmMeal(slot)}
               />
