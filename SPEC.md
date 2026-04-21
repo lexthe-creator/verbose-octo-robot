@@ -391,14 +391,17 @@ Layout zones top to bottom:
 
 ### 5.6 Finance (`'finance'`)
 
-**File:** `src/screens/Finance.jsx` *(stub — built in Step 7)*
+**File:** `src/screens/Finance.jsx` ✅ Done
 
-- Header: "Finance" + "● Plaid connected" green badge + "synced 4 min ago"
-- Hero card: "Spent today" label · large amount (DM Serif Display 38px) · comparison line ("↓ $12 less than your Monday average")
-- Weekly bar chart: 7 bars Mon–Sun. Today's bar: terracotta. Others: `#252520`. Heights proportional to spend
-- 2-column stat grid: "This week" total + "Anything odd?" (All clear / flag)
-- "Today's transactions" list: icon · merchant name · category · amount (red spend, green income)
-- V1: mock data only. V2: real Plaid API
+- Header: "Finance" (DM Serif Display 32px) + "● Plaid connected" badge (bg `#0C2A1E`, text `#1D9E75`, border `#1A4028`) + "synced 4 min ago" muted subtitle
+- Hero card (bg `#1E1E18`, border `#2A2A22`, radius 14px): "Spent today" 9px uppercase label · DM Serif Display 38px dollars + 22px `#4A4A40` cents · comparison line `#4A4A40` · 7-bar weekly chart
+- Weekly bars: Mon–Sun, `BAR_WIDTH 18px`, gap 4px, max height 48px. Today bar `#C17B56`, others `#252520`. Day labels 8px; today label `#C17B56`
+- 2-column stat grid (gap 8px): "This week" (value `#C17B56` if over last week, `#1D9E75` if under) + "Anything odd?" (value `#1D9E75` "All clear" or `#C17B56` flag)
+- "Today's transactions" list: 28px emoji icon circle (bg `#252520`, radius 8px) · merchant 12px `#C8C4BC` · category 10px `#3A3A30` · amount `#E05555` (spend) or `#1D9E75` (income)
+- V1: all data hardcoded mock. V2: real Plaid API
+- No AppContext dependency
+
+**Note:** Inline styles object named `tx_s` (not `tx`) to avoid shadowing the `tx` prop parameter inside `TxRow`.
 
 ---
 
@@ -552,5 +555,5 @@ File: `.github/workflows/pages.yml`
 | 5 | Focus Timer overlay | ✅ Done | `src/screens/FocusTimer.jsx` |
 | 6 | Inbox | ✅ Done | `src/screens/Inbox.jsx` |
 | 6b | She Stitches Studio — goal card + roadmap screen | ✅ Done | `src/context/AppContext.jsx`, `src/screens/SheStitches.jsx`, `src/screens/Home.jsx`, `src/App.jsx` |
-| 7 | Finance (mock data) | ⬜ Next | `src/screens/Finance.jsx` |
+| 7 | Finance (mock data) | ✅ Done | `src/screens/Finance.jsx` |
 | 8 | PWA manifest + GitHub Pages deploy | ⬜ Pending | `public/manifest.json`, `vite.config.js`, `.github/workflows/pages.yml` |
