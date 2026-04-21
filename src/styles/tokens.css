@@ -1,0 +1,108 @@
+/* ─── App in My Life — Design Tokens ─────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Serif+Display&display=swap');
+
+:root {
+  /* ── Colours ─────────────────────────────────────────────────────────────── */
+  --color-bg:          #141410;
+  --color-card:        #1E1E18;
+  --color-nav-bg:      #1A1A14;
+  --color-chart-bar:   #252520;
+
+  --color-border:      #2A2A22;
+
+  --color-text:        #F6F3EF;
+  --color-muted:       #8C8C7A;
+  --color-faint:       #3A3A30;
+
+  --color-accent:      #C17B56;
+  --color-accent-light:#E8A87C;
+  --color-accent-bg:   #2A1F14;
+
+  --color-success:     #1D9E75;
+  --color-success-bg:  #0F2318;
+
+  --color-danger:      #E05555;
+
+  /* ── Border ─────────────────────────────────────────────────────────────── */
+  --border:            0.5px solid var(--color-border);
+
+  /* ── Radius ──────────────────────────────────────────────────────────────── */
+  --radius-card:       12px;
+  --radius-sm:         10px;
+  --radius-pill:       999px;
+
+  /* ── Typography ──────────────────────────────────────────────────────────── */
+  --font-body:         'DM Sans', system-ui, sans-serif;
+  --font-display:      'DM Serif Display', Georgia, serif;
+
+  /* ── Spacing ─────────────────────────────────────────────────────────────── */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* ── Layout ──────────────────────────────────────────────────────────────── */
+  --nav-height:        72px;
+  --max-width:         393px;
+
+  /* ── Safe areas (iPhone 16 Pro) ─────────────────────────────────────────── */
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left,  0px);
+  --safe-right:  env(safe-area-inset-right, 0px);
+
+  /* ── Motion ──────────────────────────────────────────────────────────────── */
+  --ease-out:   cubic-bezier(0.22, 1, 0.36, 1);
+  --duration:   220ms;
+}
+
+/* ─── Reset + Base ────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--color-bg);
+}
+
+button {
+  font-family: var(--font-body);
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+}
+
+input, textarea {
+  font-family: var(--font-body);
+  color: var(--color-text);
+  background: none;
+  border: none;
+  outline: none;
+}
