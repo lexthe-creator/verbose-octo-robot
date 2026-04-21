@@ -445,10 +445,152 @@ const fs = {
   },
 }
 
+// ─── She Stitches goal card ───────────────────────────────────────────────────
+
+function SsGoalCard({ doneCount, totalCount, listingsCount, nextTask, dayOf90, onTap }) {
+  const pct = totalCount ? Math.round((doneCount / totalCount) * 100) : 0
+
+  return (
+    <div style={ss.wrap} onClick={onTap} role="button" tabIndex={0}
+      onKeyDown={e => e.key === 'Enter' && onTap()}>
+      <div style={ss.topEdge} />
+      <div style={ss.inner}>
+        {/* Top row */}
+        <div style={ss.topRow}>
+          <div style={ss.iconWrap}>
+            <span style={ss.icon}>🪡</span>
+          </div>
+          <div style={ss.nameMeta}>
+            <span style={ss.name}>90-Day Roadmap</span>
+            <span style={ss.day}>Day {dayOf90} of 90</span>
+          </div>
+          <span style={ss.arrow}>→</span>
+        </div>
+
+        {/* Progress label */}
+        <div style={ss.progressRow}>
+          <span style={ss.progressLeft}>{doneCount} of {totalCount} tasks done</span>
+          <span style={ss.progressPct}>{pct}%</span>
+        </div>
+        <div style={ss.track}>
+          <div style={{ ...ss.fill, width: `${pct}%` }} />
+        </div>
+
+        {/* Stats */}
+        <div style={ss.statsRow}>
+          <span style={ss.stat}>{listingsCount} listings live</span>
+          <div style={ss.statDivider} />
+          <span style={ss.stat}>{doneCount} tasks done</span>
+        </div>
+
+        {/* Next task */}
+        {nextTask && (
+          <div style={ss.nextRow}>
+            <span style={ss.nextDot} />
+            <span style={ss.nextText}>{nextTask}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+const ss = {
+  wrap: {
+    borderRadius: 'var(--radius-card)',
+    overflow:     'hidden',
+    border:       '0.5px solid #3A2520',
+    cursor:       'pointer',
+  },
+  topEdge: {
+    height:     '2px',
+    background: 'linear-gradient(90deg, #C17B56, #E8A87C)',
+  },
+  inner: {
+    background: '#1E1818',
+    padding:    '12px 14px',
+  },
+  topRow: {
+    display:    'flex',
+    alignItems: 'center',
+    gap:        '10px',
+    marginBottom: '10px',
+  },
+  iconWrap: {
+    width:          '28px',
+    height:         '28px',
+    borderRadius:   '50%',
+    background:     '#2A1A14',
+    display:        'flex',
+    alignItems:     'center',
+    justifyContent: 'center',
+    flexShrink:     0,
+    fontSize:       '14px',
+  },
+  icon: { lineHeight: 1 },
+  nameMeta: {
+    flex:          1,
+    display:       'flex',
+    flexDirection: 'column',
+    gap:           '1px',
+  },
+  name:  { fontSize: '13px', fontWeight: 600, color: 'var(--color-text)' },
+  day:   { fontSize: '11px', color: 'var(--color-muted)' },
+  arrow: { fontSize: '16px', color: 'var(--color-faint)' },
+
+  progressRow: {
+    display:        'flex',
+    justifyContent: 'space-between',
+    marginBottom:   '5px',
+  },
+  progressLeft: { fontSize: '11px', color: 'var(--color-muted)' },
+  progressPct:  { fontSize: '11px', fontWeight: 600, color: '#C17B56' },
+  track: {
+    height:       '3px',
+    background:   'var(--color-faint)',
+    borderRadius: 'var(--radius-pill)',
+    overflow:     'hidden',
+    marginBottom: '10px',
+  },
+  fill: {
+    height:       '100%',
+    background:   'linear-gradient(90deg, #C17B56, #E8A87C)',
+    borderRadius: 'var(--radius-pill)',
+    transition:   'width 0.4s ease',
+  },
+
+  statsRow: {
+    display:    'flex',
+    alignItems: 'center',
+    gap:        '10px',
+    marginBottom: '10px',
+  },
+  stat:        { fontSize: '12px', color: 'var(--color-muted)' },
+  statDivider: { width: '0.5px', height: '12px', background: '#2A2A22', flexShrink: 0 },
+
+  nextRow: {
+    display:     'flex',
+    alignItems:  'flex-start',
+    gap:         '8px',
+    borderTop:   '0.5px solid #2A2A22',
+    paddingTop:  '10px',
+  },
+  nextDot: {
+    width:        '5px',
+    height:       '5px',
+    borderRadius: '50%',
+    background:   '#C17B56',
+    flexShrink:   0,
+    marginTop:    '4px',
+  },
+  nextText: { fontSize: '12px', color: 'var(--color-muted)', lineHeight: 1.4, flex: 1 },
+}
+
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-export default function Home({ onOpenFocus, onOpenInbox }) {
-  const { state, dispatch, updateTaskTime, updateMealWindow } = useApp()
+export default function Home({ onOpenFocus, onOpenInbox, onNavigate }) {
+  const { state, dispatch, updateTaskTime, updateMealWindow,
+          ssDoneCount, ssTotalCount, ssListingsCount, ssNextTask, ssDayOf90 } = useApp()
 
   const [now, setNow] = useState(() => new Date())
   const [expandedTask, setExpandedTask] = useState(null)
@@ -536,7 +678,20 @@ export default function Home({ onOpenFocus, onOpenInbox }) {
         </div>
       </section>
 
-      {/* 5 — Fuel gauge */}
+      {/* 5 — She Stitches goal card */}
+      <section style={s.section}>
+        <p style={s.sectionLabel}>She Stitches Studio</p>
+        <SsGoalCard
+          doneCount={ssDoneCount}
+          totalCount={ssTotalCount}
+          listingsCount={ssListingsCount}
+          nextTask={ssNextTask}
+          dayOf90={ssDayOf90}
+          onTap={() => onNavigate && onNavigate('shestitches')}
+        />
+      </section>
+
+      {/* 6 — Fuel gauge */}
       <section style={s.section}>
         <p style={s.sectionLabel}>Fuel</p>
         <div style={s.mealGrid}>
@@ -553,7 +708,7 @@ export default function Home({ onOpenFocus, onOpenInbox }) {
         </div>
       </section>
 
-      {/* 6 — FAB */}
+      {/* 7 — FAB */}
       <button style={s.fab} onClick={onOpenInbox} aria-label="Open inbox">
         +
       </button>

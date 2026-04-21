@@ -148,7 +148,9 @@ vite.config.js            — base set to repo name for GitHub Pages
 
 ## 4. AppContext State Shape
 
-Source of truth: `src/context/AppContext.jsx`. Persisted to `localStorage` under key `aiml_state`. Resets to `initialState` on new calendar day (checked against `dayLockedAt`). Inbox items persist across day resets.
+Source of truth: `src/context/AppContext.jsx`. Main state persisted to `localStorage` under key `aiml_state`. Resets to `initialState` on new calendar day (checked against `dayLockedAt`). Inbox items persist across day resets.
+
+**She Stitches state** is persisted separately under key `'sheStitches'` and is never wiped by day reset.
 
 ```js
 {
@@ -194,6 +196,36 @@ Source of truth: `src/context/AppContext.jsx`. Persisted to `localStorage` under
 }
 ```
 
+### She Stitches State (separate localStorage key `'sheStitches'`)
+
+```js
+{
+  startDate: '2025-04-01',   // ISO date string, day 1 of 90
+  tasks: [
+    {
+      id:       string,    // 'ss1'–'ss37'
+      text:     string,
+      done:     boolean,
+      listings: number,    // live listings this task adds when completed
+      week:     number,    // 1–12
+      month:    number,    // 1–3
+      tag:      'Design' | 'Etsy' | 'Marketing' | 'Strategy',
+    },
+    // 37 seed tasks total
+  ],
+}
+```
+
+**Computed helpers** exposed via `useApp()`:
+
+| Helper | Type | Description |
+|---|---|---|
+| `ssDoneCount` | `number` | Completed task count |
+| `ssTotalCount` | `number` | Total task count (37) |
+| `ssListingsCount` | `number` | Sum of `listings` for done tasks |
+| `ssNextTask` | `string \| null` | Text of first undone task |
+| `ssDayOf90` | `number` | `min(daysSinceStartDate, 90)` |
+
 ### Dispatch Actions
 
 | Action type | Payload | Effect |
@@ -211,6 +243,7 @@ Source of truth: `src/context/AppContext.jsx`. Persisted to `localStorage` under
 | `REMOVE_INBOX_ITEM` | item `id` string | Filters item from `inboxItems` |
 | `INCREMENT_FOCUS_SESSIONS` | — | Increments `focusSessions` by 1 |
 | `RESET_DAY` | — | Resets to `initialState`, preserves `inboxItems` |
+| `TOGGLE_SS_TASK` | task `id` string | Dispatched to `ssDispatch` — toggles `ssState.tasks[id].done` |
 
 ### Context helper functions
 
@@ -220,6 +253,7 @@ Exposed alongside `state` and `dispatch` via `useApp()`:
 |---|---|---|
 | `updateTaskTime` | `(taskId: string, time: 'HH:MM') => void` | `UPDATE_TASK_TIME` |
 | `updateMealWindow` | `(slot: string, startTime: 'HH:MM', endTime: 'HH:MM') => void` | `UPDATE_MEAL_WINDOW` |
+| `ssDispatch` | `(action) => void` | Reducer dispatch for She Stitches state |
 
 ---
 
@@ -227,7 +261,7 @@ Exposed alongside `state` and `dispatch` via `useApp()`:
 
 ### Screen Names (state values in App.jsx)
 
-`'ignition'` · `'home'` · `'focus'` · `'inbox'` · `'finance'`
+`'ignition'` · `'home'` · `'focus'` · `'inbox'` · `'finance'` · `'shestitches'`
 
 ---
 
@@ -342,7 +376,20 @@ Layout zones top to bottom:
 
 ---
 
-### 5.5 Finance (`'finance'`)
+### 5.5 She Stitches Studio (`'shestitches'`)
+
+**File:** `src/screens/SheStitches.jsx` ✅ Done
+**Trigger:** Tap the goal card on Home.
+**Nav:** Hidden (full-screen, back arrow only).
+**Props:** `onBack()` → navigates to `'home'`.
+
+**Layout:** Header (← Home, italic title, subtitle) → Progress card (stats row + gradient bar) → 3 collapsible month cards → Weekly Rhythm 2×2 grid → The One Rule card.
+
+**State source:** `ssState` + computed helpers from `AppContext` (`ssDispatch` for `TOGGLE_SS_TASK`). Persisted to `localStorage` under key `'sheStitches'` — independent of daily reset.
+
+---
+
+### 5.6 Finance (`'finance'`)
 
 **File:** `src/screens/Finance.jsx` *(stub — built in Step 7)*
 
@@ -406,14 +453,14 @@ Used in Home screen fuel gauge slots.
 
 **Pattern:** `useState`-based screen switcher in `App.jsx` — no router library.
 
-**Screen values:** `'ignition'` · `'home'` · `'focus'` · `'inbox'` · `'finance'`
+**Screen values:** `'ignition'` · `'home'` · `'focus'` · `'inbox'` · `'finance'` · `'shestitches'`
 
 **Bottom nav** (`src/App.jsx`):
 - 72px height, `#1A1A14` bg, `0.5px` top border
 - 3 tabs: Home `⌂` / Inbox `◎` / Finance `◈`
 - Active: label + icon color → `#C17B56`, small 4px pip dot below icon
 - Fixed to bottom of the 393px column, `z-index: 100`
-- Hidden when `screen === 'ignition'` or `screen === 'focus'`
+- Hidden when `screen === 'ignition'` or `screen === 'focus'` or `screen === 'shestitches'`
 
 **Screen transitions triggered by props:**
 
@@ -422,7 +469,9 @@ Used in Home screen fuel gauge slots.
 | `ignition` | `home` | `onComplete()` inside MorningIgnition Step 3 |
 | `home` | `focus` | `onOpenFocus()` prop |
 | `home` | `inbox` | `onOpenInbox()` prop / FAB tap |
+| `home` | `shestitches` | `onNavigate('shestitches')` via She Stitches goal card tap |
 | `focus` | `home` | `onClose()` prop |
+| `shestitches` | `home` | `onBack()` prop |
 | Any nav tab | target screen | Bottom nav tab tap |
 
 ---
@@ -470,7 +519,7 @@ File: `.github/workflows/pages.yml`
 ### In V1
 
 - Morning Ignition full 3-step flow (Energy → Brief → Locked)
-- Home screen all zones (clock, burn bar, timeline, tasks, fuel gauge, FAB)
+- Home screen all zones (clock, burn bar, timeline, tasks, She Stitches goal card, fuel gauge, FAB)
 - Focus Timer full implementation (ring, presets, session tracking)
 - Inbox capture + triage (no persistence to calendar/task system)
 - Finance screen with mock data
@@ -502,5 +551,6 @@ File: `.github/workflows/pages.yml`
 | 4 | Home screen (all zones) | ✅ Done | `src/screens/Home.jsx` |
 | 5 | Focus Timer overlay | ✅ Done | `src/screens/FocusTimer.jsx` |
 | 6 | Inbox | ✅ Done | `src/screens/Inbox.jsx` |
+| 6b | She Stitches Studio — goal card + roadmap screen | ✅ Done | `src/context/AppContext.jsx`, `src/screens/SheStitches.jsx`, `src/screens/Home.jsx`, `src/App.jsx` |
 | 7 | Finance (mock data) | ⬜ Next | `src/screens/Finance.jsx` |
 | 8 | PWA manifest + GitHub Pages deploy | ⬜ Pending | `public/manifest.json`, `vite.config.js`, `.github/workflows/pages.yml` |

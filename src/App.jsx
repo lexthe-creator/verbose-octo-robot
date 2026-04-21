@@ -6,6 +6,7 @@ import Home            from './screens/Home.jsx'
 import FocusTimer      from './screens/FocusTimer.jsx'
 import Inbox           from './screens/Inbox.jsx'
 import Finance         from './screens/Finance.jsx'
+import SheStitches     from './screens/SheStitches.jsx'
 
 const NAV_TABS = [
   { id: 'home',    label: 'Home',    icon: '⌂' },
@@ -26,7 +27,7 @@ export default function App() {
     setScreen(target)
   }
 
-  const hideNav = screen === 'ignition' || screen === 'focus'
+  const hideNav = screen === 'ignition' || screen === 'focus' || screen === 'shestitches'
 
   return (
     <div style={styles.root}>
@@ -38,7 +39,11 @@ export default function App() {
           <Home
             onOpenFocus={() => navigate('focus')}
             onOpenInbox={() => navigate('inbox')}
+            onNavigate={navigate}
           />
+        )}
+        {screen === 'shestitches' && (
+          <SheStitches onBack={() => navigate('home')} />
         )}
         {screen === 'focus' && (
           <FocusTimer onClose={() => navigate('home')} />

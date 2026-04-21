@@ -1,4 +1,58 @@
-import { createContext, useContext, useReducer, useEffect } from 'react';
+import { createContext, useContext, useReducer, useEffect, useMemo } from 'react';
+
+/* ─── She Stitches seed data ──────────────────────────────────────────────── */
+const SS_TASKS = [
+  // Month 1 — Week 1
+  { id: 'ss1',  text: 'Create and name your Etsy shop (She Stitches)',        done: false, listings: 0, week: 1,  month: 1, tag: 'Etsy'      },
+  { id: 'ss2',  text: 'Write shop bio, About section, and owner story',       done: false, listings: 0, week: 1,  month: 1, tag: 'Etsy'      },
+  { id: 'ss3',  text: 'Design banner and profile photo in Procreate or Canva',done: false, listings: 0, week: 1,  month: 1, tag: 'Design'    },
+  { id: 'ss4',  text: 'Set shop policies (downloads, refunds, file types)',   done: false, listings: 0, week: 1,  month: 1, tag: 'Etsy'      },
+  { id: 'ss5',  text: 'Research 3–5 competitor shops',                        done: false, listings: 0, week: 1,  month: 1, tag: 'Strategy'  },
+  // Month 1 — Week 2
+  { id: 'ss6',  text: 'Complete Tampa skyline pattern',                        done: false, listings: 0, week: 2,  month: 1, tag: 'Design'    },
+  { id: 'ss7',  text: 'Complete St. Pete skyline pattern',                    done: false, listings: 0, week: 2,  month: 1, tag: 'Design'    },
+  { id: 'ss8',  text: 'Export patterns as PDF + PNG in the right file sizes', done: false, listings: 0, week: 2,  month: 1, tag: 'Design'    },
+  { id: 'ss9',  text: 'Create 2–3 mockup images per pattern',                 done: false, listings: 0, week: 2,  month: 1, tag: 'Design'    },
+  // Month 1 — Week 3
+  { id: 'ss10', text: 'Complete Miami + Orlando skyline patterns',             done: false, listings: 0, week: 3,  month: 1, tag: 'Design'    },
+  { id: 'ss11', text: 'Publish Tampa listing',                                 done: false, listings: 1, week: 3,  month: 1, tag: 'Etsy'      },
+  { id: 'ss12', text: 'Publish St. Pete listing',                             done: false, listings: 1, week: 3,  month: 1, tag: 'Etsy'      },
+  { id: 'ss13', text: 'Publish Miami listing',                                 done: false, listings: 1, week: 3,  month: 1, tag: 'Etsy'      },
+  { id: 'ss14', text: 'Publish Orlando listing',                               done: false, listings: 1, week: 3,  month: 1, tag: 'Etsy'      },
+  // Month 1 — Week 4
+  { id: 'ss15', text: 'Complete Jacksonville + Sarasota patterns',             done: false, listings: 0, week: 4,  month: 1, tag: 'Design'    },
+  { id: 'ss16', text: 'Publish Jacksonville listing',                          done: false, listings: 1, week: 4,  month: 1, tag: 'Etsy'      },
+  { id: 'ss17', text: 'Publish Sarasota listing',                              done: false, listings: 1, week: 4,  month: 1, tag: 'Etsy'      },
+  { id: 'ss18', text: 'Review all 6 listings — tweak titles and tags',        done: false, listings: 0, week: 4,  month: 1, tag: 'Strategy'  },
+  // Month 2 — Weeks 5–6
+  { id: 'ss19', text: 'Design + publish NYC skyline',                          done: false, listings: 1, week: 5,  month: 2, tag: 'Design'    },
+  { id: 'ss20', text: 'Design + publish Chicago skyline',                      done: false, listings: 1, week: 5,  month: 2, tag: 'Design'    },
+  { id: 'ss21', text: 'Design + publish Nashville skyline',                    done: false, listings: 1, week: 5,  month: 2, tag: 'Design'    },
+  { id: 'ss22', text: 'Design + publish Austin skyline',                       done: false, listings: 1, week: 6,  month: 2, tag: 'Design'    },
+  { id: 'ss23', text: 'Set up Pinterest Business account',                     done: false, listings: 0, week: 6,  month: 2, tag: 'Marketing' },
+  { id: 'ss24', text: 'Create 3 pins per existing listing',                    done: false, listings: 0, week: 6,  month: 2, tag: 'Marketing' },
+  // Month 2 — Weeks 7–8
+  { id: 'ss25', text: 'Create + publish Florida Cities 4-Pack bundle',         done: false, listings: 1, week: 7,  month: 2, tag: 'Etsy'      },
+  { id: 'ss26', text: 'Design + publish Seattle skyline',                      done: false, listings: 1, week: 7,  month: 2, tag: 'Design'    },
+  { id: 'ss27', text: 'Design + publish Denver skyline',                       done: false, listings: 1, week: 8,  month: 2, tag: 'Design'    },
+  { id: 'ss28', text: 'Pin every new listing',                                  done: false, listings: 0, week: 8,  month: 2, tag: 'Marketing' },
+  { id: 'ss29', text: 'Check Etsy stats — note top listings',                  done: false, listings: 0, week: 8,  month: 2, tag: 'Strategy'  },
+  // Month 3 — Weeks 9–10
+  { id: 'ss30', text: 'Design + publish 2 more city skylines',                 done: false, listings: 1, week: 9,  month: 3, tag: 'Design'    },
+  { id: 'ss31', text: 'Create + publish US Cities Bundle',                     done: false, listings: 1, week: 10, month: 3, tag: 'Etsy'      },
+  { id: 'ss32', text: 'Refresh top 3 listing photos',                          done: false, listings: 0, week: 10, month: 3, tag: 'Strategy'  },
+  { id: 'ss33', text: 'Design a free beginner pattern as lead magnet',         done: false, listings: 0, week: 10, month: 3, tag: 'Marketing' },
+  // Month 3 — Weeks 11–12
+  { id: 'ss34', text: 'Set up Payhip or Gumroad storefront',                   done: false, listings: 0, week: 11, month: 3, tag: 'Etsy'      },
+  { id: 'ss35', text: 'Set up free email list with lead magnet',               done: false, listings: 0, week: 11, month: 3, tag: 'Marketing' },
+  { id: 'ss36', text: 'Share freebie on Pinterest',                            done: false, listings: 0, week: 12, month: 3, tag: 'Marketing' },
+  { id: 'ss37', text: 'Full 90-day review',                                    done: false, listings: 0, week: 12, month: 3, tag: 'Strategy'  },
+]
+
+const SS_INITIAL = {
+  startDate: '2025-04-01',
+  tasks: SS_TASKS,
+}
 
 /* ─── Initial state ───────────────────────────────────────────────────────── */
 const initialState = {
@@ -145,8 +199,20 @@ function reducer(state, action) {
   }
 }
 
+/* ─── She Stitches reducer ────────────────────────────────────────────────── */
+function ssReducer(state, action) {
+  if (action.type === 'TOGGLE_SS_TASK') {
+    const tasks = state.tasks.map(t =>
+      t.id === action.payload ? { ...t, done: !t.done } : t
+    )
+    return { ...state, tasks }
+  }
+  return state
+}
+
 /* ─── Persistence helpers ─────────────────────────────────────────────────── */
 const STORAGE_KEY = 'aiml_state';
+const SS_KEY      = 'sheStitches';
 
 function loadState() {
   try {
@@ -167,19 +233,45 @@ function loadState() {
   }
 }
 
+function loadSsState() {
+  try {
+    const raw = localStorage.getItem(SS_KEY);
+    if (!raw) return SS_INITIAL;
+    const saved = JSON.parse(raw);
+    // Merge saved done states onto fresh seed data (preserves task list updates)
+    const doneMap = {}
+    saved.tasks?.forEach(t => { doneMap[t.id] = t.done })
+    return {
+      ...SS_INITIAL,
+      startDate: saved.startDate || SS_INITIAL.startDate,
+      tasks: SS_INITIAL.tasks.map(t => ({ ...t, done: doneMap[t.id] ?? false })),
+    }
+  } catch {
+    return SS_INITIAL;
+  }
+}
+
 function saveState(state) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch { /* quota exceeded — silently skip */ }
 }
 
+function saveSsState(ssState) {
+  try {
+    localStorage.setItem(SS_KEY, JSON.stringify(ssState));
+  } catch {}
+}
+
 /* ─── Context ─────────────────────────────────────────────────────────────── */
 const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
-  const [state, dispatch] = useReducer(reducer, undefined, loadState);
+  const [state,   dispatch]   = useReducer(reducer,   undefined, loadState);
+  const [ssState, ssDispatch] = useReducer(ssReducer, undefined, loadSsState);
 
-  useEffect(() => { saveState(state); }, [state]);
+  useEffect(() => { saveState(state);   }, [state]);
+  useEffect(() => { saveSsState(ssState); }, [ssState]);
 
   function updateTaskTime(taskId, time) {
     dispatch({ type: 'UPDATE_TASK_TIME', payload: { taskId, time } });
@@ -189,8 +281,21 @@ export function AppProvider({ children }) {
     dispatch({ type: 'UPDATE_MEAL_WINDOW', payload: { slot, startTime, endTime } });
   }
 
+  const ssDoneCount     = useMemo(() => ssState.tasks.filter(t => t.done).length, [ssState.tasks])
+  const ssTotalCount    = ssState.tasks.length
+  const ssListingsCount = useMemo(() => ssState.tasks.filter(t => t.done).reduce((n, t) => n + (t.listings || 0), 0), [ssState.tasks])
+  const ssNextTask      = useMemo(() => ssState.tasks.find(t => !t.done)?.text ?? null, [ssState.tasks])
+  const ssDayOf90       = Math.min(
+    Math.max(1, Math.floor((Date.now() - new Date(ssState.startDate).getTime()) / 86_400_000) + 1),
+    90
+  )
+
   return (
-    <AppContext.Provider value={{ state, dispatch, updateTaskTime, updateMealWindow }}>
+    <AppContext.Provider value={{
+      state, dispatch, updateTaskTime, updateMealWindow,
+      ssState, ssDispatch,
+      ssDoneCount, ssTotalCount, ssListingsCount, ssNextTask, ssDayOf90,
+    }}>
       {children}
     </AppContext.Provider>
   );
