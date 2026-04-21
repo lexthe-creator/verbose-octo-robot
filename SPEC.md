@@ -326,13 +326,19 @@ Layout zones top to bottom:
 
 ### 5.4 Inbox (`'inbox'`)
 
-**File:** `src/screens/Inbox.jsx` *(stub — built in Step 6)*
+**File:** `src/screens/Inbox.jsx`
 
-- Header: "Inbox" (DM Serif Display) + item count badge + subtitle "Capture anything. Sort later."
-- Capture bar: text input + `↑` send button. Enter key submits. Dispatches `ADD_INBOX_ITEM`
-- Item rows: orange dot · text · timestamp (right). Below text: 3 action buttons → Task / Calendar / Delete
-  - Tapping an action → dispatches `REMOVE_INBOX_ITEM`, slides item out with animation, decrements count
-- Empty state: centered icon + "Clear mind. Add something above."
+- Header: "Inbox" (DM Serif Display 32px) + item count badge (bg `#2A1508`, text `#C17B56`) + subtitle "Capture anything. Sort later."
+- Capture bar: text input in card + `↑` send button (terracotta circle 36px). Enter key submits. `ADD_INBOX_ITEM` dispatched; input clears; count increments.
+- Item rows: terracotta dot · text · relative timestamp (right). Below text: 3 action pill buttons (bg `#252520`, border `#2A2A22`) → Task / Calendar / Delete
+  - Exit animation: `opacity 0 + translateX(-40px)` over 200ms, then `REMOVE_INBOX_ITEM` dispatched
+  - Double-tap guard: `exitingId` blocks new actions while one is animating
+  - Delete: danger color text, same slide-out
+  - Calendar: V1 stub — removes item, no calendar integration (deferred §9)
+- Timestamp format: "just now" / "Xm ago" / "Xh ago" / "Mon DD"
+- Empty state: centered `◎` icon (faint) + "Clear mind. Add something above."
+
+**Deviation from build instructions:** `addTask(text)` does not exist in AppContext — task editing is deferred to V2+ (§9). The Task button removes the inbox item (animating it out) but does not add to the tasks array in V1.
 
 ---
 
@@ -495,6 +501,6 @@ File: `.github/workflows/pages.yml`
 | 3 | Morning Ignition (all 3 steps) | ✅ Done | `src/screens/MorningIgnition.jsx` |
 | 4 | Home screen (all zones) | ✅ Done | `src/screens/Home.jsx` |
 | 5 | Focus Timer overlay | ✅ Done | `src/screens/FocusTimer.jsx` |
-| 6 | Inbox | ⬜ Next | `src/screens/Inbox.jsx` |
-| 7 | Finance (mock data) | ⬜ Pending | `src/screens/Finance.jsx` |
+| 6 | Inbox | ✅ Done | `src/screens/Inbox.jsx` |
+| 7 | Finance (mock data) | ⬜ Next | `src/screens/Finance.jsx` |
 | 8 | PWA manifest + GitHub Pages deploy | ⬜ Pending | `public/manifest.json`, `vite.config.js`, `.github/workflows/pages.yml` |
