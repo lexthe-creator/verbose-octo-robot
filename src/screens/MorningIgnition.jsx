@@ -8,8 +8,8 @@ const ENERGY_OPTIONS = [
   { value: 4, emoji: '⚡', label: 'Charged' },
 ]
 
-// Evaluated once — true on mouse/trackpad devices, false on touch-only
-const canHover = typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches
+// Desktop only — touch devices use swipe gesture instead
+const isHoverDevice = window.matchMedia('(hover: hover)').matches
 
 // ─── Swipeable row ────────────────────────────────────────────────────────────
 function SwipeRow({ label, sublabel, confirmed, onConfirm }) {
@@ -100,7 +100,7 @@ function SwipeRow({ label, sublabel, confirmed, onConfirm }) {
         </div>
 
         {/* Right-side action: confirm button (hover devices) or swipe arrow (touch) */}
-        {canHover ? (
+        {isHoverDevice ? (
           confirmed ? (
             <span style={{ ...swipeStyles.checkmark, opacity: 1 }}>✓</span>
           ) : (
@@ -119,7 +119,7 @@ function SwipeRow({ label, sublabel, confirmed, onConfirm }) {
         )}
       </div>
 
-      {!confirmed && !canHover && (
+      {!confirmed && !isHoverDevice && (
         <div style={{ ...swipeStyles.hint, opacity: offset === 0 ? 0.35 : 0 }}>
           swipe →
         </div>
