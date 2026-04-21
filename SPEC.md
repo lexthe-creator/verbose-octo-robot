@@ -301,21 +301,26 @@ Layout zones top to bottom:
 
 ### 5.3 Focus Timer (`'focus'`)
 
-**File:** `src/screens/FocusTimer.jsx` *(stub — built in Step 5)*
+**File:** `src/screens/FocusTimer.jsx`
 **Props:** `onClose`
 **Nav:** Hidden (full-screen overlay).
 
 - Back arrow top-left → `onClose()`
-- Session counter top-right: "Session X of 4"
-- Preset pills: 15m / 25m / 45m / 60m — default 25m
+- Session counter top-right: "Session X of 4" — X driven by local `completedSessions` state (resets when overlay closes). `state.focusSessions` in AppContext is the cumulative lifetime count; `INCREMENT_FOCUS_SESSIONS` dispatched on each completion.
+- Preset pills: 15m / 25m / 45m / 60m — default 25m. Disabled (opacity 0.4, pointer-events none) while status is not `'ready'`.
 - SVG ring: 200px container, 88px radius, `stroke-linecap: round`
-  - Track circle: `#252520`
-  - Progress stroke: `#C17B56` → `#E8A87C` at 40% remaining → `#E05555` at 20% remaining
-- Ring center: MM:SS time (DM Serif Display 38px), status label below (ready / focusing / paused / done ✓)
-- Task label input: centered, placeholder "What are you focusing on?"
-- Controls row: ↺ reset · ▶/⏸ play/pause (64px terracotta circle) · ⇥ skip
-- Session dots: 4 dots, completed sessions fill terracotta
-- On completion: ring turns success-green, status "done ✓", dot fills, 2s pause then resets
+  - Track circle: `#252520`, strokeWidth 8
+  - Progress arc: rotated −90° (starts at 12 o'clock), `strokeDasharray = 2π×88`, `strokeDashoffset = circumference × (1 − progress)`
+  - Stroke color: `#C17B56` (>40% remaining) → `#E8A87C` (20–40%) → `#E05555` (<20%)
+  - `transition: stroke-dashoffset 1s linear, stroke 0.4s ease`
+- Ring center: MM:SS countdown (DM Serif Display 38px), status label below (ready / focusing / paused / done ✓)
+- Task label: centered `<input type="text">`, placeholder "What are you focusing on?", borderBottom only
+- Controls row: ↺ reset · ▶/⏸ play/pause (64px terracotta circle) · ⇥ skip. Skip disabled when `ready` or `done`.
+- Session dots: 4 dots, filled terracotta for each `completedSessions` index
+- On completion: ring turns `#1D9E75`, status shows `done ✓`, dot fills, 2s pause then auto-resets for next session
+- Timer intervals managed with `useRef` — cleared in tick effect cleanup and on unmount
+
+**Deviation from build instructions:** instructions referenced `focusSessionsCompleted` which does not exist in AppContext. Correct field is `focusSessions` (§4). Per-overlay session counting uses local state.
 
 ---
 
@@ -489,7 +494,7 @@ File: `.github/workflows/pages.yml`
 | 2 | App shell + bottom nav routing | ✅ Done | `src/main.jsx`, `src/App.jsx`, `src/index.css`, `index.html`, `src/screens/*.jsx` (stubs) |
 | 3 | Morning Ignition (all 3 steps) | ✅ Done | `src/screens/MorningIgnition.jsx` |
 | 4 | Home screen (all zones) | ✅ Done | `src/screens/Home.jsx` |
-| 5 | Focus Timer overlay | ⬜ Next | `src/screens/FocusTimer.jsx` |
-| 6 | Inbox | ⬜ Pending | `src/screens/Inbox.jsx` |
+| 5 | Focus Timer overlay | ✅ Done | `src/screens/FocusTimer.jsx` |
+| 6 | Inbox | ⬜ Next | `src/screens/Inbox.jsx` |
 | 7 | Finance (mock data) | ⬜ Pending | `src/screens/Finance.jsx` |
 | 8 | PWA manifest + GitHub Pages deploy | ⬜ Pending | `public/manifest.json`, `vite.config.js`, `.github/workflows/pages.yml` |
