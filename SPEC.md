@@ -556,4 +556,6 @@ File: `.github/workflows/pages.yml`
 | 6 | Inbox | ✅ Done | `src/screens/Inbox.jsx` |
 | 6b | She Stitches Studio — goal card + roadmap screen | ✅ Done | `src/context/AppContext.jsx`, `src/screens/SheStitches.jsx`, `src/screens/Home.jsx`, `src/App.jsx` |
 | 7 | Finance (mock data) | ✅ Done | `src/screens/Finance.jsx` |
-| 8 | PWA manifest + GitHub Pages deploy | ⬜ Pending | `public/manifest.json`, `vite.config.js`, `.github/workflows/pages.yml` |
+| 8 | PWA manifest + GitHub Pages deploy | ✅ Done | `public/manifest.json`, `public/icons/icon-192.png`, `public/icons/icon-512.png`, `vite.config.js`, `.github/workflows/pages.yml` |
+
+**Live URL:** https://lexthe-creator.github.io/verbose-octo-robot/
