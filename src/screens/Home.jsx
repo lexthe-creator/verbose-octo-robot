@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useApp } from '../context/AppContext.jsx'
+import FuelEditSheet from '../components/FuelEditSheet.jsx'
 
 // ─── Time utilities ────────────────────────────────────────────────────────────
 
@@ -346,11 +347,7 @@ const tr = {
 
 // ─── Fuel slot ────────────────────────────────────────────────────────────────
 
-function FuelSlot({ slotKey, meal, nowMins: currentMins, onMarkEaten, onUpdateWindow }) {
-  const [editing, setEditing] = useState(false)
-  const [editStart, setEditStart] = useState(meal.startTime)
-  const [editEnd,   setEditEnd]   = useState(meal.endTime)
-
+function FuelSlot({ slotKey, meal, nowMins: currentMins, onMarkEaten, onOpenEditor }) {
   const late = !meal.eaten && currentMins > parseHHMM(meal.lateAfter)
   const eaten = meal.eaten
 
@@ -364,15 +361,10 @@ function FuelSlot({ slotKey, meal, nowMins: currentMins, onMarkEaten, onUpdateWi
                    : late  ? 'var(--color-accent)'
                    :         'var(--color-border)'
 
-  function handleSave() {
-    onUpdateWindow(slotKey, editStart, editEnd)
-    setEditing(false)
-  }
-
   return (
     <div style={{ ...fs.wrap, background: stateBg, border: `0.5px solid ${borderCol}` }}>
       <div style={fs.row}>
-        {/* Tap to mark eaten */}
+        {/* Tap body to mark eaten */}
         <button style={fs.mainBtn} onClick={() => !eaten && onMarkEaten(slotKey)} disabled={eaten}>
           <span style={{ ...fs.label, color: stateColor }}>
             {eaten ? '✓ ' : late ? '! ' : ''}{meal.label}
@@ -380,33 +372,17 @@ function FuelSlot({ slotKey, meal, nowMins: currentMins, onMarkEaten, onUpdateWi
           <span style={fs.window}>{meal.startTime} – {meal.endTime}</span>
         </button>
 
-        {/* Clock icon — open time editor */}
+        {/* Clock icon — open bottom-sheet time editor */}
         {!eaten && (
           <button
-            style={{ ...fs.editBtn, color: editing ? 'var(--color-accent)' : 'var(--color-faint)' }}
-            onClick={() => { setEditing(e => !e); setEditStart(meal.startTime); setEditEnd(meal.endTime) }}
+            style={fs.editBtn}
+            onClick={() => onOpenEditor(slotKey)}
             aria-label="Edit time window"
           >
             ◷
           </button>
         )}
       </div>
-
-      {editing && (
-        <div style={fs.editor}>
-          <div style={fs.timeRow}>
-            <div style={fs.timeField}>
-              <label style={fs.timeLabel}>From</label>
-              <input type="time" value={editStart} onChange={e => setEditStart(e.target.value)} style={fs.timeInput} />
-            </div>
-            <div style={fs.timeField}>
-              <label style={fs.timeLabel}>To</label>
-              <input type="time" value={editEnd} onChange={e => setEditEnd(e.target.value)} style={fs.timeInput} />
-            </div>
-          </div>
-          <button style={fs.saveBtn} onClick={handleSave}>Save</button>
-        </div>
-      )}
     </div>
   )
 }
@@ -417,32 +393,7 @@ const fs = {
   mainBtn:   { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '12px 12px 12px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' },
   label:     { fontSize: '14px', fontWeight: 600, transition: 'color 0.2s' },
   window:    { fontSize: '11px', color: 'var(--color-muted)', marginTop: '2px' },
-  editBtn:   { padding: '12px 14px 12px 4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', flexShrink: 0, transition: 'color 0.15s' },
-  editor:    { borderTop: 'var(--border)', padding: '12px 14px' },
-  timeRow:   { display: 'flex', gap: '12px', marginBottom: '10px' },
-  timeField: { display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 },
-  timeLabel: { fontSize: '10px', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-muted)' },
-  timeInput: {
-    background:   'var(--color-bg)',
-    border:       'var(--border)',
-    borderRadius: 'var(--radius-sm)',
-    padding:      '8px 10px',
-    fontSize:     '14px',
-    color:        'var(--color-text)',
-    width:        '100%',
-    colorScheme:  'dark',
-  },
-  saveBtn: {
-    width:        '100%',
-    padding:      '9px',
-    borderRadius: 'var(--radius-sm)',
-    background:   'var(--color-accent)',
-    color:        '#fff',
-    fontSize:     '13px',
-    fontWeight:   600,
-    border:       'none',
-    cursor:       'pointer',
-  },
+  editBtn:   { padding: '12px 14px 12px 4px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', flexShrink: 0, color: 'var(--color-faint)', transition: 'color 0.15s' },
 }
 
 // ─── She Stitches goal card ───────────────────────────────────────────────────
@@ -594,6 +545,7 @@ export default function Home({ onOpenFocus, onNavigate }) {
 
   const [now, setNow] = useState(() => new Date())
   const [expandedTask, setExpandedTask] = useState(null)
+  const [editingSlot, setEditingSlot] = useState(null)
 
   // Update clock every 10 seconds
   useEffect(() => {
@@ -702,11 +654,22 @@ export default function Home({ onOpenFocus, onNavigate }) {
               meal={meal}
               nowMins={currentMins}
               onMarkEaten={handleMarkEaten}
-              onUpdateWindow={updateMealWindow}
+              onOpenEditor={setEditingSlot}
             />
           ))}
         </div>
       </section>
+
+      {editingSlot && (
+        <FuelEditSheet
+          meal={state.meals[editingSlot]}
+          onClose={() => setEditingSlot(null)}
+          onSave={(start, end) => {
+            updateMealWindow(editingSlot, start, end)
+            setEditingSlot(null)
+          }}
+        />
+      )}
     </div>
   )
 }
