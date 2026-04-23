@@ -56,6 +56,26 @@ const SS_INITIAL = {
 
 /* ─── Initial state ───────────────────────────────────────────────────────── */
 const initialState = {
+  // Profile
+  profile: {
+    name: 'Lex',                 // used in morning greeting
+  },
+
+  // App settings (user preferences + connection stubs)
+  settings: {
+    gymAccess:          'bodyweight',  // 'bodyweight' | 'dumbbells' | 'gym'
+    plaidConnected:     false,
+    calendarConnected:  false,
+  },
+
+  // Fitness training block
+  fitness: {
+    phase:         'base',       // 'base' | 'hyrox' | 'race' — see utils/fitness.js
+    weekNumber:    1,            // increments each Monday
+    workoutLog:    [],           // { date, type, duration, feel, notes, exercises[] }
+    todayComplete: false,        // resets on new calendar day
+  },
+
   // Morning ignition
   energyLevel:       null,      // 1–4 (😴 😐 🙂 ⚡)
   confirmedTasks:    [],         // array of task ids confirmed in Brief
@@ -200,10 +220,41 @@ function reducer(state, action) {
     case 'INCREMENT_FOCUS_SESSIONS':
       return { ...state, focusSessions: state.focusSessions + 1 };
 
+    // payload: { name }
+    case 'UPDATE_PROFILE':
+      return { ...state, profile: { ...state.profile, ...action.payload } };
+
+    // payload: { key, value }
+    case 'UPDATE_SETTINGS': {
+      const { key, value } = action.payload;
+      return { ...state, settings: { ...state.settings, [key]: value } };
+    }
+
+    // payload: { date, type, duration, feel, notes, exercises }
+    case 'LOG_WORKOUT':
+      return {
+        ...state,
+        fitness: {
+          ...state.fitness,
+          workoutLog:    [...state.fitness.workoutLog, action.payload],
+          todayComplete: true,
+        },
+      };
+
+    case 'INCREMENT_WEEK':
+      return {
+        ...state,
+        fitness: { ...state.fitness, weekNumber: state.fitness.weekNumber + 1 },
+      };
+
     case 'RESET_DAY':
       return {
         ...initialState,
-        inboxItems: state.inboxItems, // inbox persists across days
+        // Preserve cross-day state
+        profile:    state.profile,
+        settings:   state.settings,
+        fitness:    { ...state.fitness, todayComplete: false },
+        inboxItems: state.inboxItems,
       };
 
     default:
@@ -232,14 +283,30 @@ function loadState() {
     if (!raw) return initialState;
     const saved = JSON.parse(raw);
 
-    // If dayLockedAt is from a previous calendar day, reset
+    // If dayLockedAt is from a previous calendar day, reset — but preserve
+    // cross-day state: profile, settings, fitness (minus todayComplete), inbox.
     if (saved.dayLockedAt) {
       const lockedDate = new Date(saved.dayLockedAt).toDateString();
       const today      = new Date().toDateString();
-      if (lockedDate !== today) return initialState;
+      if (lockedDate !== today) {
+        return {
+          ...initialState,
+          profile:    { ...initialState.profile,  ...(saved.profile  || {}) },
+          settings:   { ...initialState.settings, ...(saved.settings || {}) },
+          fitness:    { ...initialState.fitness,  ...(saved.fitness  || {}), todayComplete: false },
+          inboxItems: saved.inboxItems || [],
+        };
+      }
     }
 
-    return { ...initialState, ...saved };
+    return {
+      ...initialState,
+      ...saved,
+      // Deep-merge nested slices so new fields added post-release don't crash
+      profile:  { ...initialState.profile,  ...(saved.profile  || {}) },
+      settings: { ...initialState.settings, ...(saved.settings || {}) },
+      fitness:  { ...initialState.fitness,  ...(saved.fitness  || {}) },
+    };
   } catch {
     return initialState;
   }
