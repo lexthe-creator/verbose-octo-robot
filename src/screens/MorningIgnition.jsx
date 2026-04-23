@@ -368,7 +368,12 @@ export default function MorningIgnition({ onComplete }) {
 
         {/* Meals */}
         <section style={s.section}>
-          <p style={s.sectionLabel}>Meals</p>
+          <div style={s.labelGroup}>
+            <p style={s.sectionLabel}>Set today's meal reminders</p>
+            <p style={s.sectionHelper}>
+              Tap each window to confirm — we'll nudge you if you miss one.
+            </p>
+          </div>
           <div style={s.mealGrid}>
             {Object.entries(state.meals).map(([slot, meal]) => (
               <MealSlot
@@ -544,6 +549,16 @@ const s = {
     letterSpacing: '0.08em',
     textTransform: 'uppercase',
     color:         'var(--color-muted)',
+  },
+  labelGroup: {
+    display:       'flex',
+    flexDirection: 'column',
+    gap:           '4px',
+  },
+  sectionHelper: {
+    fontSize: '11px',
+    color:    '#4A4A40',
+    lineHeight: 1.4,
   },
   stack: {
     display:       'flex',

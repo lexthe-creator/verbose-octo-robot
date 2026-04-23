@@ -588,7 +588,7 @@ const ss = {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-export default function Home({ onOpenFocus, onOpenInbox, onNavigate }) {
+export default function Home({ onOpenFocus, onNavigate }) {
   const { state, dispatch, updateTaskTime, updateMealWindow,
           ssDoneCount, ssTotalCount, ssListingsCount, ssNextTask, ssDayOf90 } = useApp()
 
@@ -707,11 +707,6 @@ export default function Home({ onOpenFocus, onOpenInbox, onNavigate }) {
           ))}
         </div>
       </section>
-
-      {/* 7 — FAB */}
-      <button style={s.fab} onClick={onOpenInbox} aria-label="Open inbox">
-        +
-      </button>
     </div>
   )
 }
@@ -751,24 +746,5 @@ const s = {
     display:             'grid',
     gridTemplateColumns: 'repeat(2, 1fr)',
     gap:                 'var(--space-2)',
-  },
-  fab: {
-    position:       'fixed',
-    bottom:         'calc(var(--nav-height) + var(--safe-bottom) + 16px)',
-    right:          '20px',
-    width:          '52px',
-    height:         '52px',
-    borderRadius:   '50%',
-    background:     'var(--color-accent)',
-    color:          '#fff',
-    fontSize:       '26px',
-    lineHeight:     1,
-    display:        'flex',
-    alignItems:     'center',
-    justifyContent: 'center',
-    border:         'none',
-    cursor:         'pointer',
-    boxShadow:      '0 4px 16px rgba(193,123,86,0.35)',
-    zIndex:         90,
   },
 }

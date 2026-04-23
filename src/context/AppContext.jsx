@@ -138,6 +138,18 @@ function reducer(state, action) {
       return { ...state, tasks };
     }
 
+    // payload: { text } — appends new task from inbox triage
+    case 'ADD_TASK': {
+      const { text } = action.payload;
+      const newTask = {
+        id:            Date.now(),
+        text,
+        done:          false,
+        scheduledTime: null,
+      };
+      return { ...state, tasks: [...state.tasks, newTask] };
+    }
+
     // payload: { taskId, time: 'HH:MM' }
     case 'UPDATE_TASK_TIME': {
       const { taskId, time } = action.payload;

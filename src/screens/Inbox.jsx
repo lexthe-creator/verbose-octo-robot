@@ -13,7 +13,15 @@ function formatTimestamp(iso) {
 
 // ─── Single inbox row ─────────────────────────────────────────────────────────
 
-function InboxItem({ item, exiting, onAction }) {
+function InboxItem({ item, exiting, flashing, onAction }) {
+  if (flashing) {
+    return (
+      <div style={s.flashWrap}>
+        <span style={s.flashText}>Added to tasks ✓</span>
+      </div>
+    )
+  }
+
   return (
     <div
       style={{
@@ -52,6 +60,7 @@ export default function Inbox() {
   const { state, dispatch } = useApp()
   const [inputText, setInputText] = useState('')
   const [exitingId, setExitingId] = useState(null)
+  const [flashingId, setFlashingId] = useState(null)
   const inputRef   = useRef(null)
 
   function handleSubmit() {
@@ -67,11 +76,26 @@ export default function Inbox() {
   }
 
   function handleAction(itemId, action) {
-    if (exitingId) return  // prevent double-tap while animating
+    if (exitingId || flashingId) return
+
+    if (action === 'task') {
+      const item = state.inboxItems.find(i => i.id === itemId)
+      if (!item) return
+      dispatch({ type: 'ADD_TASK', payload: { text: item.text } })
+      setFlashingId(itemId)
+      setTimeout(() => {
+        setFlashingId(null)
+        setExitingId(itemId)
+        setTimeout(() => {
+          dispatch({ type: 'REMOVE_INBOX_ITEM', payload: itemId })
+          setExitingId(null)
+        }, 200)
+      }, 600)
+      return
+    }
+
     setExitingId(itemId)
     setTimeout(() => {
-      // Task action (V1): item is triaged and removed.
-      // addTask() is deferred to V2 — see SPEC §9.
       dispatch({ type: 'REMOVE_INBOX_ITEM', payload: itemId })
       setExitingId(null)
     }, 200)
@@ -132,6 +156,7 @@ export default function Inbox() {
               key={item.id}
               item={item}
               exiting={exitingId === item.id}
+              flashing={flashingId === item.id}
               onAction={handleAction}
             />
           ))}
@@ -255,6 +280,22 @@ const s = {
     border:        'var(--border)',
     borderRadius:  'var(--radius-card)',
     overflow:      'hidden',
+  },
+  flashWrap: {
+    background:    '#0F2318',
+    border:        '0.5px solid var(--color-success)',
+    borderRadius:  'var(--radius-card)',
+    padding:       '18px 14px',
+    display:       'flex',
+    alignItems:    'center',
+    justifyContent:'center',
+    transition:    'background 150ms ease',
+  },
+  flashText: {
+    fontSize:   '14px',
+    fontWeight: 600,
+    color:      'var(--color-success)',
+    letterSpacing: '0.01em',
   },
   itemRow: {
     display:    'flex',
