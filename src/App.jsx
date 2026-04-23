@@ -7,15 +7,19 @@ import FocusTimer      from './screens/FocusTimer.jsx'
 import Inbox           from './screens/Inbox.jsx'
 import Finance         from './screens/Finance.jsx'
 import SheStitches     from './screens/SheStitches.jsx'
+import Settings        from './screens/Settings.jsx'
+import Fitness         from './screens/Fitness.jsx'
+import WorkoutPlayer   from './components/WorkoutPlayer.jsx'
 
 const NAV_TABS = [
   { id: 'home',    label: 'Home',    icon: '⌂' },
+  { id: 'fitness', label: 'Fitness', icon: '◉' },
   { id: 'inbox',   label: 'Inbox',   icon: '◎' },
   { id: 'finance', label: 'Finance', icon: '◈' },
 ]
 
 export default function App() {
-  const { state } = useApp()
+  const { state, dispatch } = useApp()
 
   const [screen, setScreen] = useState(() => {
     if (!state.dayLockedAt) return 'ignition'
@@ -23,11 +27,27 @@ export default function App() {
     return lockedDate === new Date().toDateString() ? 'home' : 'ignition'
   })
 
+  const [activeWorkout, setActiveWorkout] = useState(null)
+
   function navigate(target) {
     setScreen(target)
   }
 
-  const hideNav = screen === 'ignition' || screen === 'focus' || screen === 'shestitches'
+  function handleStartWorkout(workout) {
+    setActiveWorkout(workout)
+  }
+
+  function handleWorkoutComplete(log) {
+    dispatch({ type: 'LOG_WORKOUT', payload: log })
+    setActiveWorkout(null)
+  }
+
+  const hideNav = (
+    screen === 'ignition' ||
+    screen === 'focus'    ||
+    screen === 'shestitches' ||
+    screen === 'settings'
+  )
 
   return (
     <div style={styles.root}>
@@ -38,9 +58,15 @@ export default function App() {
         {screen === 'home' && (
           <Home
             onOpenFocus={() => navigate('focus')}
-            onOpenInbox={() => navigate('inbox')}
             onNavigate={navigate}
+            onStartWorkout={handleStartWorkout}
           />
+        )}
+        {screen === 'fitness' && (
+          <Fitness onStartWorkout={handleStartWorkout} />
+        )}
+        {screen === 'settings' && (
+          <Settings onBack={() => navigate('home')} />
         )}
         {screen === 'shestitches' && (
           <SheStitches onBack={() => navigate('home')} />
@@ -74,6 +100,14 @@ export default function App() {
             )
           })}
         </nav>
+      )}
+
+      {activeWorkout && (
+        <WorkoutPlayer
+          workout={activeWorkout}
+          onComplete={handleWorkoutComplete}
+          onClose={() => setActiveWorkout(null)}
+        />
       )}
     </div>
   )

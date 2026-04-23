@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useApp } from '../context/AppContext.jsx'
 import FuelEditSheet from '../components/FuelEditSheet.jsx'
+import { getTodayType, generateWorkout, WORKOUT_ICONS } from '../utils/fitness.js'
 
 // ─── Time utilities ────────────────────────────────────────────────────────────
 
@@ -47,10 +48,24 @@ const TIME_OPTIONS = Array.from({ length: 33 }, (_, i) => {
 
 // ─── Hero clock ────────────────────────────────────────────────────────────────
 
-function HeroClock({ now, onOpenFocus }) {
+function greeting(now, name) {
+  const h = now.getHours()
+  const part = h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening'
+  return `Good ${part}, ${name}`
+}
+
+function HeroClock({ now, name, onOpenFocus, onOpenSettings }) {
   const { time, colon, mins, ampm } = formatClockParts(now)
   return (
     <div style={hero.wrap}>
+      {/* Top row: greeting + gear */}
+      <div style={hero.topRow}>
+        <span style={hero.greeting}>{greeting(now, name)}</span>
+        <button style={hero.gearBtn} onClick={onOpenSettings} aria-label="Settings">
+          ⚙
+        </button>
+      </div>
+      {/* Clock row */}
       <div style={hero.row}>
         <div style={hero.clockWrap}>
           <span style={hero.clock}>
@@ -70,7 +85,23 @@ function HeroClock({ now, onOpenFocus }) {
 }
 
 const hero = {
-  wrap:  { padding: '20px 20px 0' },
+  wrap:    { padding: '20px 20px 0' },
+  topRow:  { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' },
+  greeting:{ fontSize: '13px', color: 'var(--color-muted)', fontWeight: 500 },
+  gearBtn: {
+    width:           '32px',
+    height:          '32px',
+    borderRadius:    '50%',
+    background:      '#1E1E18',
+    border:          '0.5px solid #2A2A22',
+    color:           '#8C8C7A',
+    fontSize:        '16px',
+    display:         'flex',
+    alignItems:      'center',
+    justifyContent:  'center',
+    cursor:          'pointer',
+    flexShrink:      0,
+  },
   row:   { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' },
   clockWrap: { display: 'flex', alignItems: 'baseline', gap: '4px' },
   clock: {
@@ -537,9 +568,84 @@ const ss = {
   nextText: { fontSize: '12px', color: 'var(--color-muted)', lineHeight: 1.4, flex: 1 },
 }
 
+// ─── Today's Training card ─────────────────────────────────────────────────────
+
+function TodayTrainingCard({ todayComplete, gymAccess, weekNumber, onStart }) {
+  const todayType = getTodayType()
+  const workout   = generateWorkout(todayType, gymAccess, weekNumber)
+  const canStart  = workout.type !== 'rest' && !todayComplete
+
+  return (
+    <div style={tt.wrap}>
+      <div style={tt.top}>
+        <span style={tt.icon}>{WORKOUT_ICONS[workout.type] || '🏋'}</span>
+        <div style={tt.info}>
+          <p style={tt.name}>{workout.title}</p>
+          <p style={tt.sub}>{workout.subtitle}</p>
+        </div>
+        {todayComplete && <span style={tt.doneBadge}>✓ Done</span>}
+      </div>
+      {workout.type !== 'rest' && (
+        <button
+          style={{
+            ...tt.startBtn,
+            background: todayComplete ? 'var(--color-success-bg)' : 'var(--color-accent)',
+            color:      todayComplete ? 'var(--color-success)'    : '#fff',
+            border:     todayComplete ? '0.5px solid var(--color-success)' : 'none',
+            cursor:     canStart ? 'pointer' : 'default',
+          }}
+          onClick={canStart ? onStart : undefined}
+          disabled={!canStart}
+        >
+          {todayComplete ? '✓ Completed' : 'Start →'}
+        </button>
+      )}
+    </div>
+  )
+}
+
+const tt = {
+  wrap: {
+    background:    'var(--color-card)',
+    border:        'var(--border)',
+    borderRadius:  'var(--radius-card)',
+    padding:       '14px',
+    display:       'flex',
+    flexDirection: 'column',
+    gap:           '12px',
+  },
+  top: { display: 'flex', alignItems: 'center', gap: '12px' },
+  icon: { fontSize: '26px', lineHeight: 1 },
+  info: {
+    flex:          1,
+    display:       'flex',
+    flexDirection: 'column',
+    gap:           '2px',
+  },
+  name: { fontSize: '16px', fontWeight: 600, color: 'var(--color-text)' },
+  sub:  { fontSize: '12px', color: 'var(--color-muted)' },
+  doneBadge: {
+    padding:      '4px 10px',
+    borderRadius: 'var(--radius-pill)',
+    background:   'var(--color-success-bg)',
+    color:        'var(--color-success)',
+    border:       '0.5px solid var(--color-success)',
+    fontSize:     '11px',
+    fontWeight:   600,
+    flexShrink:   0,
+  },
+  startBtn: {
+    width:        '100%',
+    padding:      '12px',
+    borderRadius: 'var(--radius-sm)',
+    fontSize:     '14px',
+    fontWeight:   600,
+  },
+}
+
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-export default function Home({ onOpenFocus, onNavigate }) {
+export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
   const { state, dispatch, updateTaskTime, updateMealWindow,
           ssDoneCount, ssTotalCount, ssListingsCount, ssNextTask, ssDayOf90 } = useApp()
 
@@ -605,15 +711,35 @@ export default function Home({ onOpenFocus, onNavigate }) {
   return (
     <div style={s.screen}>
       {/* 1 — Hero clock */}
-      <HeroClock now={now} onOpenFocus={onOpenFocus} />
+      <HeroClock
+        now={now}
+        name={state.profile.name}
+        onOpenFocus={onOpenFocus}
+        onOpenSettings={() => onNavigate && onNavigate('settings')}
+      />
 
       {/* 2 — Burn bar */}
       <BurnBar now={now} nextLabel={nextLabel} />
 
-      {/* 3 — Timeline */}
+      {/* 3 — Today's Training */}
+      <section style={s.section}>
+        <p style={s.sectionLabel}>Today's Training</p>
+        <TodayTrainingCard
+          todayComplete={state.fitness.todayComplete}
+          gymAccess={state.settings.gymAccess}
+          weekNumber={state.fitness.weekNumber}
+          onStart={() => {
+            const type    = getTodayType()
+            const workout = generateWorkout(type, state.settings.gymAccess, state.fitness.weekNumber)
+            onStartWorkout && onStartWorkout(workout)
+          }}
+        />
+      </section>
+
+      {/* 4 — Timeline */}
       <Timeline state={state} now={now} />
 
-      {/* 4 — 3 Things */}
+      {/* 5 — 3 Things */}
       <section style={s.section}>
         <p style={s.sectionLabel}>3 Things</p>
         <div style={s.stack}>
