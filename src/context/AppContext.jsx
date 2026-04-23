@@ -68,9 +68,9 @@ const initialState = {
     calendarConnected:  false,
   },
 
-  // Fitness training block
+  // Fitness training block. Phase is derived — call getPhase(weekNumber)
+  // from utils/fitness.js; don't read/write a stored phase field.
   fitness: {
-    phase:         'base',       // 'base' | 'hyrox' | 'race' — see utils/fitness.js
     weekNumber:    1,            // increments each Monday
     workoutLog:    [],           // { date, type, duration, feel, notes, exercises[] }
     todayComplete: false,        // resets on new calendar day
