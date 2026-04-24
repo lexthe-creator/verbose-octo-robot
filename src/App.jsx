@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useApp } from './context/AppContext.jsx'
 
 import MorningIgnition from './screens/MorningIgnition.jsx'
@@ -20,6 +20,10 @@ const NAV_TABS = [
 
 export default function App() {
   const { state, dispatch } = useApp()
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', state.settings.theme || 'dark')
+  }, [state.settings.theme])
 
   const [screen, setScreen] = useState(() => {
     if (!state.dayLockedAt) return 'ignition'

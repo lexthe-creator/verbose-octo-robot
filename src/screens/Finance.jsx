@@ -53,10 +53,10 @@ function WeeklyBars() {
               <div style={{
                 ...bc.bar,
                 height:     `${h}px`,
-                background: d.isToday ? '#C17B56' : '#252520',
+                background: d.isToday ? 'var(--color-accent)' : 'var(--color-chart-bar)',
               }} />
             </div>
-            <span style={{ ...bc.label, color: d.isToday ? '#C17B56' : '#3A3A30' }}>
+            <span style={{ ...bc.label, color: d.isToday ? 'var(--color-accent)' : 'var(--color-faint)' }}>
               {d.day}
             </span>
           </div>
@@ -87,10 +87,10 @@ function StatCard({ label, value, valueColor, sub }) {
 }
 
 const sc = {
-  card:  { background: '#1E1E18', border: '0.5px solid #2A2A22', borderRadius: '12px', padding: '12px', flex: 1 },
-  label: { fontSize: '9px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#3A3A30', margin: '0 0 4px' },
+  card:  { background: 'var(--color-card)', border: 'var(--border)', borderRadius: '12px', padding: '12px', flex: 1 },
+  label: { fontSize: '9px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-faint)', margin: '0 0 4px' },
   value: { fontFamily: 'var(--font-display)', fontSize: '20px', lineHeight: 1, margin: '0 0 3px' },
-  sub:   { fontSize: '10px', color: '#4A4A40', margin: 0 },
+  sub:   { fontSize: '10px', color: 'var(--color-faint)', margin: 0 },
 }
 
 // ─── Transaction row ──────────────────────────────────────────────────────────
@@ -106,7 +106,7 @@ function TxRow({ tx }) {
         <span style={tx_s.merchant}>{tx.merchant}</span>
         <span style={tx_s.category}>{tx.category}</span>
       </div>
-      <span style={{ ...tx_s.amount, color: tx.income ? '#1D9E75' : '#E05555' }}>
+      <span style={{ ...tx_s.amount, color: tx.income ? 'var(--color-success)' : 'var(--color-danger)' }}>
         {sign}${dollars}.{cents}
       </span>
     </div>
@@ -114,12 +114,12 @@ function TxRow({ tx }) {
 }
 
 const tx_s = {
-  row:      { display: 'flex', alignItems: 'center', gap: '10px', background: '#1E1E18', border: '0.5px solid #2A2A22', borderRadius: '11px', padding: '9px 12px' },
-  iconWrap: { width: '28px', height: '28px', borderRadius: '8px', background: '#252520', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  row:      { display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--color-card)', border: 'var(--border)', borderRadius: '11px', padding: '9px 12px' },
+  iconWrap: { width: '28px', height: '28px', borderRadius: '8px', background: 'var(--color-chart-bar)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   icon:     { fontSize: '14px', lineHeight: 1 },
   info:     { flex: 1, display: 'flex', flexDirection: 'column', gap: '1px' },
-  merchant: { fontSize: '12px', color: '#C8C4BC', fontWeight: 500 },
-  category: { fontSize: '10px', color: '#3A3A30' },
+  merchant: { fontSize: '12px', color: 'var(--color-text)', fontWeight: 500 },
+  category: { fontSize: '10px', color: 'var(--color-faint)' },
   amount:   { fontSize: '13px', fontWeight: 600, flexShrink: 0 },
 }
 
@@ -130,7 +130,7 @@ export default function Finance() {
   const diff        = MON_AVERAGE - TODAY_SPEND
   const diffStr     = `↓ $${Math.abs(diff).toFixed(2)} less than your Monday average`
   const weekOver    = WEEK_TOTAL > LAST_WEEK_TOTAL
-  const weekColor   = weekOver ? '#C17B56' : '#1D9E75'
+  const weekColor   = weekOver ? 'var(--color-accent)' : 'var(--color-success)'
 
   return (
     <div style={s.screen}>
@@ -167,7 +167,7 @@ export default function Finance() {
         <StatCard
           label="Anything odd?"
           value="All clear"
-          valueColor="#1D9E75"
+          valueColor="var(--color-success)"
           sub="No unusual charges"
         />
       </div>
@@ -216,9 +216,9 @@ const s = {
   badge: {
     padding:      '3px 9px',
     borderRadius: 'var(--radius-pill)',
-    background:   '#0C2A1E',
-    color:        '#1D9E75',
-    border:       '0.5px solid #1A4028',
+    background:   'var(--color-success-bg)',
+    color:        'var(--color-success)',
+    border:       '0.5px solid var(--color-success)',
     fontSize:     '11px',
     fontWeight:   600,
   },
@@ -230,8 +230,8 @@ const s = {
   // Hero
   hero: {
     margin:       '0 20px var(--space-4)',
-    background:   '#1E1E18',
-    border:       '0.5px solid #2A2A22',
+    background:   'var(--color-card)',
+    border:       'var(--border)',
     borderRadius: '14px',
     padding:      '16px',
   },
@@ -259,12 +259,12 @@ const s = {
   heroCents: {
     fontFamily: 'var(--font-display)',
     fontSize:   '22px',
-    color:      '#4A4A40',
+    color:      'var(--color-faint)',
     lineHeight: 1,
   },
   comparison: {
     fontSize:     '12px',
-    color:        '#4A4A40',
+    color:        'var(--color-faint)',
     margin:       '0 0 14px',
   },
 

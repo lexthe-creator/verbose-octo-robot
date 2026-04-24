@@ -64,10 +64,10 @@ export default function Settings({ onBack }) {
                   key={opt.value}
                   style={{
                     ...s.pill,
-                    background:  active ? '#2A1F14'                 : '#252520',
-                    border:      active ? '0.5px solid #C17B56'     : '0.5px solid #2A2A22',
-                    color:       active ? '#C17B56'                 : '#4A4A40',
-                    fontWeight:  active ? 600                       : 500,
+                    background:  active ? 'var(--color-accent-bg)'            : 'var(--color-chart-bar)',
+                    border:      active ? '0.5px solid var(--color-accent)'   : 'var(--border)',
+                    color:       active ? 'var(--color-accent)'               : 'var(--color-faint)',
+                    fontWeight:  active ? 600                                  : 500,
                   }}
                   onClick={() => handleEquipment(opt.value)}
                 >
@@ -116,6 +116,34 @@ export default function Settings({ onBack }) {
         <div style={s.aboutRow}>
           <span style={s.aboutLeft}>Week</span>
           <span style={s.aboutRight}>Week {state.fitness.weekNumber}</span>
+        </div>
+      </section>
+
+      {/* Appearance */}
+      <section style={s.card}>
+        <p style={s.cardLabel}>Appearance</p>
+        <div style={s.field}>
+          <label style={s.fieldLabel}>Theme</label>
+          <div style={{ ...s.pillRow, gridTemplateColumns: 'repeat(2, 1fr)' }}>
+            {['dark', 'light'].map(theme => {
+              const active = (state.settings.theme || 'dark') === theme
+              return (
+                <button
+                  key={theme}
+                  style={{
+                    ...s.pill,
+                    background: active ? 'var(--color-accent-bg)'          : 'var(--color-chart-bar)',
+                    border:     active ? '0.5px solid var(--color-accent)'  : 'var(--border)',
+                    color:      active ? 'var(--color-accent)'              : 'var(--color-faint)',
+                    fontWeight: active ? 600                                 : 500,
+                  }}
+                  onClick={() => dispatch({ type: 'UPDATE_SETTINGS', payload: { key: 'theme', value: theme } })}
+                >
+                  {theme === 'dark' ? '◑ Dark' : '◐ Light'}
+                </button>
+              )
+            })}
+          </div>
         </div>
       </section>
 
@@ -233,8 +261,8 @@ const s = {
   // Card
   card: {
     margin:       '0 20px',
-    background:   '#1E1E18',
-    border:       '0.5px solid #2A2A22',
+    background:   'var(--color-card)',
+    border:       'var(--border)',
     borderRadius: '14px',
     padding:      '16px',
     display:      'flex',
@@ -260,10 +288,10 @@ const s = {
   },
   input: {
     height:       '40px',
-    background:   '#252520',
-    border:       '0.5px solid #2A2A22',
+    background:   'var(--color-chart-bar)',
+    border:       'var(--border)',
     borderRadius: '10px',
-    color:        '#F6F3EF',
+    color:        'var(--color-text)',
     fontFamily:   'var(--font-body)',
     fontSize:     '15px',
     padding:      '0 12px',
@@ -272,7 +300,7 @@ const s = {
   },
   helper: {
     fontSize: '10px',
-    color:    '#3A3A30',
+    color:    'var(--color-faint)',
     lineHeight: 1.4,
   },
 
@@ -318,9 +346,9 @@ const s = {
   connectedBadge: {
     padding:      '4px 10px',
     borderRadius: 'var(--radius-pill)',
-    background:   '#0C2A1E',
-    color:        '#1D9E75',
-    border:       '0.5px solid #1A4028',
+    background:   'var(--color-success-bg)',
+    color:        'var(--color-success)',
+    border:       '0.5px solid var(--color-success)',
     fontSize:     '11px',
     fontWeight:   600,
     flexShrink:   0,
@@ -328,7 +356,7 @@ const s = {
   connectBtn: {
     background: 'none',
     border:     'none',
-    color:      '#C17B56',
+    color:      'var(--color-accent)',
     fontSize:   '13px',
     fontWeight: 600,
     cursor:     'pointer',
@@ -337,7 +365,7 @@ const s = {
   },
   divider: {
     height:     '0.5px',
-    background: '#2A2A22',
+    background: 'var(--color-border)',
     margin:     '2px 0',
   },
 
@@ -378,7 +406,7 @@ const sheet = {
   box: {
     width:                '100%',
     maxWidth:             'var(--max-width)',
-    background:           '#1E1E18',
+    background:           'var(--color-card)',
     borderTopLeftRadius:  '20px',
     borderTopRightRadius: '20px',
     padding:              '24px',

@@ -1,32 +1,50 @@
+import { useState } from 'react'
 import { useApp } from '../context/AppContext.jsx'
 import {
   getPhase, PHASE_LABELS,
   getTodayType, getWeekDates, getTypeForDay,
-  generateWorkout, WORKOUT_TITLES, WORKOUT_ICONS,
+  generateWorkout,
 } from '../utils/fitness.js'
 
 const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
-const FEEL_EMOJI = ['', '😴', '😐', '🙂', '😄', '⚡']
+const DAY_NAMES  = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
+const TYPE_ABBR = {
+  easy_run:   'R',
+  tempo_run:  'R',
+  long_run:   'R',
+  strength_a: 'US',
+  strength_b: 'LS',
+  stretch:    'ST',
+  rest:       '—',
+}
+
+const FEEL_LABELS = ['', 'drained', 'flat', 'good', 'great', 'charged']
+
+function todayWeekIndex() {
+  return (new Date().getDay() + 6) % 7
+}
 
 // ─── Today card ──────────────────────────────────────────────────────────────
 
-function TodayCard({ workout, todayComplete, onStart }) {
-  const canStart = workout.type !== 'rest' && !todayComplete
+function TodayCard({ workout, todayComplete, isToday, onStart }) {
+  const canStart = isToday && workout.type !== 'rest' && !todayComplete
+  const abbr     = TYPE_ABBR[workout.type] || '?'
 
   return (
     <div style={tc.wrap}>
       <div style={tc.top}>
-        <span style={tc.icon}>{WORKOUT_ICONS[workout.type] || '🏋'}</span>
+        <span style={tc.abbr}>{abbr}</span>
         <div style={tc.info}>
           <p style={tc.name}>{workout.title}</p>
           <p style={tc.sub}>{workout.subtitle}</p>
         </div>
-        {todayComplete && (
-          <span style={tc.doneBadge}>✓ Done</span>
+        {isToday && todayComplete && (
+          <span style={tc.doneBadge}>Done</span>
         )}
       </div>
 
-      {workout.type !== 'rest' && (
+      {isToday && workout.type !== 'rest' && (
         <button
           style={{
             ...tc.startBtn,
@@ -38,7 +56,7 @@ function TodayCard({ workout, todayComplete, onStart }) {
           onClick={canStart ? onStart : undefined}
           disabled={!canStart}
         >
-          {todayComplete ? '✓ Completed' : 'Start →'}
+          {todayComplete ? 'Completed' : 'Start'}
         </button>
       )}
     </div>
@@ -47,20 +65,34 @@ function TodayCard({ workout, todayComplete, onStart }) {
 
 const tc = {
   wrap: {
-    background:   'var(--color-card)',
-    border:       'var(--border)',
-    borderRadius: 'var(--radius-card)',
-    padding:      '16px',
-    display:      'flex',
-    flexDirection:'column',
-    gap:          '14px',
+    background:    'var(--color-card)',
+    border:        'var(--border)',
+    borderRadius:  'var(--radius-card)',
+    padding:       '16px',
+    display:       'flex',
+    flexDirection: 'column',
+    gap:           '14px',
   },
   top: {
     display:    'flex',
     alignItems: 'center',
     gap:        '12px',
   },
-  icon: { fontSize: '28px', lineHeight: 1 },
+  abbr: {
+    width:          '40px',
+    height:         '40px',
+    borderRadius:   'var(--radius-sm)',
+    background:     'var(--color-accent-bg)',
+    border:         '0.5px solid var(--color-accent)',
+    color:          'var(--color-accent)',
+    fontSize:       '13px',
+    fontWeight:     700,
+    letterSpacing:  '0.04em',
+    display:        'flex',
+    alignItems:     'center',
+    justifyContent: 'center',
+    flexShrink:     0,
+  },
   info: {
     flex:          1,
     display:       'flex',
@@ -91,29 +123,38 @@ const tc = {
 
 // ─── Weekly strip ─────────────────────────────────────────────────────────────
 
-function WeekStrip({ weekDates }) {
-  const todayStr = new Date().toDateString()
+function WeekStrip({ weekDates, selectedIndex, onSelect }) {
+  const todayIndex = todayWeekIndex()
 
   return (
-    <div style={ws.wrap}>
+    <div style={ws.scroll}>
       {weekDates.map((date, i) => {
-        const isToday = date.toDateString() === todayStr
-        const type    = getTypeForDay(date.getDay())
+        const isToday    = i === todayIndex
+        const isSelected = i === selectedIndex
+        const type       = getTypeForDay(date.getDay())
+        const abbr       = TYPE_ABBR[type] || '—'
+
+        let bg, borderColor, labelColor, abbrColor
+        if (isToday) {
+          bg = 'var(--color-accent)'; borderColor = 'var(--color-accent)'
+          labelColor = '#fff'; abbrColor = '#fff'
+        } else if (isSelected) {
+          bg = 'var(--color-accent-bg)'; borderColor = 'var(--color-accent)'
+          labelColor = 'var(--color-accent)'; abbrColor = 'var(--color-accent)'
+        } else {
+          bg = 'var(--color-chart-bar)'; borderColor = 'transparent'
+          labelColor = 'var(--color-muted)'; abbrColor = 'var(--color-faint)'
+        }
 
         return (
-          <div
+          <button
             key={i}
-            style={{
-              ...ws.day,
-              background: isToday ? 'var(--color-accent-bg)' : 'var(--color-card)',
-              border:     isToday ? '0.5px solid var(--color-accent)' : 'var(--border)',
-            }}
+            style={{ ...ws.pill, background: bg, border: `0.5px solid ${borderColor}` }}
+            onClick={() => onSelect(i === todayIndex ? null : i)}
           >
-            <span style={{ ...ws.label, color: isToday ? 'var(--color-accent)' : 'var(--color-muted)' }}>
-              {DAY_LABELS[i]}
-            </span>
-            <span style={ws.icon}>{WORKOUT_ICONS[type]}</span>
-          </div>
+            <span style={{ ...ws.dayLabel, color: labelColor }}>{DAY_LABELS[i]}</span>
+            <span style={{ ...ws.abbr, color: abbrColor }}>{abbr}</span>
+          </button>
         )
       })}
     </div>
@@ -121,28 +162,35 @@ function WeekStrip({ weekDates }) {
 }
 
 const ws = {
-  wrap: {
-    display:             'grid',
-    gridTemplateColumns: 'repeat(7, 1fr)',
-    gap:                 '4px',
+  scroll: {
+    display:           'flex',
+    gap:               '4px',
+    overflowX:         'auto',
+    scrollbarWidth:    'none',
+    msOverflowStyle:   'none',
+    WebkitOverflowScrolling: 'touch',
   },
-  day: {
+  pill: {
     display:        'flex',
     flexDirection:  'column',
     alignItems:     'center',
     gap:            '4px',
-    padding:        '8px 4px',
+    padding:        '8px 0',
+    minWidth:       '44px',
+    flex:           '1 0 44px',
     borderRadius:   'var(--radius-sm)',
+    cursor:         'pointer',
     transition:     'background 0.15s, border-color 0.15s',
   },
-  label: { fontSize: '10px', fontWeight: 600 },
-  icon:  { fontSize: '14px', lineHeight: 1 },
+  dayLabel: { fontSize: '10px', fontWeight: 700, lineHeight: 1 },
+  abbr:     { fontSize: '10px', fontWeight: 600, lineHeight: 1 },
 }
 
 // ─── Log row ──────────────────────────────────────────────────────────────────
 
 function LogRow({ entry }) {
-  const dateStr = new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const dateStr  = new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const feelText = FEEL_LABELS[entry.feel] || ''
 
   return (
     <div style={lr.wrap}>
@@ -150,7 +198,7 @@ function LogRow({ entry }) {
         <p style={lr.title}>{entry.title}</p>
         <p style={lr.meta}>{dateStr} · {entry.duration} min</p>
       </div>
-      <span style={lr.feel}>{FEEL_EMOJI[entry.feel] || ''}</span>
+      {feelText && <span style={lr.feel}>{feelText}</span>}
     </div>
   )
 }
@@ -172,7 +220,7 @@ const lr = {
   },
   title: { fontSize: '14px', fontWeight: 500, color: 'var(--color-text)' },
   meta:  { fontSize: '11px', color: 'var(--color-muted)' },
-  feel:  { fontSize: '20px', lineHeight: 1 },
+  feel:  { fontSize: '11px', color: 'var(--color-muted)', fontStyle: 'italic' },
 }
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
@@ -180,13 +228,24 @@ const lr = {
 export default function Fitness({ onStartWorkout }) {
   const { state } = useApp()
   const { weekNumber, workoutLog, todayComplete } = state.fitness
-  const gymAccess  = state.settings.gymAccess
+  const gymAccess = state.settings.gymAccess
 
-  const todayType    = getTodayType()
-  const todayWorkout = generateWorkout(todayType, gymAccess, weekNumber)
-  const weekDates    = getWeekDates()
-  const phaseKey     = getPhase(weekNumber)
-  const recentLog    = [...workoutLog].reverse().slice(0, 5)
+  const weekDates  = getWeekDates()
+  const phaseKey   = getPhase(weekNumber)
+  const todayIdx   = todayWeekIndex()
+
+  // null = viewing today, 0-6 = browsing a specific day
+  const [selectedIndex, setSelectedIndex] = useState(null)
+
+  const viewingIndex = selectedIndex ?? todayIdx
+  const viewingDate  = weekDates[viewingIndex]
+  const viewingType  = getTypeForDay(viewingDate.getDay())
+  const viewedWorkout = generateWorkout(viewingType, gymAccess, weekNumber)
+  const isViewingToday = selectedIndex === null || selectedIndex === todayIdx
+
+  const recentLog = [...workoutLog].reverse().slice(0, 5)
+
+  const sectionLabel = isViewingToday ? 'Today' : DAY_NAMES[viewingIndex]
 
   return (
     <div style={s.screen}>
@@ -199,20 +258,32 @@ export default function Fitness({ onStartWorkout }) {
         </div>
       </div>
 
-      {/* Today */}
-      <section style={s.section}>
-        <p style={s.sectionLabel}>Today</p>
-        <TodayCard
-          workout={todayWorkout}
-          todayComplete={todayComplete}
-          onStart={() => onStartWorkout && onStartWorkout(todayWorkout)}
-        />
-      </section>
-
       {/* Weekly strip */}
       <section style={s.section}>
         <p style={s.sectionLabel}>This week</p>
-        <WeekStrip weekDates={weekDates} />
+        <WeekStrip
+          weekDates={weekDates}
+          selectedIndex={selectedIndex}
+          onSelect={setSelectedIndex}
+        />
+      </section>
+
+      {/* Day workout card */}
+      <section style={s.section}>
+        <div style={s.cardLabelRow}>
+          <p style={s.sectionLabel}>{sectionLabel}</p>
+          {!isViewingToday && (
+            <button style={s.todayBtn} onClick={() => setSelectedIndex(null)}>
+              ← Today
+            </button>
+          )}
+        </div>
+        <TodayCard
+          workout={viewedWorkout}
+          todayComplete={todayComplete}
+          isToday={isViewingToday}
+          onStart={() => onStartWorkout && onStartWorkout(viewedWorkout)}
+        />
       </section>
 
       {/* Recent log */}
@@ -277,12 +348,26 @@ const s = {
     gap:           'var(--space-3)',
     padding:       '16px 20px 0',
   },
+  cardLabelRow: {
+    display:        'flex',
+    alignItems:     'center',
+    justifyContent: 'space-between',
+  },
   sectionLabel: {
     fontSize:      '11px',
     fontWeight:    600,
     letterSpacing: '0.08em',
     textTransform: 'uppercase',
     color:         'var(--color-muted)',
+  },
+  todayBtn: {
+    background:  'none',
+    border:      'none',
+    color:       'var(--color-accent)',
+    fontSize:    '12px',
+    fontWeight:  600,
+    cursor:      'pointer',
+    padding:     0,
   },
   logList: {
     display:       'flex',
