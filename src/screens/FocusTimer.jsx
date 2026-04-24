@@ -12,10 +12,10 @@ function formatTime(secs) {
 }
 
 function ringStroke(progress, isDone) {
-  if (isDone)        return '#1D9E75'
-  if (progress > 0.4) return '#C17B56'
-  if (progress > 0.2) return '#E8A87C'
-  return '#E05555'
+  if (isDone)          return 'var(--color-success)'
+  if (progress > 0.4)  return 'var(--color-accent)'
+  if (progress > 0.2)  return 'var(--color-accent-light)'
+  return 'var(--color-danger)'
 }
 
 export default function FocusTimer({ onClose }) {
@@ -147,20 +147,19 @@ export default function FocusTimer({ onClose }) {
           <circle
             cx="100" cy="100" r="88"
             fill="none"
-            stroke="#252520"
             strokeWidth="8"
+            style={{ stroke: 'var(--color-chart-bar)' }}
           />
           {/* Progress arc — rotated so 0% starts at 12 o'clock */}
           <circle
             cx="100" cy="100" r="88"
             fill="none"
-            stroke={strokeColor}
             strokeWidth="8"
             strokeLinecap="round"
             strokeDasharray={CIRCUMFERENCE}
             strokeDashoffset={dashOffset}
             transform="rotate(-90 100 100)"
-            style={{ transition: 'stroke-dashoffset 1s linear, stroke 0.4s ease' }}
+            style={{ stroke: strokeColor, transition: 'stroke-dashoffset 1s linear, stroke 0.4s ease' }}
           />
         </svg>
 

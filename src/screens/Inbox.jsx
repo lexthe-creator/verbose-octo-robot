@@ -199,8 +199,8 @@ const s = {
   badge: {
     padding:      '3px 9px',
     borderRadius: 'var(--radius-pill)',
-    background:   '#2A1508',
-    color:        '#C17B56',
+    background:   'var(--color-accent-bg)',
+    color:        'var(--color-accent)',
     fontSize:     '13px',
     fontWeight:   600,
   },
@@ -282,7 +282,7 @@ const s = {
     overflow:      'hidden',
   },
   flashWrap: {
-    background:    '#0F2318',
+    background:    'var(--color-success-bg)',
     border:        '0.5px solid var(--color-success)',
     borderRadius:  'var(--radius-card)',
     padding:       '18px 14px',
@@ -333,8 +333,8 @@ const s = {
   actionBtn: {
     padding:      '5px 12px',
     borderRadius: 'var(--radius-pill)',
-    background:   '#252520',
-    border:       '0.5px solid #2A2A22',
+    background:   'var(--color-chart-bar)',
+    border:       'var(--border)',
     color:        'var(--color-muted)',
     fontSize:     '12px',
     fontWeight:   500,

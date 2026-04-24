@@ -376,7 +376,7 @@ const s = {
   exReps: { fontSize: '18px', color: 'var(--color-accent)', fontWeight: 600, textAlign: 'center', marginTop: '-4px' },
   hyroxBadge: {
     alignSelf: 'center', padding: '3px 10px', borderRadius: 'var(--radius-pill)',
-    background: '#2A1F14', color: '#C17B56', border: '0.5px solid #C17B56',
+    background: 'var(--color-accent-bg)', color: 'var(--color-accent)', border: '0.5px solid var(--color-accent)',
     fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em',
   },
   setList: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' },

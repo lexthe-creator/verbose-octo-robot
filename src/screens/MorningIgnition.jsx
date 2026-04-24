@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { useApp } from '../context/AppContext.jsx'
+import FuelEditSheet from '../components/FuelEditSheet.jsx'
 
 const ENERGY_OPTIONS = [
   { value: 1, emoji: '😴', label: 'Drained' },
@@ -12,14 +13,13 @@ const ENERGY_OPTIONS = [
 const isHoverDevice = window.matchMedia('(hover: hover)').matches
 
 // ─── Swipeable row ────────────────────────────────────────────────────────────
-function SwipeRow({ label, sublabel, confirmed, onConfirm }) {
+function SwipeRow({ label, sublabel, confirmed, onConfirm, onSkip }) {
   const [offset, setOffset] = useState(0)
   const [swiping, setSwiping] = useState(false)
   const startX    = useRef(null)
   const isDragging = useRef(false)
   const THRESHOLD = 80
 
-  // ── Touch handlers ──────────────────────────────────────────────────────────
   function onTouchStart(e) {
     if (confirmed) return
     startX.current = e.touches[0].clientX
@@ -38,7 +38,6 @@ function SwipeRow({ label, sublabel, confirmed, onConfirm }) {
     startX.current = null
   }
 
-  // ── Mouse handlers ──────────────────────────────────────────────────────────
   function onMouseDown(e) {
     if (confirmed) return
     startX.current   = e.clientX
@@ -99,24 +98,37 @@ function SwipeRow({ label, sublabel, confirmed, onConfirm }) {
           )}
         </div>
 
-        {/* Right-side action: confirm button (hover devices) or swipe arrow (touch) */}
-        {isHoverDevice ? (
-          confirmed ? (
-            <span style={{ ...swipeStyles.checkmark, opacity: 1 }}>✓</span>
-          ) : (
+        <div style={swipeStyles.actions}>
+          {/* Skip button (only when not confirmed and handler provided) */}
+          {!confirmed && onSkip && (
             <button
-              style={swipeStyles.confirmBtn}
-              onClick={e => { e.stopPropagation(); onConfirm() }}
-              aria-label="Confirm"
+              style={swipeStyles.skipBtn}
+              onClick={e => { e.stopPropagation(); onSkip() }}
+              aria-label="Skip task"
             >
-              ✓
+              ✕
             </button>
-          )
-        ) : (
-          <span style={{ ...swipeStyles.checkmark, opacity: confirmed ? 1 : progress }}>
-            {confirmed ? '✓' : '→'}
-          </span>
-        )}
+          )}
+
+          {/* Confirm control */}
+          {isHoverDevice ? (
+            confirmed ? (
+              <span style={{ ...swipeStyles.checkmark, opacity: 1 }}>✓</span>
+            ) : (
+              <button
+                style={swipeStyles.confirmBtn}
+                onClick={e => { e.stopPropagation(); onConfirm() }}
+                aria-label="Confirm"
+              >
+                ✓
+              </button>
+            )
+          ) : (
+            <span style={{ ...swipeStyles.checkmark, opacity: confirmed ? 1 : progress }}>
+              {confirmed ? '✓' : '→'}
+            </span>
+          )}
+        </div>
       </div>
 
       {!confirmed && !isHoverDevice && (
@@ -157,6 +169,28 @@ const swipeStyles = {
     fontSize:    '12px',
     color:       'var(--color-muted)',
   },
+  actions: {
+    display:    'flex',
+    alignItems: 'center',
+    gap:        '8px',
+    flexShrink: 0,
+  },
+  skipBtn: {
+    width:          '22px',
+    height:         '22px',
+    borderRadius:   '50%',
+    background:     'var(--color-faint)',
+    border:         'none',
+    color:          'var(--color-muted)',
+    fontSize:       '11px',
+    fontWeight:     700,
+    cursor:         'pointer',
+    display:        'flex',
+    alignItems:     'center',
+    justifyContent: 'center',
+    lineHeight:     1,
+    flexShrink:     0,
+  },
   checkmark: {
     fontSize:   '18px',
     color:      'var(--color-success)',
@@ -193,22 +227,42 @@ const swipeStyles = {
 }
 
 // ─── Meal tap slot ────────────────────────────────────────────────────────────
-function MealSlot({ label, startTime, endTime, confirmed, onConfirm }) {
-  const windowLabel = `${startTime} – ${endTime}`
+
+function fmt24(hhmm) {
+  if (!hhmm) return ''
+  const [h, m] = hhmm.split(':').map(Number)
+  const ampm = h >= 12 ? 'PM' : 'AM'
+  const h12  = h % 12 || 12
+  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`
+}
+
+function MealSlot({ label, startTime, endTime, confirmed, onConfirm, onEditTime }) {
   return (
-    <button
-      style={{
-        ...mealStyles.slot,
-        background:   confirmed ? 'var(--color-success-bg)' : 'var(--color-card)',
-        border:       confirmed ? '0.5px solid var(--color-success)' : 'var(--border)',
-      }}
-      onClick={onConfirm}
-    >
-      <span style={{ ...mealStyles.label, color: confirmed ? 'var(--color-success)' : 'var(--color-text)' }}>
-        {confirmed ? '✓ ' : ''}{label}
-      </span>
-      <span style={mealStyles.window}>{windowLabel}</span>
-    </button>
+    <div style={{
+      ...mealStyles.slot,
+      background: confirmed ? 'var(--color-success-bg)' : 'var(--color-card)',
+      border:     confirmed ? '0.5px solid var(--color-success)' : 'var(--border)',
+    }}>
+      {/* Tap main area to confirm */}
+      <button
+        style={mealStyles.mainBtn}
+        onClick={!confirmed ? onConfirm : undefined}
+        disabled={confirmed}
+      >
+        <span style={{ ...mealStyles.label, color: confirmed ? 'var(--color-success)' : 'var(--color-text)' }}>
+          {confirmed ? '✓ ' : ''}{label}
+        </span>
+      </button>
+
+      {/* Time text — tap to edit */}
+      {!confirmed ? (
+        <button style={mealStyles.timeBtn} onClick={onEditTime}>
+          {fmt24(startTime)} – {fmt24(endTime)}
+        </button>
+      ) : (
+        <span style={mealStyles.timeConfirmed}>{fmt24(startTime)} – {fmt24(endTime)}</span>
+      )}
+    </div>
   )
 }
 
@@ -216,66 +270,234 @@ const mealStyles = {
   slot: {
     display:        'flex',
     flexDirection:  'column',
-    alignItems:     'flex-start',
-    padding:        '12px 14px',
     borderRadius:   'var(--radius-sm)',
-    cursor:         'pointer',
+    overflow:       'hidden',
     transition:     'background 0.2s, border-color 0.2s',
+  },
+  mainBtn: {
+    display:        'flex',
+    alignItems:     'flex-start',
+    padding:        '12px 14px 6px',
+    background:     'none',
+    border:         'none',
+    cursor:         'pointer',
     textAlign:      'left',
+    width:          '100%',
   },
   label: {
     fontSize:   '14px',
     fontWeight: 600,
   },
-  window: {
-    fontSize: '11px',
-    color:    'var(--color-muted)',
-    marginTop: '2px',
+  timeBtn: {
+    padding:        '0 14px 10px',
+    background:     'none',
+    border:         'none',
+    cursor:         'pointer',
+    fontSize:       '11px',
+    color:          'var(--color-accent)',
+    fontWeight:     500,
+    textAlign:      'left',
+    textDecoration: 'underline',
+    textDecorationColor: 'var(--color-accent)',
+    fontFamily:     'var(--font-body)',
+  },
+  timeConfirmed: {
+    padding:   '0 14px 10px',
+    display:   'block',
+    fontSize:  '11px',
+    color:     'var(--color-muted)',
   },
 }
 
-// Default meal windows applied at lock time
-const MEAL_DEFAULTS = {
-  breakfast: { startTime: '07:00', endTime: '09:00' },
-  lunch:     { startTime: '12:00', endTime: '14:00' },
-  snack:     { startTime: '15:00', endTime: '17:00' },
-  dinner:    { startTime: '19:00', endTime: '21:00' },
+// ─── Add task row (inline input) ──────────────────────────────────────────────
+
+function DraftTaskRow({ draft, onUpdate, onCommit, onCancel }) {
+  return (
+    <div style={dt.wrap}>
+      <input
+        autoFocus
+        type="text"
+        style={dt.input}
+        value={draft.text}
+        onChange={e => onUpdate(draft.id, e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter') onCommit(draft.id)
+          if (e.key === 'Escape') onCancel(draft.id)
+        }}
+        placeholder="Task name..."
+      />
+      <button
+        style={{ ...dt.btn, ...dt.confirmBtn, opacity: draft.text.trim() ? 1 : 0.4 }}
+        onClick={() => onCommit(draft.id)}
+        disabled={!draft.text.trim()}
+        aria-label="Add task"
+      >
+        ✓
+      </button>
+      <button
+        style={{ ...dt.btn, ...dt.cancelBtn }}
+        onClick={() => onCancel(draft.id)}
+        aria-label="Cancel"
+      >
+        ✕
+      </button>
+    </div>
+  )
+}
+
+const dt = {
+  wrap: {
+    display:      'flex',
+    alignItems:   'center',
+    gap:          '8px',
+    background:   'var(--color-card)',
+    border:       'var(--border)',
+    borderRadius: 'var(--radius-sm)',
+    padding:      '10px 12px',
+  },
+  input: {
+    flex:       1,
+    fontSize:   '15px',
+    color:      'var(--color-text)',
+    background: 'none',
+    border:     'none',
+    outline:    'none',
+    fontFamily: 'var(--font-body)',
+  },
+  btn: {
+    width:          '24px',
+    height:         '24px',
+    borderRadius:   '50%',
+    border:         'none',
+    fontSize:       '12px',
+    fontWeight:     700,
+    cursor:         'pointer',
+    display:        'flex',
+    alignItems:     'center',
+    justifyContent: 'center',
+    flexShrink:     0,
+    lineHeight:     1,
+    transition:     'opacity 0.15s',
+  },
+  confirmBtn: {
+    background: 'var(--color-accent)',
+    color:      '#fff',
+  },
+  cancelBtn: {
+    background: 'var(--color-faint)',
+    color:      'var(--color-muted)',
+  },
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function MorningIgnition({ onComplete }) {
   const { state, dispatch } = useApp()
-  const [step, setStep] = useState('energy') // 'energy' | 'brief' | 'locked'
+  const [step, setStep] = useState('energy')
 
-  // Local brief state (mirrors what gets committed on lock)
+  // Local brief state
   const [localEnergy,  setLocalEnergy]  = useState(state.energyLevel)
   const [localTasks,   setLocalTasks]   = useState([])  // confirmed task ids
   const [localMeals,   setLocalMeals]   = useState([])  // confirmed meal slots
   const [localWorkout, setLocalWorkout] = useState(false)
 
-  const TOTAL_ITEMS = 8 // 3 tasks + 1 workout + 4 meals
-  const confirmedCount = localTasks.length + localMeals.length + (localWorkout ? 1 : 0)
-  const progress = confirmedCount / TOTAL_ITEMS
-  const allConfirmed = confirmedCount === TOTAL_ITEMS
+  // Task management in brief
+  const [briefTasks, setBriefTasks]       = useState(
+    () => state.tasks.map(t => ({ ...t, _new: false }))
+  )
+  const [exitingTaskId, setExitingTaskId] = useState(null)
+  const [draftTasks,    setDraftTasks]    = useState([])  // pending inline inputs
 
-  const today = new Date()
-  const dayLabel = today.toLocaleDateString('en-US', { weekday: 'long' })
+  // Meal window editing
+  const [mealWindows, setMealWindows] = useState(() => {
+    const w = {}
+    Object.entries(state.meals).forEach(([slot, meal]) => {
+      w[slot] = { startTime: meal.startTime, endTime: meal.endTime }
+    })
+    return w
+  })
+  const [editingMealSlot, setEditingMealSlot] = useState(null)
+
+  // Dynamic totals
+  const activeTasks   = briefTasks.filter(t => t.id !== exitingTaskId)
+  const TOTAL_ITEMS   = activeTasks.length + 1 + 4  // tasks + workout + meals
+  const confirmedCount = (
+    localTasks.filter(id => activeTasks.some(t => t.id === id)).length +
+    localMeals.length +
+    (localWorkout ? 1 : 0)
+  )
+  const progress     = TOTAL_ITEMS > 0 ? confirmedCount / TOTAL_ITEMS : 0
+  const allConfirmed = confirmedCount === TOTAL_ITEMS && draftTasks.length === 0
+
+  const today     = new Date()
+  const dayLabel  = today.toLocaleDateString('en-US', { weekday: 'long' })
   const dateLabel = today.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
 
   function confirmTask(id) {
     if (!localTasks.includes(id)) setLocalTasks(prev => [...prev, id])
   }
+
   function confirmMeal(slot) {
     if (!localMeals.includes(slot)) setLocalMeals(prev => [...prev, slot])
   }
 
+  function skipTask(id) {
+    setLocalTasks(prev => prev.filter(tid => tid !== id))
+    setExitingTaskId(id)
+    setTimeout(() => {
+      setBriefTasks(prev => prev.filter(t => t.id !== id))
+      setExitingTaskId(null)
+    }, 200)
+  }
+
+  function addDraftTask() {
+    setDraftTasks(prev => [...prev, { id: `draft_${Date.now()}`, text: '' }])
+  }
+
+  function updateDraftText(id, text) {
+    setDraftTasks(prev => prev.map(d => d.id === id ? { ...d, text } : d))
+  }
+
+  function commitDraft(id) {
+    const draft = draftTasks.find(d => d.id === id)
+    if (!draft?.text.trim()) {
+      setDraftTasks(prev => prev.filter(d => d.id !== id))
+      return
+    }
+    const newTask = {
+      id:    id,
+      text:  draft.text.trim(),
+      _new:  true,
+      done:  false,
+      dueTime:       null,
+      scheduledTime: null,
+    }
+    setBriefTasks(prev => [...prev, newTask])
+    setDraftTasks(prev => prev.filter(d => d.id !== id))
+  }
+
+  function cancelDraft(id) {
+    setDraftTasks(prev => prev.filter(d => d.id !== id))
+  }
+
   function handleLockDay() {
     dispatch({ type: 'SET_ENERGY', payload: localEnergy })
-    localTasks.forEach(id => dispatch({ type: 'CONFIRM_TASK', payload: id }))
+
+    // Confirm original tasks
+    activeTasks
+      .filter(t => !t._new && localTasks.includes(t.id))
+      .forEach(t => dispatch({ type: 'CONFIRM_TASK', payload: t.id }))
+
+    // Add + confirm new tasks
+    activeTasks
+      .filter(t => t._new && localTasks.includes(t.id))
+      .forEach(t => dispatch({ type: 'ADD_TASK', payload: { text: t.text } }))
+
+    // Meals with local window overrides
     localMeals.forEach(slot => dispatch({
       type: 'CONFIRM_MEAL',
-      payload: { slot, ...MEAL_DEFAULTS[slot] },
+      payload: { slot, ...mealWindows[slot] },
     }))
+
     if (localWorkout) dispatch({ type: 'CONFIRM_WORKOUT' })
     dispatch({ type: 'LOCK_DAY' })
     setStep('locked')
@@ -343,15 +565,40 @@ export default function MorningIgnition({ onComplete }) {
         <section style={s.section}>
           <p style={s.sectionLabel}>3 Things</p>
           <div style={s.stack}>
-            {state.tasks.map(task => (
-              <SwipeRow
+            {activeTasks.map(task => (
+              <div
                 key={task.id}
-                label={task.text}
-                sublabel={task.dueTime}
-                confirmed={localTasks.includes(task.id)}
-                onConfirm={() => confirmTask(task.id)}
+                style={{
+                  opacity:    exitingTaskId === task.id ? 0 : 1,
+                  transform:  exitingTaskId === task.id ? 'translateX(-40px)' : 'translateX(0)',
+                  transition: 'opacity 200ms ease, transform 200ms ease',
+                }}
+              >
+                <SwipeRow
+                  label={task.text}
+                  sublabel={task._new ? '' : task.dueTime}
+                  confirmed={localTasks.includes(task.id)}
+                  onConfirm={() => confirmTask(task.id)}
+                  onSkip={!localTasks.includes(task.id) ? () => skipTask(task.id) : undefined}
+                />
+              </div>
+            ))}
+
+            {/* Pending draft inputs */}
+            {draftTasks.map(draft => (
+              <DraftTaskRow
+                key={draft.id}
+                draft={draft}
+                onUpdate={updateDraftText}
+                onCommit={commitDraft}
+                onCancel={cancelDraft}
               />
             ))}
+
+            {/* Add task button */}
+            <button style={s.addTaskBtn} onClick={addDraftTask}>
+              + Add task
+            </button>
           </div>
         </section>
 
@@ -371,7 +618,7 @@ export default function MorningIgnition({ onComplete }) {
           <div style={s.labelGroup}>
             <p style={s.sectionLabel}>Set today's meal reminders</p>
             <p style={s.sectionHelper}>
-              Tap each window to confirm — we'll nudge you if you miss one.
+              Tap each window to confirm — tap the time to adjust it.
             </p>
           </div>
           <div style={s.mealGrid}>
@@ -379,10 +626,11 @@ export default function MorningIgnition({ onComplete }) {
               <MealSlot
                 key={slot}
                 label={meal.label}
-                startTime={meal.startTime}
-                endTime={meal.endTime}
+                startTime={mealWindows[slot]?.startTime ?? meal.startTime}
+                endTime={mealWindows[slot]?.endTime ?? meal.endTime}
                 confirmed={localMeals.includes(slot)}
                 onConfirm={() => confirmMeal(slot)}
+                onEditTime={() => setEditingMealSlot(slot)}
               />
             ))}
           </div>
@@ -401,15 +649,35 @@ export default function MorningIgnition({ onComplete }) {
             Lock in my day
           </button>
         </div>
+
+        {/* FuelEditSheet for meal time editing */}
+        {editingMealSlot && (
+          <FuelEditSheet
+            meal={{
+              label:     state.meals[editingMealSlot].label,
+              startTime: mealWindows[editingMealSlot]?.startTime ?? state.meals[editingMealSlot].startTime,
+              endTime:   mealWindows[editingMealSlot]?.endTime   ?? state.meals[editingMealSlot].endTime,
+            }}
+            onClose={() => setEditingMealSlot(null)}
+            onSave={(start, end) => {
+              setMealWindows(prev => ({ ...prev, [editingMealSlot]: { startTime: start, endTime: end } }))
+              setEditingMealSlot(null)
+            }}
+          />
+        )}
       </div>
     )
   }
 
   // ── Step 3: Locked ──────────────────────────────────────────────────────────
+  const confirmedTaskTexts = activeTasks
+    .filter(t => localTasks.includes(t.id))
+    .map(t => t.text)
+
   const lockedItems = [
-    ...state.tasks.map(t => t.text),
+    ...confirmedTaskTexts,
     `${state.workout.type} — ${state.workout.duration}`,
-    ...Object.values(state.meals).map(m => m.label),
+    ...localMeals.map(slot => state.meals[slot]?.label ?? slot),
   ]
 
   return (
@@ -484,7 +752,7 @@ const s = {
     transition:     'background 0.15s, border-color 0.15s',
   },
   emoji: {
-    fontSize: '32px',
+    fontSize:   '32px',
     lineHeight: 1,
   },
   emojiLabel: {
@@ -556,14 +824,24 @@ const s = {
     gap:           '4px',
   },
   sectionHelper: {
-    fontSize: '11px',
-    color:    '#4A4A40',
+    fontSize:   '11px',
+    color:      'var(--color-faint)',
     lineHeight: 1.4,
   },
   stack: {
     display:       'flex',
     flexDirection: 'column',
     gap:           'var(--space-2)',
+  },
+  addTaskBtn: {
+    alignSelf:   'flex-start',
+    background:  'none',
+    border:      'none',
+    color:       'var(--color-faint)',
+    fontSize:    '11px',
+    fontWeight:  500,
+    cursor:      'pointer',
+    padding:     '2px 0',
   },
   mealGrid: {
     display:             'grid',

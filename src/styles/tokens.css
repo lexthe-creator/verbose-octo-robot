@@ -2,8 +2,8 @@
 
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Serif+Display&display=swap');
 
-:root {
-  /* ── Colours ─────────────────────────────────────────────────────────────── */
+/* ─── Dark theme ─────────────────────────────────────────────────────────── */
+[data-theme="dark"] {
   --color-bg:          #141410;
   --color-card:        #1E1E18;
   --color-nav-bg:      #1A1A14;
@@ -24,6 +24,35 @@
 
   --color-danger:      #E05555;
 
+  color-scheme: dark;
+}
+
+/* ─── Light theme ────────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --color-bg:          #F5F2ED;
+  --color-card:        #FFFFFF;
+  --color-nav-bg:      #F0EDE8;
+  --color-chart-bar:   #E8E4DE;
+
+  --color-border:      #D8D2CA;
+
+  --color-text:        #1A1A14;
+  --color-muted:       #706A60;
+  --color-faint:       #B8B2A8;
+
+  --color-accent:      #C17B56;
+  --color-accent-light:#E8A87C;
+  --color-accent-bg:   #FDF0E8;
+
+  --color-success:     #1D9E75;
+  --color-success-bg:  #E8F6F1;
+
+  --color-danger:      #E05555;
+
+  color-scheme: light;
+}
+
+:root {
   /* ── Border ─────────────────────────────────────────────────────────────── */
   --border:            0.5px solid var(--color-border);
 

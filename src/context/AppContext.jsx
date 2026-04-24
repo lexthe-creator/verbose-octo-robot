@@ -66,6 +66,7 @@ const initialState = {
     gymAccess:          'bodyweight',  // 'bodyweight' | 'dumbbells' | 'gym'
     plaidConnected:     false,
     calendarConnected:  false,
+    theme:              'dark',        // 'dark' | 'light'
   },
 
   // Fitness training block. Phase is derived — call getPhase(weekNumber)

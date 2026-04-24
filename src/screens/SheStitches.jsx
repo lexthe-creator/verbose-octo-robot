@@ -4,10 +4,10 @@ import { useApp } from '../context/AppContext.jsx'
 // ─── Tag config ───────────────────────────────────────────────────────────────
 
 const TAG_STYLES = {
-  Design:    { bg: '#2A1F14', color: '#C17B56' },
-  Etsy:      { bg: '#0C2A1E', color: '#1D9E75' },
-  Marketing: { bg: '#1A1A0A', color: '#8A8A40' },
-  Strategy:  { bg: '#2A1010', color: '#C05050' },
+  Design:    { bg: 'var(--color-accent-bg)',  color: 'var(--color-accent)'  },
+  Etsy:      { bg: 'var(--color-success-bg)', color: 'var(--color-success)' },
+  Marketing: { bg: 'var(--color-chart-bar)',  color: 'var(--color-muted)'   },
+  Strategy:  { bg: 'var(--color-chart-bar)',  color: 'var(--color-danger)'  },
 }
 
 // ─── Month + week structure ───────────────────────────────────────────────────
@@ -55,14 +55,14 @@ function SsTaskRow({ task, onToggle }) {
       onKeyDown={e => e.key === 'Enter' && onToggle()}>
       <div style={{
         ...tr.checkbox,
-        background:   task.done ? '#1D9E75' : '#1A1A14',
-        borderColor:  task.done ? '#1D9E75' : '#2A2A22',
+        background:   task.done ? 'var(--color-success)' : 'var(--color-bg)',
+        borderColor:  task.done ? 'var(--color-success)' : 'var(--color-border)',
       }}>
         {task.done && <span style={tr.check}>✓</span>}
       </div>
       <span style={{
         ...tr.text,
-        color:          task.done ? '#3A3A30' : '#8C8C7A',
+        color:          task.done ? 'var(--color-faint)' : 'var(--color-muted)',
         textDecoration: task.done ? 'line-through' : 'none',
       }}>
         {task.text}
@@ -136,18 +136,18 @@ function MonthCard({ month, tasks, defaultOpen }) {
 }
 
 const mc = {
-  card:      { background: '#1E1818', border: '0.5px solid #3A2520', borderRadius: '12px', overflow: 'hidden', marginBottom: '10px' },
+  card:      { background: 'var(--color-card)', border: 'var(--border)', borderRadius: '12px', overflow: 'hidden', marginBottom: '10px' },
   header:    { width: '100%', display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' },
-  numCircle: { width: '28px', height: '28px', borderRadius: '50%', background: '#2A1A10', border: '0.5px solid #3A2520', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  roman:     { fontSize: '11px', fontWeight: 700, color: '#C17B56', lineHeight: 1 },
+  numCircle: { width: '28px', height: '28px', borderRadius: '50%', background: 'var(--color-accent-bg)', border: '0.5px solid var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  roman:     { fontSize: '11px', fontWeight: 700, color: 'var(--color-accent)', lineHeight: 1 },
   meta:      { flex: 1, display: 'flex', flexDirection: 'column', gap: '1px', alignItems: 'flex-start' },
   tag:       { fontSize: '9px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-muted)' },
   title:     { fontSize: '13px', fontWeight: 600, color: 'var(--color-text)', lineHeight: 1.2 },
   right:     { display: 'flex', alignItems: 'center', gap: '8px' },
-  pct:       { fontSize: '12px', fontWeight: 600, color: '#C17B56' },
+  pct:       { fontSize: '12px', fontWeight: 600, color: 'var(--color-accent)' },
   chevron:   { fontSize: '18px', color: 'var(--color-faint)', transition: 'transform 0.2s', lineHeight: 1 },
-  body:      { borderTop: '0.5px solid #2A2020' },
-  weekLabel: { fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', color: '#C17B56', padding: '12px 16px 4px', margin: 0 },
+  body:      { borderTop: 'var(--border)' },
+  weekLabel: { fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--color-accent)', padding: '12px 16px 4px', margin: 0 },
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -163,7 +163,7 @@ export default function SheStitches({ onBack }) {
       <div style={s.header}>
         <button style={s.back} onClick={onBack}>← Home</button>
         <h1 style={s.title}>
-          She <span style={{ color: '#C17B56' }}>Stitches</span>
+          She <span style={{ color: 'var(--color-accent)' }}>Stitches</span>
         </h1>
         <p style={s.subtitle}>90-DAY LAUNCH ROADMAP</p>
       </div>
@@ -298,14 +298,14 @@ const s = {
     margin:       '0 20px 14px',
     borderRadius: '12px',
     overflow:     'hidden',
-    border:       '0.5px solid #3A2520',
+    border:       'var(--border)',
   },
   topEdge: {
     height:     '2px',
-    background: 'linear-gradient(90deg, #C17B56, #E8A87C)',
+    background: 'linear-gradient(90deg, var(--color-accent), var(--color-accent-light))',
   },
   card: {
-    background: '#1E1818',
+    background: 'var(--color-card)',
     padding:    '14px 16px',
   },
 
@@ -325,7 +325,7 @@ const s = {
   statNum: {
     fontFamily: 'var(--font-display)',
     fontSize:   '24px',
-    color:      '#C17B56',
+    color:      'var(--color-accent)',
     lineHeight: 1,
   },
   statLabel: {
@@ -337,7 +337,7 @@ const s = {
   divider: {
     width:      '0.5px',
     height:     '32px',
-    background: '#2A2A22',
+    background: 'var(--color-border)',
     flexShrink: 0,
   },
 
@@ -349,7 +349,7 @@ const s = {
     marginBottom:   '6px',
   },
   progressLeft:  { fontSize: '11px', color: 'var(--color-muted)' },
-  progressRight: { fontSize: '11px', fontWeight: 600, color: '#C17B56' },
+  progressRight: { fontSize: '11px', fontWeight: 600, color: 'var(--color-accent)' },
   track: {
     height:       '3px',
     background:   'var(--color-faint)',
@@ -358,7 +358,7 @@ const s = {
   },
   fill: {
     height:     '100%',
-    background: 'linear-gradient(90deg, #C17B56, #E8A87C)',
+    background: 'linear-gradient(90deg, var(--color-accent), var(--color-accent-light))',
     borderRadius: 'var(--radius-pill)',
     transition: 'width 0.4s ease',
   },
@@ -390,18 +390,18 @@ const s = {
     gap:                 '8px',
   },
   rhythmBlock: {
-    background:    '#252520',
+    background:    'var(--color-chart-bar)',
     borderRadius:  '8px',
     padding:       '10px 12px',
     display:       'flex',
     flexDirection: 'column',
     gap:           '2px',
   },
-  rhythmLabel: { fontSize: '10px', fontWeight: 600, color: '#C17B56', letterSpacing: '0.04em' },
-  rhythmHours: { fontFamily: 'var(--font-display)', fontSize: '22px', color: '#F6F3EF', lineHeight: 1 },
-  rhythmDesc:  { fontSize: '10px', color: '#4A4A40' },
+  rhythmLabel: { fontSize: '10px', fontWeight: 600, color: 'var(--color-accent)', letterSpacing: '0.04em' },
+  rhythmHours: { fontFamily: 'var(--font-display)', fontSize: '22px', color: 'var(--color-text)', lineHeight: 1 },
+  rhythmDesc:  { fontSize: '10px', color: 'var(--color-faint)' },
 
   // One Rule
-  ruleEyebrow: { fontSize: '11px', fontWeight: 600, color: '#C17B56', margin: '0 0 6px' },
+  ruleEyebrow: { fontSize: '11px', fontWeight: 600, color: 'var(--color-accent)', margin: '0 0 6px' },
   ruleText:    { fontFamily: 'var(--font-display)', fontStyle: 'italic', fontSize: '15px', color: 'var(--color-text)', lineHeight: 1.5, margin: 0 },
 }
