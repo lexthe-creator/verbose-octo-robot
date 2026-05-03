@@ -1,38 +1,98 @@
-// TODO: replace with Plaid API in V2
+// TODO V2: Twilio SMS pipeline
+import { useState, useRef, useEffect } from 'react'
+import { useApp } from '../context/AppContext.jsx'
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
+const CATEGORIES = ['Food', 'Transport', 'Shopping', 'Health', 'Bills', 'Other']
 
-const TODAY_SPEND = 47.83
+const CATEGORY_EMOJI = {
+  Food:      '🍔',
+  Transport: '🚗',
+  Shopping:  '🛍',
+  Health:    '💊',
+  Bills:     '💡',
+  Other:     '📌',
+}
 
-// Mon–Sun daily spend for the current week (today = Monday index 0)
-const WEEKLY = [
-  { day: 'Mon', amount: 47.83, isToday: true  },
-  { day: 'Tue', amount: 0,     isToday: false },
-  { day: 'Wed', amount: 0,     isToday: false },
-  { day: 'Thu', amount: 0,     isToday: false },
-  { day: 'Fri', amount: 0,     isToday: false },
-  { day: 'Sat', amount: 0,     isToday: false },
-  { day: 'Sun', amount: 0,     isToday: false },
-]
+const DAY_INITIAL = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 
-const WEEK_TOTAL      = 47.83
-const LAST_WEEK_TOTAL = 214.52
-const MON_AVERAGE     = 59.20   // used for comparison line
+// ─── Date helpers ──────────────────────────────────────────────────────────────
 
-const TRANSACTIONS = [
-  { id: 1, icon: '☕', merchant: 'Starbucks',          category: 'Coffee',    amount: -6.75,  income: false },
-  { id: 2, icon: '🛒', merchant: 'Whole Foods',        category: 'Groceries', amount: -31.40, income: false },
-  { id: 3, icon: '⛽', merchant: 'Shell',               category: 'Gas',       amount: -9.68,  income: false },
-  { id: 4, icon: '💳', merchant: 'Venmo Transfer',     category: 'Transfer',  amount: 40.00,  income: true  },
-]
+function toDateStr(date) {
+  return date.toISOString().slice(0, 10)
+}
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+function todayDateStr() {
+  return toDateStr(new Date())
+}
+
+function getWeekDates() {
+  const today = new Date()
+  const dow = today.getDay()
+  const monOffset = dow === 0 ? -6 : 1 - dow
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(today)
+    d.setHours(0, 0, 0, 0)
+    d.setDate(today.getDate() + monOffset + i)
+    return d
+  })
+}
+
+// ─── Calculation helpers ───────────────────────────────────────────────────────
 
 function formatAmount(n) {
-  const abs    = Math.abs(n)
+  const abs     = Math.abs(n)
   const dollars = Math.floor(abs).toLocaleString('en-US')
   const cents   = String(Math.round((abs % 1) * 100)).padStart(2, '0')
   return { dollars, cents, sign: n < 0 ? '-' : '+' }
+}
+
+function getTodaySpend(transactions) {
+  const today = todayDateStr()
+  return transactions
+    .filter(t => t.date === today && t.amount < 0)
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+}
+
+function getWeeklyBars(transactions) {
+  const dates = getWeekDates()
+  const today = todayDateStr()
+  return dates.map((d, i) => {
+    const ds = toDateStr(d)
+    const amount = transactions
+      .filter(t => t.date === ds && t.amount < 0)
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+    return { day: DAY_INITIAL[i], amount, isToday: ds === today }
+  })
+}
+
+function getWeekTotal(transactions) {
+  const dateSet = new Set(getWeekDates().map(d => toDateStr(d)))
+  return transactions
+    .filter(t => dateSet.has(t.date) && t.amount < 0)
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+}
+
+function getFourWeekAvg(transactions) {
+  const today = new Date()
+  const totals = [7, 14, 21, 28].map(daysBack => {
+    const d = new Date(today)
+    d.setDate(today.getDate() - daysBack)
+    const ds = toDateStr(d)
+    return transactions
+      .filter(t => t.date === ds && t.amount < 0)
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+  })
+  return totals.reduce((a, b) => a + b, 0) / 4
+}
+
+function hasOddCharge(transactions) {
+  return transactions.some(t => Math.abs(t.amount) > 200)
+}
+
+function getTodayTransactions(transactions) {
+  const today = todayDateStr()
+  return transactions.filter(t => t.date === today)
+  // already prepended newest-first via ADD_TRANSACTION
 }
 
 // ─── Weekly bar chart ─────────────────────────────────────────────────────────
@@ -40,15 +100,14 @@ function formatAmount(n) {
 const MAX_HEIGHT = 48
 const BAR_WIDTH  = 18
 
-function WeeklyBars() {
-  const maxVal = Math.max(...WEEKLY.map(d => d.amount), 1)
-
+function WeeklyBars({ data }) {
+  const maxVal = Math.max(...data.map(d => d.amount), 1)
   return (
     <div style={bc.wrap}>
-      {WEEKLY.map(d => {
+      {data.map((d, i) => {
         const h = d.amount > 0 ? Math.max(4, Math.round((d.amount / maxVal) * MAX_HEIGHT)) : 4
         return (
-          <div key={d.day} style={bc.col}>
+          <div key={i} style={bc.col}>
             <div style={bc.barTrack}>
               <div style={{
                 ...bc.bar,
@@ -93,28 +152,89 @@ const sc = {
   sub:   { fontSize: '10px', color: 'var(--color-faint)', margin: 0 },
 }
 
-// ─── Transaction row ──────────────────────────────────────────────────────────
+// ─── Transaction row (swipe left → delete zone) ────────────────────────────────
 
-function TxRow({ tx }) {
+function TxRow({ tx, onDelete }) {
+  const [offset,  setOffset]  = useState(0)
+  const [exiting, setExiting] = useState(false)
+  const startXRef = useRef(0)
+  const DELETE_W  = 72
+
+  function handleTouchStart(e) { startXRef.current = e.touches[0].clientX }
+
+  function handleTouchMove(e) {
+    const delta = startXRef.current - e.touches[0].clientX
+    if (delta > 0) setOffset(Math.min(DELETE_W, delta))
+    else setOffset(0)
+  }
+
+  function handleTouchEnd() {
+    if (offset >= DELETE_W * 0.6) setOffset(DELETE_W)
+    else setOffset(0)
+  }
+
+  function handleDelete() {
+    setExiting(true)
+    setTimeout(onDelete, 200)
+  }
+
   const { dollars, cents, sign } = formatAmount(tx.amount)
+  const icon = CATEGORY_EMOJI[tx.category] || '📌'
+
   return (
-    <div style={tx_s.row}>
-      <div style={tx_s.iconWrap}>
-        <span style={tx_s.icon}>{tx.icon}</span>
+    <div style={{ position: 'relative', borderRadius: '11px', overflow: 'hidden' }}>
+      {/* Red delete zone revealed by swipe */}
+      <div style={tx_s.deleteZone} onClick={handleDelete}>
+        <span style={{ color: '#E05555', fontSize: '12px', fontWeight: 700 }}>Delete</span>
       </div>
-      <div style={tx_s.info}>
-        <span style={tx_s.merchant}>{tx.merchant}</span>
-        <span style={tx_s.category}>{tx.category}</span>
+      {/* Sliding row */}
+      <div
+        style={{
+          ...tx_s.row,
+          transform:  exiting ? 'translateX(-100%)' : `translateX(-${offset}px)`,
+          transition: exiting
+            ? 'transform 200ms ease'
+            : offset === 0 ? 'transform 200ms ease' : 'none',
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        <div style={tx_s.iconWrap}>
+          <span style={tx_s.icon}>{icon}</span>
+        </div>
+        <div style={tx_s.info}>
+          <span style={tx_s.merchant}>{tx.merchant}</span>
+          <span style={tx_s.category}>{tx.category}</span>
+        </div>
+        <span style={{ ...tx_s.amount, color: tx.amount < 0 ? 'var(--color-danger)' : 'var(--color-success)' }}>
+          {sign}${dollars}.{cents}
+        </span>
       </div>
-      <span style={{ ...tx_s.amount, color: tx.income ? 'var(--color-success)' : 'var(--color-danger)' }}>
-        {sign}${dollars}.{cents}
-      </span>
     </div>
   )
 }
 
 const tx_s = {
-  row:      { display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--color-card)', border: 'var(--border)', borderRadius: '11px', padding: '9px 12px' },
+  deleteZone: {
+    position:       'absolute',
+    right:          0, top: 0, bottom: 0,
+    width:          '72px',
+    background:     '#5A2020',
+    display:        'flex',
+    alignItems:     'center',
+    justifyContent: 'center',
+    cursor:         'pointer',
+  },
+  row: {
+    display:    'flex',
+    alignItems: 'center',
+    gap:        '10px',
+    background: 'var(--color-card)',
+    border:     'var(--border)',
+    borderRadius: '11px',
+    padding:    '9px 12px',
+  },
   iconWrap: { width: '28px', height: '28px', borderRadius: '8px', background: 'var(--color-chart-bar)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   icon:     { fontSize: '14px', lineHeight: 1 },
   info:     { flex: 1, display: 'flex', flexDirection: 'column', gap: '1px' },
@@ -123,14 +243,206 @@ const tx_s = {
   amount:   { fontSize: '13px', fontWeight: 600, flexShrink: 0 },
 }
 
+// ─── Add Transaction bottom sheet ─────────────────────────────────────────────
+
+function TransactionSheet({ onClose, onSave }) {
+  const [visible,  setVisible]  = useState(false)
+  const [merchant, setMerchant] = useState('')
+  const [amount,   setAmount]   = useState('')
+  const [isIncome, setIsIncome] = useState(false)
+  const [category, setCategory] = useState('Food')
+  const [date,     setDate]     = useState(todayDateStr())
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setVisible(true))
+    return () => cancelAnimationFrame(id)
+  }, [])
+
+  function close() {
+    setVisible(false)
+    setTimeout(onClose, 250)
+  }
+
+  function handleSave() {
+    if (!merchant.trim() || !amount) return
+    const sign = isIncome ? 1 : -1
+    onSave({
+      merchant: merchant.trim(),
+      amount:   sign * Math.abs(parseFloat(amount)),
+      category,
+      date,
+    })
+    close()
+  }
+
+  return (
+    <div
+      style={{ ...sh.backdrop, opacity: visible ? 1 : 0, pointerEvents: visible ? 'auto' : 'none' }}
+      onClick={close}
+    >
+      <div
+        style={{ ...sh.box, transform: visible ? 'translateY(0)' : 'translateY(100%)' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <h3 style={sh.title}>Add Transaction</h3>
+
+        <div style={sh.field}>
+          <label style={sh.label}>Merchant</label>
+          <input
+            type="text"
+            style={sh.input}
+            placeholder="e.g. Starbucks"
+            value={merchant}
+            onChange={e => setMerchant(e.target.value)}
+          />
+        </div>
+
+        <div style={sh.field}>
+          <label style={sh.label}>Amount</label>
+          <div style={sh.amountRow}>
+            <input
+              type="number"
+              style={{ ...sh.input, flex: 1 }}
+              placeholder="0.00"
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              min="0"
+              step="0.01"
+            />
+            <div style={sh.toggle}>
+              {['Spend', 'Income'].map(opt => {
+                const active = isIncome === (opt === 'Income')
+                return (
+                  <button
+                    key={opt}
+                    style={{
+                      ...sh.toggleBtn,
+                      background: active ? 'var(--color-accent-bg)' : 'transparent',
+                      color:      active ? 'var(--color-accent)'    : 'var(--color-muted)',
+                      border:     active ? '0.5px solid var(--color-accent)' : '0.5px solid transparent',
+                    }}
+                    onClick={() => setIsIncome(opt === 'Income')}
+                  >
+                    {opt}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div style={sh.field}>
+          <label style={sh.label}>Category</label>
+          <div style={sh.pillWrap}>
+            {CATEGORIES.map(cat => {
+              const active = category === cat
+              return (
+                <button
+                  key={cat}
+                  style={{
+                    ...sh.pill,
+                    background: active ? 'var(--color-accent-bg)' : 'var(--color-chart-bar)',
+                    color:      active ? 'var(--color-accent)'    : 'var(--color-muted)',
+                    border:     active ? '0.5px solid var(--color-accent)' : 'var(--border)',
+                  }}
+                  onClick={() => setCategory(cat)}
+                >
+                  {CATEGORY_EMOJI[cat]} {cat}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div style={sh.field}>
+          <label style={sh.label}>Date</label>
+          <input
+            type="date"
+            style={sh.input}
+            value={date}
+            onChange={e => setDate(e.target.value)}
+          />
+        </div>
+
+        <button
+          style={{ ...sh.saveBtn, opacity: merchant.trim() && amount ? 1 : 0.45 }}
+          onClick={handleSave}
+        >
+          Save transaction
+        </button>
+      </div>
+    </div>
+  )
+}
+
+const sh = {
+  backdrop: {
+    position:       'fixed',
+    inset:          0,
+    background:     'rgba(0,0,0,0.6)',
+    zIndex:         200,
+    transition:     'opacity 250ms ease',
+    display:        'flex',
+    alignItems:     'flex-end',
+    justifyContent: 'center',
+  },
+  box: {
+    width:                '100%',
+    maxWidth:             'var(--max-width)',
+    background:           'var(--color-card)',
+    borderTopLeftRadius:  '20px',
+    borderTopRightRadius: '20px',
+    padding:              '24px',
+    paddingBottom:        'calc(24px + var(--safe-bottom))',
+    transition:           'transform 250ms var(--ease-out)',
+    display:              'flex',
+    flexDirection:        'column',
+    gap:                  '16px',
+  },
+  title: {
+    fontFamily: 'var(--font-display)',
+    fontSize:   '22px',
+    color:      'var(--color-text)',
+    lineHeight: 1.2,
+  },
+  field:    { display: 'flex', flexDirection: 'column', gap: '8px' },
+  label:    { fontSize: '10px', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-muted)' },
+  input:    { height: '42px', background: 'var(--color-chart-bar)', border: 'var(--border)', borderRadius: '10px', color: 'var(--color-text)', fontFamily: 'var(--font-body)', fontSize: '15px', padding: '0 12px', outline: 'none', width: '100%', boxSizing: 'border-box' },
+  amountRow: { display: 'flex', gap: '8px', alignItems: 'stretch' },
+  toggle:    { display: 'flex', gap: '3px', background: 'var(--color-chart-bar)', borderRadius: '8px', padding: '3px', flexShrink: 0 },
+  toggleBtn: { padding: '6px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' },
+  pillWrap:  { display: 'flex', flexWrap: 'wrap', gap: '6px' },
+  pill:      { padding: '7px 11px', borderRadius: 'var(--radius-pill)', fontSize: '12px', fontWeight: 500, cursor: 'pointer' },
+  saveBtn:   { width: '100%', padding: '14px', borderRadius: '12px', background: 'var(--color-accent)', color: '#fff', fontSize: '15px', fontWeight: 600, border: 'none', cursor: 'pointer', marginTop: '4px', transition: 'opacity 0.15s' },
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function Finance() {
-  const { dollars, cents } = formatAmount(TODAY_SPEND)
-  const diff        = MON_AVERAGE - TODAY_SPEND
-  const diffStr     = `↓ $${Math.abs(diff).toFixed(2)} less than your Monday average`
-  const weekOver    = WEEK_TOTAL > LAST_WEEK_TOTAL
-  const weekColor   = weekOver ? 'var(--color-accent)' : 'var(--color-success)'
+  const { state, dispatch } = useApp()
+  const transactions   = state.transactions
+  const plaidConnected = state.settings.plaidConnected
+
+  const [showSheet, setShowSheet] = useState(false)
+
+  const todaySpend = getTodaySpend(transactions)
+  const weeklyBars = getWeeklyBars(transactions)
+  const weekTotal  = getWeekTotal(transactions)
+  const fourWkAvg  = getFourWeekAvg(transactions)
+  const isOdd      = hasOddCharge(transactions)
+  const todayList  = getTodayTransactions(transactions)
+
+  const { dollars, cents } = formatAmount(todaySpend)
+
+  let comparisonLine
+  if (fourWkAvg === 0) {
+    comparisonLine = 'No prior data for comparison'
+  } else {
+    const diff = fourWkAvg - todaySpend
+    comparisonLine = diff >= 0
+      ? `↓ $${Math.abs(diff).toFixed(2)} less than your 4-week average`
+      : `↑ $${Math.abs(diff).toFixed(2)} more than your 4-week average`
+  }
 
   return (
     <div style={s.screen}>
@@ -138,47 +450,73 @@ export default function Finance() {
       <div style={s.header}>
         <div style={s.headerRow}>
           <h1 style={s.title}>Finance</h1>
-          <span style={s.badge}>● Plaid connected</span>
+          <div style={s.headerRight}>
+            {plaidConnected ? (
+              <span style={{ ...s.badge, background: '#0C2A1E', color: '#1D9E75', border: '0.5px solid #1A4028' }}>
+                ● Plaid connected
+              </span>
+            ) : (
+              <span style={{ ...s.badge, background: '#2A1010', color: '#E05555', border: '0.5px solid #5A2020' }}>
+                ● Not connected
+              </span>
+            )}
+            <button style={s.addBtn} onClick={() => setShowSheet(true)}>+ Add</button>
+          </div>
         </div>
-        <p style={s.subtitle}>synced 4 min ago</p>
+        {plaidConnected && <p style={s.subtitle}>synced automatically</p>}
       </div>
 
       {/* ── Hero card ──────────────────────────────────────────────────── */}
       <div style={s.hero}>
         <p style={s.heroLabel}>Spent today</p>
         <div style={s.heroAmount}>
-          <span style={s.heroDollars}>
-            ${dollars}
-          </span>
+          <span style={s.heroDollars}>${dollars}</span>
           <span style={s.heroCents}>.{cents}</span>
         </div>
-        <p style={s.comparison}>{diffStr}</p>
-        <WeeklyBars />
+        <p style={s.comparison}>{comparisonLine}</p>
+        <WeeklyBars data={weeklyBars} />
       </div>
 
       {/* ── Stat grid ──────────────────────────────────────────────────── */}
       <div style={s.statGrid}>
         <StatCard
           label="This week"
-          value={`$${WEEK_TOTAL.toFixed(2)}`}
-          valueColor={weekColor}
-          sub={`vs $${LAST_WEEK_TOTAL.toFixed(2)} last week`}
+          value={`$${weekTotal.toFixed(2)}`}
+          valueColor="var(--color-accent)"
+          sub="total spend"
         />
         <StatCard
           label="Anything odd?"
-          value="All clear"
-          valueColor="var(--color-success)"
-          sub="No unusual charges"
+          value={isOdd ? 'Check it' : 'All clear'}
+          valueColor={isOdd ? 'var(--color-accent)' : 'var(--color-success)'}
+          sub={isOdd ? 'Transaction over $200' : 'No unusual charges'}
         />
       </div>
 
       {/* ── Transactions ───────────────────────────────────────────────── */}
       <div style={s.section}>
         <p style={s.sectionLabel}>Today's transactions</p>
-        <div style={s.txList}>
-          {TRANSACTIONS.map(tx => <TxRow key={tx.id} tx={tx} />)}
-        </div>
+        {todayList.length === 0 ? (
+          <p style={s.empty}>No transactions today — tap + Add to log one.</p>
+        ) : (
+          <div style={s.txList}>
+            {todayList.map(tx => (
+              <TxRow
+                key={tx.id}
+                tx={tx}
+                onDelete={() => dispatch({ type: 'DELETE_TRANSACTION', payload: tx.id })}
+              />
+            ))}
+          </div>
+        )}
       </div>
+
+      {showSheet && (
+        <TransactionSheet
+          onClose={() => setShowSheet(false)}
+          onSave={payload => dispatch({ type: 'ADD_TRANSACTION', payload })}
+        />
+      )}
     </div>
   )
 }
@@ -195,7 +533,6 @@ const s = {
     background:    'var(--color-bg)',
   },
 
-  // Header
   header: {
     padding:       '0 20px var(--space-5)',
     display:       'flex',
@@ -203,9 +540,14 @@ const s = {
     gap:           'var(--space-1)',
   },
   headerRow: {
+    display:        'flex',
+    alignItems:     'center',
+    justifyContent: 'space-between',
+  },
+  headerRight: {
     display:    'flex',
     alignItems: 'center',
-    gap:        'var(--space-3)',
+    gap:        '8px',
   },
   title: {
     fontFamily: 'var(--font-display)',
@@ -216,18 +558,24 @@ const s = {
   badge: {
     padding:      '3px 9px',
     borderRadius: 'var(--radius-pill)',
-    background:   'var(--color-success-bg)',
-    color:        'var(--color-success)',
-    border:       '0.5px solid var(--color-success)',
     fontSize:     '11px',
     fontWeight:   600,
+  },
+  addBtn: {
+    padding:      '5px 12px',
+    borderRadius: 'var(--radius-pill)',
+    background:   'var(--color-accent)',
+    color:        '#fff',
+    fontSize:     '12px',
+    fontWeight:   600,
+    border:       'none',
+    cursor:       'pointer',
   },
   subtitle: {
     fontSize: '13px',
     color:    'var(--color-muted)',
   },
 
-  // Hero
   hero: {
     margin:       '0 20px var(--space-4)',
     background:   'var(--color-card)',
@@ -244,9 +592,9 @@ const s = {
     margin:        '0 0 6px',
   },
   heroAmount: {
-    display:    'flex',
-    alignItems: 'baseline',
-    gap:        '1px',
+    display:      'flex',
+    alignItems:   'baseline',
+    gap:          '1px',
     marginBottom: '4px',
   },
   heroDollars: {
@@ -263,22 +611,18 @@ const s = {
     lineHeight: 1,
   },
   comparison: {
-    fontSize:     '12px',
-    color:        'var(--color-faint)',
-    margin:       '0 0 14px',
+    fontSize: '12px',
+    color:    'var(--color-faint)',
+    margin:   '0 0 14px',
   },
 
-  // Stat grid
   statGrid: {
-    display:    'flex',
-    gap:        '8px',
-    margin:     '0 20px var(--space-4)',
+    display: 'flex',
+    gap:     '8px',
+    margin:  '0 20px var(--space-4)',
   },
 
-  // Transactions
-  section: {
-    padding: '0 20px',
-  },
+  section: { padding: '0 20px' },
   sectionLabel: {
     fontSize:      '11px',
     fontWeight:    600,
@@ -291,5 +635,12 @@ const s = {
     display:       'flex',
     flexDirection: 'column',
     gap:           '6px',
+  },
+  empty: {
+    fontSize:  '13px',
+    color:     'var(--color-faint)',
+    textAlign: 'center',
+    padding:   '24px 0',
+    lineHeight: 1.4,
   },
 }

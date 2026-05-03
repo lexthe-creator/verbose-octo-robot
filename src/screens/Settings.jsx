@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext.jsx'
-import { getPhase, PHASE_LABELS } from '../utils/fitness.js'
+import { getPhase, getWeekNumber, PHASE_LABELS } from '../utils/fitness.js'
 
 const EQUIPMENT_OPTIONS = [
   { value: 'bodyweight', label: 'Bodyweight' },
@@ -26,7 +26,9 @@ export default function Settings({ onBack }) {
     dispatch({ type: 'UPDATE_SETTINGS', payload: { key: 'gymAccess', value } })
   }
 
-  const phaseKey = getPhase(state.fitness.weekNumber)
+  const { programStartDate, programEndDate } = state.fitness
+  const phaseKey = getPhase(programStartDate, programEndDate)
+  const weekNum  = getWeekNumber(programStartDate)
 
   return (
     <div style={s.screen}>
@@ -82,6 +84,38 @@ export default function Settings({ onBack }) {
         </div>
       </section>
 
+      {/* Program */}
+      <section style={s.card}>
+        <p style={s.cardLabel}>Program</p>
+        <div style={s.field}>
+          <label style={s.fieldLabel}>Start date</label>
+          <input
+            type="date"
+            style={s.input}
+            value={programStartDate || ''}
+            onChange={e => dispatch({
+              type:    'UPDATE_FITNESS',
+              payload: { key: 'programStartDate', value: e.target.value || null },
+            })}
+          />
+        </div>
+        <div style={s.field}>
+          <label style={s.fieldLabel}>Race date</label>
+          <input
+            type="date"
+            style={s.input}
+            value={programEndDate || ''}
+            onChange={e => dispatch({
+              type:    'UPDATE_FITNESS',
+              payload: { key: 'programEndDate', value: e.target.value || null },
+            })}
+          />
+        </div>
+        <p style={s.helper}>
+          Phase and week number are calculated from these dates
+        </p>
+      </section>
+
       {/* Connections */}
       <section style={s.card}>
         <p style={s.cardLabel}>Connections</p>
@@ -115,7 +149,7 @@ export default function Settings({ onBack }) {
         <div style={s.divider} />
         <div style={s.aboutRow}>
           <span style={s.aboutLeft}>Week</span>
-          <span style={s.aboutRight}>Week {state.fitness.weekNumber}</span>
+          <span style={s.aboutRight}>Week {weekNum}</span>
         </div>
       </section>
 

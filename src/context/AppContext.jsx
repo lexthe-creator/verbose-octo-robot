@@ -69,12 +69,14 @@ const initialState = {
     theme:              'dark',        // 'dark' | 'light'
   },
 
-  // Fitness training block. Phase is derived — call getPhase(weekNumber)
+  // Fitness training block. Phase is derived — call getPhase(programStartDate, programEndDate)
   // from utils/fitness.js; don't read/write a stored phase field.
   fitness: {
-    weekNumber:    1,            // increments each Monday
-    workoutLog:    [],           // { date, type, duration, feel, notes, exercises[] }
-    todayComplete: false,        // resets on new calendar day
+    weekNumber:       1,    // legacy — UI uses getWeekNumber(programStartDate) when set
+    programStartDate: null, // ISO date string (YYYY-MM-DD)
+    programEndDate:   null, // ISO date string — race date
+    workoutLog:       [],   // { date, type, duration, feel, notes, exercises[] }
+    todayComplete:    false,
   },
 
   // Morning ignition
@@ -110,6 +112,9 @@ const initialState = {
 
   // Inbox
   inboxItems: [],
+
+  // Finance transactions (persists across day resets)
+  transactions: [], // { id, merchant, amount, category, date }
 
   // Focus timer
   focusSessions: 0,
@@ -248,14 +253,30 @@ function reducer(state, action) {
         fitness: { ...state.fitness, weekNumber: state.fitness.weekNumber + 1 },
       };
 
+    // payload: { merchant, amount, category, date } — amount is signed (negative = spend)
+    case 'ADD_TRANSACTION': {
+      const tx = { id: `tx${Date.now()}`, ...action.payload }
+      return { ...state, transactions: [tx, ...state.transactions] }
+    }
+
+    case 'DELETE_TRANSACTION':
+      return { ...state, transactions: state.transactions.filter(t => t.id !== action.payload) }
+
+    // payload: { key, value } — updates fitness state slice
+    case 'UPDATE_FITNESS': {
+      const { key, value } = action.payload
+      return { ...state, fitness: { ...state.fitness, [key]: value } }
+    }
+
     case 'RESET_DAY':
       return {
         ...initialState,
         // Preserve cross-day state
-        profile:    state.profile,
-        settings:   state.settings,
-        fitness:    { ...state.fitness, todayComplete: false },
-        inboxItems: state.inboxItems,
+        profile:      state.profile,
+        settings:     state.settings,
+        fitness:      { ...state.fitness, todayComplete: false },
+        inboxItems:   state.inboxItems,
+        transactions: state.transactions,
       };
 
     default:
@@ -292,10 +313,11 @@ function loadState() {
       if (lockedDate !== today) {
         return {
           ...initialState,
-          profile:    { ...initialState.profile,  ...(saved.profile  || {}) },
-          settings:   { ...initialState.settings, ...(saved.settings || {}) },
-          fitness:    { ...initialState.fitness,  ...(saved.fitness  || {}), todayComplete: false },
-          inboxItems: saved.inboxItems || [],
+          profile:      { ...initialState.profile,  ...(saved.profile  || {}) },
+          settings:     { ...initialState.settings, ...(saved.settings || {}) },
+          fitness:      { ...initialState.fitness,  ...(saved.fitness  || {}), todayComplete: false },
+          inboxItems:   saved.inboxItems   || [],
+          transactions: saved.transactions || [],
         };
       }
     }
@@ -304,9 +326,10 @@ function loadState() {
       ...initialState,
       ...saved,
       // Deep-merge nested slices so new fields added post-release don't crash
-      profile:  { ...initialState.profile,  ...(saved.profile  || {}) },
-      settings: { ...initialState.settings, ...(saved.settings || {}) },
-      fitness:  { ...initialState.fitness,  ...(saved.fitness  || {}) },
+      profile:      { ...initialState.profile,  ...(saved.profile  || {}) },
+      settings:     { ...initialState.settings, ...(saved.settings || {}) },
+      fitness:      { ...initialState.fitness,  ...(saved.fitness  || {}) },
+      transactions: saved.transactions || [],
     };
   } catch {
     return initialState;

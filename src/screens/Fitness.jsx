@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useApp } from '../context/AppContext.jsx'
 import {
-  getPhase, PHASE_LABELS,
+  getPhase, getWeekNumber, PHASE_LABELS,
   getTodayType, getWeekDates, getTypeForDay,
   generateWorkout,
 } from '../utils/fitness.js'
@@ -25,15 +25,53 @@ function todayWeekIndex() {
   return (new Date().getDay() + 6) % 7
 }
 
+// ─── Workout preview helpers ──────────────────────────────────────────────────
+
+function fmtSegDetail(seg) {
+  if (seg.sets && seg.reps) return `${seg.sets}×${seg.reps}`
+  if (seg.duration) {
+    const m = Math.floor(seg.duration / 60)
+    const s = seg.duration % 60
+    return s > 0 ? `${m}:${String(s).padStart(2, '0')}` : `${m} min`
+  }
+  if (seg.reps) return seg.reps
+  return ''
+}
+
+function PreviewSection({ title, segs }) {
+  return (
+    <div style={tc.prevSection}>
+      <p style={tc.prevSectionTitle}>{title}</p>
+      {segs.map((seg, i) => (
+        <div key={i} style={tc.prevRow}>
+          <span style={tc.prevName}>{seg.name}</span>
+          <span style={tc.prevDetail}>{fmtSegDetail(seg)}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ─── Today card ──────────────────────────────────────────────────────────────
 
 function TodayCard({ workout, todayComplete, isToday, onStart }) {
-  const canStart = isToday && workout.type !== 'rest' && !todayComplete
-  const abbr     = TYPE_ABBR[workout.type] || '?'
+  const [expanded, setExpanded] = useState(false)
+
+  const canStart    = isToday && workout.type !== 'rest' && !todayComplete
+  const hasPreview  = workout.type !== 'rest' && workout.segments.length > 0
+  const abbr        = TYPE_ABBR[workout.type] || '?'
+
+  const warmupSegs = workout.segments.filter(s => s.section === 'warmup')
+  const mainSegs   = workout.segments.filter(s => s.section === 'main' || !s.section)
+  const coolSegs   = workout.segments.filter(s => s.section === 'cooldown')
 
   return (
     <div style={tc.wrap}>
-      <div style={tc.top}>
+      {/* Header — tap to toggle preview */}
+      <div
+        style={{ ...tc.top, cursor: hasPreview ? 'pointer' : 'default' }}
+        onClick={() => hasPreview && setExpanded(e => !e)}
+      >
         <span style={tc.abbr}>{abbr}</span>
         <div style={tc.info}>
           <p style={tc.name}>{workout.title}</p>
@@ -42,16 +80,48 @@ function TodayCard({ workout, todayComplete, isToday, onStart }) {
         {isToday && todayComplete && (
           <span style={tc.doneBadge}>Done</span>
         )}
+        {hasPreview && (
+          <span style={{
+            ...tc.chevron,
+            transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+          }}>▾</span>
+        )}
       </div>
 
-      {isToday && workout.type !== 'rest' && (
+      {/* Expandable workout preview */}
+      <div style={{
+        overflow:   'hidden',
+        maxHeight:  expanded ? '900px' : '0',
+        transition: 'max-height 300ms ease',
+      }}>
+        <div style={tc.prevWrap}>
+          {warmupSegs.length > 0 && <PreviewSection title="WARM UP"   segs={warmupSegs} />}
+          {mainSegs.length   > 0 && <PreviewSection title="MAIN"      segs={mainSegs}   />}
+          {coolSegs.length   > 0 && <PreviewSection title="COOL DOWN" segs={coolSegs}   />}
+
+          <div style={tc.prevFooter}>
+            <span style={tc.prevTotal}>~{workout.durationEst} min</span>
+            {canStart && (
+              <button style={tc.startInPreview} onClick={onStart}>
+                Start Workout
+              </button>
+            )}
+            {isToday && todayComplete && (
+              <span style={tc.completedLabel}>✓ Completed</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Collapsed-state start / completed button */}
+      {isToday && workout.type !== 'rest' && !expanded && (
         <button
           style={{
             ...tc.startBtn,
-            background:  todayComplete ? 'var(--color-success-bg)' : 'var(--color-accent)',
-            color:       todayComplete ? 'var(--color-success)'    : '#fff',
-            border:      todayComplete ? '0.5px solid var(--color-success)' : 'none',
-            cursor:      canStart ? 'pointer' : 'default',
+            background: todayComplete ? 'var(--color-success-bg)' : 'var(--color-accent)',
+            color:      todayComplete ? 'var(--color-success)'    : '#fff',
+            border:     todayComplete ? '0.5px solid var(--color-success)' : 'none',
+            cursor:     canStart ? 'pointer' : 'default',
           }}
           onClick={canStart ? onStart : undefined}
           disabled={!canStart}
@@ -77,6 +147,7 @@ const tc = {
     display:    'flex',
     alignItems: 'center',
     gap:        '12px',
+    userSelect: 'none',
   },
   abbr: {
     width:          '40px',
@@ -111,6 +182,72 @@ const tc = {
     fontWeight:   600,
     flexShrink:   0,
   },
+  chevron: {
+    fontSize:   '18px',
+    color:      'var(--color-muted)',
+    flexShrink: 0,
+    transition: 'transform 300ms ease',
+    lineHeight: 1,
+  },
+
+  // Preview sections
+  prevWrap: {
+    display:       'flex',
+    flexDirection: 'column',
+    gap:           '12px',
+    paddingTop:    '4px',
+  },
+  prevSection: {
+    display:       'flex',
+    flexDirection: 'column',
+    gap:           '4px',
+  },
+  prevSectionTitle: {
+    fontSize:      '9px',
+    fontWeight:    700,
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase',
+    color:         'var(--color-muted)',
+    marginBottom:  '4px',
+  },
+  prevRow: {
+    display:        'flex',
+    justifyContent: 'space-between',
+    alignItems:     'center',
+    padding:        '5px 0',
+    borderBottom:   '0.5px solid var(--color-border)',
+  },
+  prevName:   { fontSize: '13px', color: 'var(--color-text)', fontWeight: 500 },
+  prevDetail: { fontSize: '13px', color: 'var(--color-accent)', fontWeight: 600 },
+
+  prevFooter: {
+    display:        'flex',
+    alignItems:     'center',
+    justifyContent: 'space-between',
+    paddingTop:     '4px',
+    gap:            '12px',
+  },
+  prevTotal: {
+    fontSize:  '12px',
+    color:     'var(--color-muted)',
+    fontWeight: 500,
+  },
+  startInPreview: {
+    padding:      '10px 18px',
+    borderRadius: 'var(--radius-sm)',
+    background:   'var(--color-accent)',
+    color:        '#fff',
+    fontSize:     '14px',
+    fontWeight:   600,
+    border:       'none',
+    cursor:       'pointer',
+  },
+  completedLabel: {
+    fontSize:   '13px',
+    color:      'var(--color-success)',
+    fontWeight: 600,
+  },
+
   startBtn: {
     width:        '100%',
     padding:      '14px',
@@ -118,6 +255,7 @@ const tc = {
     fontSize:     '15px',
     fontWeight:   600,
     transition:   'background 0.15s',
+    border:       'none',
   },
 }
 
@@ -225,22 +363,34 @@ const lr = {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
+function getWeeksToRace(programEndDate) {
+  if (!programEndDate) return null
+  const end   = new Date(programEndDate)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const msLeft = end - today
+  if (msLeft <= 0) return 0
+  return Math.ceil(msLeft / (7 * 24 * 60 * 60 * 1000))
+}
+
 export default function Fitness({ onStartWorkout }) {
   const { state } = useApp()
-  const { weekNumber, workoutLog, todayComplete } = state.fitness
+  const { programStartDate, programEndDate, workoutLog, todayComplete } = state.fitness
   const gymAccess = state.settings.gymAccess
 
-  const weekDates  = getWeekDates()
-  const phaseKey   = getPhase(weekNumber)
-  const todayIdx   = todayWeekIndex()
+  const weekNum     = getWeekNumber(programStartDate)
+  const weekDates   = getWeekDates()
+  const phaseKey    = getPhase(programStartDate, programEndDate)
+  const weeksToRace = getWeeksToRace(programEndDate)
+  const todayIdx    = todayWeekIndex()
 
   // null = viewing today, 0-6 = browsing a specific day
   const [selectedIndex, setSelectedIndex] = useState(null)
 
-  const viewingIndex = selectedIndex ?? todayIdx
-  const viewingDate  = weekDates[viewingIndex]
-  const viewingType  = getTypeForDay(viewingDate.getDay())
-  const viewedWorkout = generateWorkout(viewingType, gymAccess, weekNumber)
+  const viewingIndex   = selectedIndex ?? todayIdx
+  const viewingDate    = weekDates[viewingIndex]
+  const viewingType    = getTypeForDay(viewingDate.getDay())
+  const viewedWorkout  = generateWorkout(viewingType, gymAccess, weekNum)
   const isViewingToday = selectedIndex === null || selectedIndex === todayIdx
 
   const recentLog = [...workoutLog].reverse().slice(0, 5)
@@ -254,8 +404,13 @@ export default function Fitness({ onStartWorkout }) {
         <p style={s.phase}>{PHASE_LABELS[phaseKey]}</p>
         <div style={s.titleRow}>
           <h1 style={s.title}>Training</h1>
-          <span style={s.weekBadge}>Week {weekNumber}</span>
+          <span style={s.weekBadge}>Week {weekNum}</span>
         </div>
+        {weeksToRace !== null && (
+          <p style={s.raceCountdown}>
+            {weeksToRace === 0 ? 'Race week!' : `${weeksToRace} week${weeksToRace === 1 ? '' : 's'} to race`}
+          </p>
+        )}
       </div>
 
       {/* Weekly strip */}
@@ -341,6 +496,12 @@ const s = {
     fontSize:   '13px',
     color:      'var(--color-muted)',
     fontWeight: 500,
+  },
+  raceCountdown: {
+    fontSize:   '12px',
+    color:      'var(--color-accent)',
+    fontWeight: 600,
+    marginTop:  '2px',
   },
   section: {
     display:       'flex',

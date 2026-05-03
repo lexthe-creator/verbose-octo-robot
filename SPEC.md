@@ -174,11 +174,13 @@ Source of truth: `src/context/AppContext.jsx`. Main state persisted to `localSto
   },
 
   // Fitness training block (persists across days; todayComplete resets)
-  // Phase is DERIVED — never stored. Call getPhase(weekNumber) from utils/fitness.js
+  // Phase is DERIVED — call getPhase(programStartDate, programEndDate) from utils/fitness.js.
   fitness: {
-    weekNumber:    1,       // increments manually or each Monday
-    workoutLog:    [],      // { date, type, title, duration, feel, notes, exercises[] }[]
-    todayComplete: false,   // resets on new calendar day
+    weekNumber:       1,    // legacy fallback; use getWeekNumber(programStartDate) in UI
+    programStartDate: null, // ISO date string (YYYY-MM-DD)
+    programEndDate:   null, // ISO date string — race day
+    workoutLog:       [],   // { date, type, title, duration, feel, notes, exercises[] }[]
+    todayComplete:    false,
   },
 
   // Morning Ignition
@@ -216,6 +218,12 @@ Source of truth: `src/context/AppContext.jsx`. Main state persisted to `localSto
   // Inbox
   inboxItems: [
     { id: string, text: string, createdAt: ISO8601 },
+  ],
+
+  // Finance transactions (persists across day resets)
+  transactions: [
+    { id: string, merchant: string, amount: number, category: string, date: 'YYYY-MM-DD' },
+    // amount is signed: negative = spend, positive = income
   ],
 
   // Focus Timer
@@ -272,8 +280,11 @@ Source of truth: `src/context/AppContext.jsx`. Main state persisted to `localSto
 | `UPDATE_PROFILE` | `{ name }` | Merges into `profile` |
 | `UPDATE_SETTINGS` | `{ key, value }` | Sets `settings[key] = value` |
 | `LOG_WORKOUT` | `{ date, type, title, duration, feel, notes, exercises[] }` | Appends to `fitness.workoutLog`; sets `fitness.todayComplete = true` |
-| `INCREMENT_WEEK` | — | Increments `fitness.weekNumber` by 1 |
+| `INCREMENT_WEEK` | — | Increments `fitness.weekNumber` by 1 (legacy — prefer `UPDATE_FITNESS { key: 'programStartDate' }`) |
+| `UPDATE_FITNESS` | `{ key, value }` | Sets `fitness[key] = value` — used for `programStartDate`, `programEndDate` |
 | `ADD_TASK` | `{ text }` | Appends `{ id: Date.now(), text, done: false, scheduledTime: null }` to `tasks` |
+| `ADD_TRANSACTION` | `{ merchant, amount, category, date }` | Prepends new transaction to `transactions` (amount is signed) |
+| `DELETE_TRANSACTION` | transaction `id` string | Removes transaction from `transactions` |
 | `RESET_DAY` | — | Resets to `initialState`, preserves `profile`, `settings`, `fitness` (minus `todayComplete`), `inboxItems` |
 | `TOGGLE_SS_TASK` | task `id` string | Dispatched to `ssDispatch` — toggles `ssState.tasks[id].done` |
 
@@ -426,15 +437,14 @@ Layout zones top to bottom:
 
 **File:** `src/screens/Finance.jsx` ✅ Done
 
-- Header: "Finance" (DM Serif Display 32px) + "● Plaid connected" badge (bg `#0C2A1E`, text `#1D9E75`, border `#1A4028`) + "synced 4 min ago" muted subtitle
-- Hero card (bg `#1E1E18`, border `#2A2A22`, radius 14px): "Spent today" 9px uppercase label · DM Serif Display 38px dollars + 22px `#4A4A40` cents · comparison line `#4A4A40` · 7-bar weekly chart
-- Weekly bars: Mon–Sun, `BAR_WIDTH 18px`, gap 4px, max height 48px. Today bar `#C17B56`, others `#252520`. Day labels 8px; today label `#C17B56`
-- 2-column stat grid (gap 8px): "This week" (value `#C17B56` if over last week, `#1D9E75` if under) + "Anything odd?" (value `#1D9E75` "All clear" or `#C17B56` flag)
-- "Today's transactions" list: 28px emoji icon circle (bg `#252520`, radius 8px) · merchant 12px `#C8C4BC` · category 10px `#3A3A30` · amount `#E05555` (spend) or `#1D9E75` (income)
-- V1: all data hardcoded mock. V2: real Plaid API
-- No AppContext dependency
-
-**Note:** Inline styles object named `tx_s` (not `tx`) to avoid shadowing the `tx` prop parameter inside `TxRow`.
+- **Header:** "Finance" (DM Serif Display 32px) + dynamic Plaid badge + `+ Add` button (terracotta pill)
+  - `plaidConnected: false` → red badge `#2A1010/#E05555/#5A2020` "● Not connected"
+  - `plaidConnected: true` → green badge `#0C2A1E/#1D9E75/#1A4028` "● Plaid connected" + "synced automatically" subtitle
+- **Hero card:** "Spent today" · DM Serif Display 38px · 7-bar weekly chart. Comparison line shows diff vs 4-week same-day average (hides when no prior data).
+- **Stat grid:** "This week" (accent) + "Anything odd?" (green = clear, accent = any tx > $200)
+- **Today's transactions:** list computed from `state.transactions` filtered to today, newest-first. Empty state shown when none. Swipe left on row → red delete zone 72px wide → tap → 200ms slide-out → `DELETE_TRANSACTION`.
+- **`+ Add` → `TransactionSheet` bottom sheet:** merchant text · amount number + Spend/Income toggle · category pills (Food/Transport/Shopping/Health/Bills/Other) · date input. Save dispatches `ADD_TRANSACTION`.
+- All data driven from `state.transactions`. `// TODO V2: Twilio SMS pipeline` at top of file.
 
 ---
 
@@ -446,8 +456,9 @@ Layout zones top to bottom:
 
 - **Profile card** — text input for `profile.name`; onBlur dispatches `UPDATE_PROFILE { name }`.
 - **Training card** — 3-pill equipment toggle (Bodyweight / Dumbbells / Full gym); dispatches `UPDATE_SETTINGS { key: 'gymAccess', value }`. Controls which exercise list `generateWorkout` selects.
+- **Program card** — start date input → `UPDATE_FITNESS { key: 'programStartDate', value }` · race date input → `UPDATE_FITNESS { key: 'programEndDate', value }`. Both ISO date strings or null.
 - **Connections card** — Plaid (bank & spending) and Google Calendar rows. Stub `StubSheet` bottom-sheet explains V2 timeline.
-- **About card** — shows app version, current training phase label (`PHASE_LABELS[getPhase(weekNumber)]`), and week number.
+- **About card** — shows app version, current training phase label (`PHASE_LABELS[getPhase(programStartDate, programEndDate)]`), and week number (`getWeekNumber(programStartDate)`).
 
 ---
 
@@ -457,10 +468,10 @@ Layout zones top to bottom:
 **Props:** `onStartWorkout(workout)` — App.jsx manages global WorkoutPlayer overlay.
 **Nav:** Shown (Fitness tab in bottom nav).
 
-- **Header** — phase label (terracotta, small caps) + "Training" title + "Week N" badge.
-- **Today card** — generated via `generateWorkout(getTodayType(), gymAccess, weekNumber)`. Displays workout icon, title, subtitle. "Start →" button calls `onStartWorkout(workout)`; green completed state when `fitness.todayComplete`.
-- **Weekly strip** — 7-column grid (Mon–Sun). Each cell shows day initial + workout type emoji. Today's cell: accent bg + accent border.
-- **Recent log** — last 5 entries from `fitness.workoutLog` (reverse order). Each row: title, date + duration, feel emoji.
+- **Header** — phase label (terracotta, small caps) + "Training" title + "Week N" badge. When `programEndDate` is set: accent "X weeks to race" line below (or "Race week!" when 0).
+- **Today card** — generated via `generateWorkout(getTodayType(), gymAccess, weekNum)` where `weekNum = getWeekNumber(programStartDate)`. Card header is tappable: toggles full workout preview with 300ms max-height animation. Preview shows WARM UP / MAIN / COOL DOWN sections; each row: name left + `3×10` or `2:00` right in accent. Footer: `~Xmin` + "Start Workout" button. Collapsed state shows original Start/Completed button.
+- **Weekly strip** — 7-column grid (Mon–Sun). Each cell shows day initial + workout type abbr. Today's cell: accent bg + accent border.
+- **Recent log** — last 5 entries from `fitness.workoutLog` (reverse order). Each row: title, date + duration, feel label.
 
 ---
 
@@ -488,9 +499,17 @@ Full-screen `position: fixed` overlay (`z-index: 150`). Flows through `workout.s
 
 Returns `{ type, title, subtitle, durationEst, segments[] }`.
 
+**Segment shape:** `{ kind, section, name, duration?, sets?, reps?, restSec?, detail?, hyrox? }`
+- `section`: `'warmup'` | `'main'` | `'cooldown'` — used by preview renderer
+- `kind`: `'timed'` | `'exercise'` | `'text'`
+
+**Shared warmup (all types):** Jumping jacks 2 min · Hip circles 1 min each · Leg swings 30s each
+
+**Shared cooldown (all types):** Hamstring stretch 60s each · Hip flexor 60s each · Child's pose 2 min
+
 **Run durations** scale per 4-week block (weeks 1–4, 5–8, 9–12, 13+):
 - Easy run main block: 20 / 25 / 30 / 35 min
-- Tempo main block: 10 / 15 / 20 / 25 min  
+- Tempo main block (inner): 10 / 15 / 20 / 25 min + 5 min easy each side
 - Long run main block: 30 / 40 / 50 / 60 min
 
 **HYROX phase** (weeks 17–24): replaces final strength exercise with station drill:
@@ -499,7 +518,9 @@ Returns `{ type, title, subtitle, durationEst, segments[] }`.
 - Weeks 21–22: Wall balls / DB thruster (3×15)
 - Weeks 23–24: Farmers carry simulation (3×40m)
 
-**Phase logic:** `getPhase(weekNumber)` → `'base'` (1–16) / `'hyrox'` (17–24) / `'race'` (25–26). Phase is never stored in state — always derived.
+**Phase logic:** `getPhase(programStartDate, programEndDate)` → `'race'` (≤2 wks to end) / `'hyrox'` (≤10 wks) / falls through to week-based: `'base'` (wk 1–16) / `'hyrox'` (17–24) / `'race'` (25+). Phase is never stored in state.
+
+`getWeekNumber(programStartDate)` → weeks since start date (min 1); returns 1 when null.
 
 **Day schedule** (JS `getDay()` indexed): Sun=rest, Mon=easy\_run, Tue=strength\_a, Wed=stretch, Thu=tempo\_run, Fri=strength\_b, Sat=long\_run.
 
@@ -641,6 +662,7 @@ File: `.github/workflows/pages.yml`
 ### Deferred (V2+)
 
 - **Real Plaid API** integration (read-only transaction sync)
+- **V2 Twilio SMS pipeline** — finance spend alerts via SMS (stub comment in Finance.jsx)
 - **Runna API** integration (live workout data instead of mock)
 - **Google Calendar** integration (inbox "→ Calendar" action)
 - **Task editing** — add/edit/delete tasks from the app
@@ -650,6 +672,8 @@ File: `.github/workflows/pages.yml`
 - **Multiple energy history** — chart of energy levels over time
 - **Swipe left to delete** on task rows
 - **iCloud / remote sync** — multi-device state
+- **V2 intensity blocks** — RPE-based effort scaling within phases
+- **V3 program builder** — custom week-by-week plan editor
 
 ---
 
@@ -667,5 +691,6 @@ File: `.github/workflows/pages.yml`
 | 7 | Finance (mock data) | ✅ Done | `src/screens/Finance.jsx` |
 | 8 | PWA manifest + GitHub Pages deploy | ✅ Done | `public/manifest.json`, `public/icons/icon-192.png`, `public/icons/icon-512.png`, `vite.config.js`, `.github/workflows/pages.yml` |
 | 9 | Fitness tab, workout generator, settings, polish | ✅ Done | `src/utils/fitness.js`, `src/screens/Fitness.jsx`, `src/screens/Settings.jsx`, `src/components/WorkoutPlayer.jsx`, `src/components/FuelEditSheet.jsx`, `src/screens/Home.jsx` (training card, gear icon, greeting), `src/screens/Inbox.jsx` (ADD_TASK + flash), `src/screens/MorningIgnition.jsx` (meal labels), `src/context/AppContext.jsx` (profile/settings/fitness slices), `src/App.jsx` (4-tab nav, global WorkoutPlayer overlay) |
+| 11 | Finance transactions, fitness program dates, workout preview | ✅ Done | `src/context/AppContext.jsx` (transactions[], programStartDate/End, ADD_TRANSACTION, DELETE_TRANSACTION, UPDATE_FITNESS), `src/screens/Finance.jsx` (dynamic Plaid badge, live calculations, TransactionSheet, swipe-delete), `src/utils/fitness.js` (getWeekNumber, getPhase(startDate,endDate), shared WARMUP/COOLDOWN, section field on all segments), `src/screens/Fitness.jsx` (program-date header, weeks-to-race, expandable TodayCard preview), `src/screens/Settings.jsx` (Program section with date inputs) |
 
 **Live URL:** https://lexthe-creator.github.io/verbose-octo-robot/

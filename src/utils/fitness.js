@@ -1,9 +1,37 @@
-// ─── Phase logic ────────────────────────────────────────────────────────────
+// ─── Week number from program start date ────────────────────────────────────
 
-// weeks 1–16 → 'base'; 17–24 → 'hyrox'; 25–26 → 'race'
-export function getPhase(weekNumber) {
-  if (weekNumber >= 25) return 'race'
-  if (weekNumber >= 17) return 'hyrox'
+// Returns the current program week (1-indexed, minimum 1).
+// Falls back to 1 when programStartDate is null.
+export function getWeekNumber(programStartDate) {
+  if (!programStartDate) return 1
+  const start = new Date(programStartDate)
+  start.setHours(0, 0, 0, 0)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const weeks = Math.floor((today - start) / (7 * 24 * 60 * 60 * 1000))
+  return Math.max(1, weeks + 1)
+}
+
+// ─── Phase logic ─────────────────────────────────────────────────────────────
+
+// When programEndDate is set, derive phase from weeks remaining to race:
+//   ≤2 weeks → 'race'  |  ≤10 weeks → 'hyrox'  |  else fall through to week-based
+// Without programEndDate, uses week number from programStartDate.
+export function getPhase(programStartDate, programEndDate) {
+  if (programEndDate) {
+    const end = new Date(programEndDate)
+    end.setHours(0, 0, 0, 0)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const msLeft = end - today
+    if (msLeft <= 0) return 'race'
+    const weeksToEnd = Math.ceil(msLeft / (7 * 24 * 60 * 60 * 1000))
+    if (weeksToEnd <= 2)  return 'race'
+    if (weeksToEnd <= 10) return 'hyrox'
+  }
+  const week = getWeekNumber(programStartDate)
+  if (week >= 25) return 'race'
+  if (week >= 17) return 'hyrox'
   return 'base'
 }
 
@@ -14,9 +42,8 @@ export const PHASE_LABELS = {
 }
 
 // ─── Weekly training split ──────────────────────────────────────────────────
-// Day 1 Mon: Easy Run · Day 2 Tue: Strength A · Day 3 Wed: Stretch / Rest
-// Day 4 Thu: Tempo Run · Day 5 Fri: Strength B · Day 6 Sat: Long Run · Day 7 Sun: Rest
-// Indexed by JS getDay(): 0=Sun … 6=Sat
+// Mon: Easy Run · Tue: Strength A · Wed: Stretch · Thu: Tempo Run
+// Fri: Strength B · Sat: Long Run · Sun: Rest
 const DAY_SCHEDULE = [
   'rest',       // Sun
   'easy_run',   // Mon
@@ -67,10 +94,9 @@ export function getWeekDates(today = new Date()) {
   })
 }
 
-// ─── Workout progression helpers ────────────────────────────────────────────
+// ─── Run progression helpers ─────────────────────────────────────────────────
 
 function block(week) {
-  // 1 → weeks 1-4, 2 → 5-8, 3 → 9-12, 4 → 13-16, capped at 4 for HYROX phase
   return Math.min(4, Math.ceil(week / 4))
 }
 
@@ -78,7 +104,21 @@ function easyRunMinutes(week)  { return [20, 25, 30, 35][block(week) - 1] }
 function tempoMinutes(week)    { return [10, 15, 20, 25][block(week) - 1] }
 function longRunMinutes(week)  { return [30, 40, 50, 60][block(week) - 1] }
 
-// ─── Exercise libraries ─────────────────────────────────────────────────────
+// ─── Shared warmup / cooldown segments ──────────────────────────────────────
+
+const WARMUP = [
+  { kind: 'timed', section: 'warmup', name: 'Jumping jacks', duration: 120, detail: '2 min' },
+  { kind: 'timed', section: 'warmup', name: 'Hip circles',   duration: 60,  detail: '1 min each' },
+  { kind: 'timed', section: 'warmup', name: 'Leg swings',    duration: 30,  detail: '30s each' },
+]
+
+const COOLDOWN = [
+  { kind: 'timed', section: 'cooldown', name: 'Hamstring stretch', duration: 60,  detail: '60s each side' },
+  { kind: 'timed', section: 'cooldown', name: 'Hip flexor',        duration: 60,  detail: '60s each side' },
+  { kind: 'timed', section: 'cooldown', name: "Child's pose",      duration: 120, detail: '2 min' },
+]
+
+// ─── Exercise libraries ──────────────────────────────────────────────────────
 
 const STRENGTH_A = {
   bodyweight: [
@@ -124,22 +164,21 @@ const STRENGTH_B = {
 
 // HYROX phase replaces the final strength exercise with a station drill
 function hyroxStation(week) {
-  if (week >= 23 && week <= 24) return { name: 'Farmers carry simulation', sets: 3, reps: '40m',     hyrox: true }
-  if (week >= 21 && week <= 22) return { name: 'Wall balls (DB thruster)', sets: 3, reps: '15',      hyrox: true }
-  if (week >= 19 && week <= 20) return { name: 'Sandbag/DB lunges',        sets: 3, reps: '10 each', hyrox: true }
-  if (week >= 17 && week <= 18) return { name: 'Burpee broad jumps',       sets: 3, reps: '8',       hyrox: true }
+  if (week >= 23) return { name: 'Farmers carry simulation', sets: 3, reps: '40m',     hyrox: true }
+  if (week >= 21) return { name: 'Wall balls (DB thruster)', sets: 3, reps: '15',      hyrox: true }
+  if (week >= 19) return { name: 'Sandbag/DB lunges',        sets: 3, reps: '10 each', hyrox: true }
+  if (week >= 17) return { name: 'Burpee broad jumps',       sets: 3, reps: '8',       hyrox: true }
   return null
 }
 
-// ─── generateWorkout ────────────────────────────────────────────────────────
+// ─── generateWorkout ─────────────────────────────────────────────────────────
 
 // Signature: generateWorkout(type, gymAccess, week)
-// Returns: { type, title, subtitle, durationEst, segments: [...] }
+// Returns: { type, title, subtitle, durationEst, segments[] }
 //
-// Segment kinds:
-//   { kind: 'timed',    name, duration (sec), detail }
-//   { kind: 'exercise', name, sets, reps, restSec, hyrox? }
-//   { kind: 'text',     name, detail }
+// Segment shape: { kind, section, name, duration?, sets?, reps?, restSec?, detail?, hyrox? }
+//   section: 'warmup' | 'main' | 'cooldown'
+//   kind:    'timed' | 'exercise' | 'text'
 export function generateWorkout(type, gymAccess, week) {
   switch (type) {
 
@@ -152,48 +191,48 @@ export function generateWorkout(type, gymAccess, week) {
       }
 
     case 'easy_run': {
-      const main = easyRunMinutes(week)
-      const total = 5 + main + 5
+      const main  = easyRunMinutes(week)
+      const total = main + 8  // warmup ~3.5 + cooldown ~4
       return {
         type, title: 'Easy Run',
-        subtitle:    `Run · ${total} min`,
+        subtitle:    `Run · ~${total} min`,
         durationEst: total,
         segments: [
-          { kind: 'timed', name: 'Warm up',    duration: 5 * 60,    detail: 'Easy walk/jog' },
-          { kind: 'timed', name: 'Main block', duration: main * 60, detail: 'Easy pace — conversational' },
-          { kind: 'timed', name: 'Cool down',  duration: 5 * 60,    detail: 'Easy walk' },
+          ...WARMUP,
+          { kind: 'timed', section: 'main', name: 'Easy run', duration: main * 60, detail: 'Conversational pace — you should be able to speak full sentences' },
+          ...COOLDOWN,
         ],
       }
     }
 
     case 'tempo_run': {
       const tempo = tempoMinutes(week)
-      const total = 5 + 5 + tempo + 5 + 5
+      const total = tempo + 18  // warmup ~3.5 + easy5 + easy5 + cooldown ~4
       return {
         type, title: 'Tempo Run',
-        subtitle:    `Run · ${total} min`,
+        subtitle:    `Run · ~${total} min`,
         durationEst: total,
         segments: [
-          { kind: 'timed', name: 'Warm up',   duration: 5 * 60,     detail: 'Easy walk/jog' },
-          { kind: 'timed', name: 'Easy',      duration: 5 * 60,     detail: 'Conversational pace' },
-          { kind: 'timed', name: 'Tempo',     duration: tempo * 60, detail: 'Comfortably hard — threshold' },
-          { kind: 'timed', name: 'Easy',      duration: 5 * 60,     detail: 'Recover' },
-          { kind: 'timed', name: 'Cool down', duration: 5 * 60,     detail: 'Easy walk' },
+          ...WARMUP,
+          { kind: 'timed', section: 'main', name: 'Easy',      duration: 5 * 60,     detail: 'Conversational pace' },
+          { kind: 'timed', section: 'main', name: 'Tempo',     duration: tempo * 60, detail: 'Comfortably hard — threshold effort' },
+          { kind: 'timed', section: 'main', name: 'Easy',      duration: 5 * 60,     detail: 'Recover' },
+          ...COOLDOWN,
         ],
       }
     }
 
     case 'long_run': {
-      const main = longRunMinutes(week)
-      const total = 5 + main + 5
+      const main  = longRunMinutes(week)
+      const total = main + 8
       return {
         type, title: 'Long Run',
-        subtitle:    `Run · ${total} min`,
+        subtitle:    `Run · ~${total} min`,
         durationEst: total,
         segments: [
-          { kind: 'timed', name: 'Warm up',    duration: 5 * 60,    detail: 'Easy walk/jog' },
-          { kind: 'timed', name: 'Main block', duration: main * 60, detail: 'Steady easy pace — time on feet' },
-          { kind: 'timed', name: 'Cool down',  duration: 5 * 60,    detail: 'Easy walk' },
+          ...WARMUP,
+          { kind: 'timed', section: 'main', name: 'Long run', duration: main * 60, detail: 'Steady easy pace — time on feet' },
+          ...COOLDOWN,
         ],
       }
     }
@@ -201,30 +240,30 @@ export function generateWorkout(type, gymAccess, week) {
     case 'strength_a':
     case 'strength_b': {
       const source = type === 'strength_a' ? STRENGTH_A : STRENGTH_B
-      const list = (source[gymAccess] || source.bodyweight).slice()
+      const list   = (source[gymAccess] || source.bodyweight).slice()
 
       const hy = hyroxStation(week)
-      if (hy) list[list.length - 1] = hy   // replace final exercise in HYROX phase
+      if (hy) list[list.length - 1] = hy
 
       const focus = type === 'strength_a' ? 'Push + Core' : 'Pull + Legs'
-      const total = 35
 
       return {
         type,
         title:       type === 'strength_a' ? 'Strength A' : 'Strength B',
-        subtitle:    `${focus} · ~${total} min`,
-        durationEst: total,
+        subtitle:    `${focus} · ~40 min`,
+        durationEst: 40,
         segments: [
-          { kind: 'text', name: 'Warm up', detail: '5 min: jumping jacks, arm circles, hip circles' },
+          ...WARMUP,
           ...list.map(ex => ({
             kind:    'exercise',
+            section: 'main',
             name:    ex.name,
             sets:    ex.sets,
             reps:    ex.reps,
             restSec: 60,
             hyrox:   !!ex.hyrox,
           })),
-          { kind: 'text', name: 'Cool down', detail: '5 min stretch' },
+          ...COOLDOWN,
         ],
       }
     }
@@ -235,12 +274,11 @@ export function generateWorkout(type, gymAccess, week) {
         subtitle:    'Mobility · ~12 min',
         durationEst: 12,
         segments: [
-          { kind: 'text',  name: '5 min breathwork',       detail: 'Slow nasal breathing, relaxed body' },
-          { kind: 'timed', name: 'Hip flexor stretch',     duration: 60,  detail: '60s each side' },
-          { kind: 'timed', name: 'Hamstring stretch',      duration: 60,  detail: '60s each side' },
-          { kind: 'timed', name: 'Pigeon pose',            duration: 90,  detail: '90s each side' },
-          { kind: 'text',  name: 'Thoracic rotation',      detail: '10 reps each side' },
-          { kind: 'timed', name: "Child's pose",           duration: 120, detail: 'Breathe and release' },
+          { kind: 'timed',    section: 'main', name: 'Breathwork',         duration: 5 * 60, detail: 'Slow nasal breathing, relaxed body' },
+          { kind: 'timed',    section: 'main', name: 'Hip flexor stretch', duration: 60,     detail: '60s each side' },
+          { kind: 'timed',    section: 'main', name: 'Pigeon pose',        duration: 90,     detail: '90s each side' },
+          { kind: 'exercise', section: 'main', name: 'Thoracic rotation',  sets: 1, reps: '10 each', restSec: 0, hyrox: false },
+          { kind: 'timed',    section: 'main', name: "Child's pose",       duration: 120,    detail: 'Breathe and release' },
         ],
       }
 
