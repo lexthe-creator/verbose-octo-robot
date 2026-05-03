@@ -54,18 +54,22 @@ export default function App() {
   const [activeWorkout, setActiveWorkout] = useState(null)
 
   const [showReflection, setShowReflection] = useState(() => {
+    if (new URLSearchParams(window.location.search).get('eod') === '1') return true
     const h    = new Date().getHours()
     const last = localStorage.getItem('lastReflectionDate')
     return h >= 19 && last !== todayStr()
   })
 
   const [showWeeklyPlan, setShowWeeklyPlan] = useState(() => {
+    if (new URLSearchParams(window.location.search).get('weekly') === '1') return true
     const now  = new Date()
     const last = localStorage.getItem('lastWeeklyPlanDate')
     return now.getDay() === 0 && now.getHours() >= 17 && !isThisWeek(last)
   })
 
   function navigate(target) {
+    if (target === 'eod')    { setShowReflection(true);  return }
+    if (target === 'weekly') { setShowWeeklyPlan(true);  return }
     setScreen(target)
   }
 
