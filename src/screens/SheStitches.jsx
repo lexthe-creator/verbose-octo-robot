@@ -86,7 +86,7 @@ const tr = {
 
 function MonthCard({ month, tasks, defaultOpen }) {
   const [open, setOpen] = useState(defaultOpen)
-  const { ssDispatch } = useApp()
+  const { dispatch } = useApp()
 
   const monthTasks  = tasks.filter(t => t.month === month.num)
   const donePct     = monthTasks.length
@@ -123,7 +123,7 @@ function MonthCard({ month, tasks, defaultOpen }) {
                   <SsTaskRow
                     key={task.id}
                     task={task}
-                    onToggle={() => ssDispatch({ type: 'TOGGLE_SS_TASK', payload: task.id })}
+                    onToggle={() => dispatch({ type: 'TOGGLE_PROJECT_TASK', payload: { projectId: 'she-stitches', taskId: task.id } })}
                   />
                 ))}
               </div>
@@ -153,7 +153,7 @@ const mc = {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function SheStitches({ onBack }) {
-  const { ssState, ssDoneCount, ssTotalCount, ssListingsCount, ssDayOf90 } = useApp()
+  const { state, ssDoneCount, ssTotalCount, ssListingsCount, ssDayOf90 } = useApp()
 
   const pct = ssTotalCount ? Math.round((ssDoneCount / ssTotalCount) * 100) : 0
 
@@ -209,7 +209,7 @@ export default function SheStitches({ onBack }) {
           <MonthCard
             key={month.num}
             month={month}
-            tasks={ssState.tasks}
+            tasks={state.projects?.[0]?.tasks ?? []}
             defaultOpen={i === 0}
           />
         ))}

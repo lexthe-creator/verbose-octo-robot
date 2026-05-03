@@ -10,6 +10,26 @@ import SheStitches     from './screens/SheStitches.jsx'
 import Settings        from './screens/Settings.jsx'
 import Fitness         from './screens/Fitness.jsx'
 import WorkoutPlayer   from './components/WorkoutPlayer.jsx'
+import EodReflection   from './screens/EodReflection.jsx'
+import WeeklyPlanning  from './screens/WeeklyPlanning.jsx'
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function isThisWeek(dateStr) {
+  if (!dateStr) return false
+  const d   = new Date(dateStr)
+  const now = new Date()
+  const day = now.getDay()
+  const diffToMon = day === 0 ? -6 : 1 - day
+  const mon = new Date(now)
+  mon.setDate(now.getDate() + diffToMon)
+  mon.setHours(0, 0, 0, 0)
+  const nextMon = new Date(mon)
+  nextMon.setDate(mon.getDate() + 7)
+  return d >= mon && d < nextMon
+}
 
 const NAV_TABS = [
   { id: 'home',    label: 'Home',    icon: '⌂' },
@@ -32,6 +52,18 @@ export default function App() {
   })
 
   const [activeWorkout, setActiveWorkout] = useState(null)
+
+  const [showReflection, setShowReflection] = useState(() => {
+    const h    = new Date().getHours()
+    const last = localStorage.getItem('lastReflectionDate')
+    return h >= 19 && last !== todayStr()
+  })
+
+  const [showWeeklyPlan, setShowWeeklyPlan] = useState(() => {
+    const now  = new Date()
+    const last = localStorage.getItem('lastWeeklyPlanDate')
+    return now.getDay() === 0 && now.getHours() >= 17 && !isThisWeek(last)
+  })
 
   function navigate(target) {
     setScreen(target)
@@ -104,6 +136,26 @@ export default function App() {
             )
           })}
         </nav>
+      )}
+
+      {/* EOD Reflection — shows after 7pm if not logged today; priority over weekly plan */}
+      {showReflection && screen !== 'ignition' && (
+        <EodReflection
+          onComplete={() => {
+            localStorage.setItem('lastReflectionDate', todayStr())
+            setShowReflection(false)
+          }}
+        />
+      )}
+
+      {/* Sunday Weekly Planning — shows Sunday ≥5pm if not planned this week */}
+      {showWeeklyPlan && !showReflection && screen !== 'ignition' && (
+        <WeeklyPlanning
+          onComplete={() => {
+            localStorage.setItem('lastWeeklyPlanDate', todayStr())
+            setShowWeeklyPlan(false)
+          }}
+        />
       )}
 
       {activeWorkout && (

@@ -157,7 +157,7 @@ vite.config.js            — base set to repo name for GitHub Pages
 
 Source of truth: `src/context/AppContext.jsx`. Main state persisted to `localStorage` under key `aiml_state`. Resets to `initialState` on new calendar day (checked against `dayLockedAt`). Inbox items, profile, settings, and fitness persist across day resets.
 
-**She Stitches state** is persisted separately under key `'sheStitches'` and is never wiped by day reset.
+**She Stitches** is now `projects[0]` in the generic `projects[]` array. The legacy `'sheStitches'` localStorage key is migrated on first load.
 
 ```js
 {
@@ -228,30 +228,69 @@ Source of truth: `src/context/AppContext.jsx`. Main state persisted to `localSto
 
   // Focus Timer
   focusSessions: number,   // cumulative completed sessions
-}
-```
 
-### She Stitches State (separate localStorage key `'sheStitches'`)
-
-```js
-{
-  startDate: '2025-04-01',   // ISO date string, day 1 of 90
-  tasks: [
+  // Generic projects array — She Stitches is always projects[0]
+  projects: [
     {
-      id:       string,    // 'ss1'–'ss37'
-      text:     string,
-      done:     boolean,
-      listings: number,    // live listings this task adds when completed
-      week:     number,    // 1–12
-      month:    number,    // 1–3
-      tag:      'Design' | 'Etsy' | 'Marketing' | 'Strategy',
+      id:               string,          // 'she-stitches'
+      name:             string,          // 'She Stitches'
+      emoji:            string,          // '🪡'
+      startDate:        'YYYY-MM-DD',
+      endDate:          'YYYY-MM-DD',    // '2025-06-29' (day 90)
+      bufferDays:       7,
+      weeklyGoal:       null | number,
+      tasks: [
+        {
+          id:       string,
+          text:     string,
+          done:     boolean,
+          listings: number,
+          week:     number,
+          month:    number,
+          tag:      'Design' | 'Etsy' | 'Marketing' | 'Strategy',
+        },
+      ],
+      lastActivityDate: null | 'YYYY-MM-DD',
     },
-    // 37 seed tasks total
+  ],
+
+  // EOD reflection log (persists across days)
+  reflectionLog: [
+    { date: 'YYYY-MM-DD', feel: 1–5, tomorrowTasks: string[] },
+  ],
+
+  // Weekly planning (persists across days)
+  weeklyPriorities: string[],
+  groceryList: [
+    { id: string, text: string, done: boolean },
   ],
 }
 ```
 
-**Computed helpers** exposed via `useApp()`:
+### `src/utils/projectUtils.js` — `getProjectPace(project)`
+
+Returns `{ status, projectedFinish, daysOver }`.
+
+| Field | Description |
+|---|---|
+| `tasksRemaining` | Undone task count |
+| `avgDailyRate` | `tasksDone / daysElapsed` (min 1 when no tasks done) |
+| `projectedFinish` | `today + tasksRemaining / avgDailyRate` days |
+| `status` | `'on_track'` / `'buffer'` / `'behind'` |
+
+**Pace status logic:**
+- `projectedFinish ≤ endDate` → `'on_track'`
+- `projectedFinish ≤ endDate + bufferDays` → `'buffer'`
+- `projectedFinish > endDate + bufferDays` → `'behind'`
+
+**Goal card border + badge colors:**
+| Status | Border | Badge bg | Badge text |
+|---|---|---|---|
+| `on_track` | `var(--color-success)` | `var(--color-success-bg)` | `var(--color-success)` |
+| `buffer` | `#8A6A00` | `#8A6A00` | `#F0C040` |
+| `behind` | `var(--color-danger)` | `rgba(224,85,85,0.12)` | `var(--color-danger)` |
+
+**Computed helpers** exposed via `useApp()` (derived from `state.projects[0]`):
 
 | Helper | Type | Description |
 |---|---|---|
@@ -286,7 +325,15 @@ Source of truth: `src/context/AppContext.jsx`. Main state persisted to `localSto
 | `ADD_TRANSACTION` | `{ merchant, amount, category, date }` | Prepends new transaction to `transactions` (amount is signed) |
 | `DELETE_TRANSACTION` | transaction `id` string | Removes transaction from `transactions` |
 | `RESET_DAY` | — | Resets to `initialState`, preserves `profile`, `settings`, `fitness` (minus `todayComplete`), `inboxItems` |
-| `TOGGLE_SS_TASK` | task `id` string | Dispatched to `ssDispatch` — toggles `ssState.tasks[id].done` |
+| `TOGGLE_PROJECT_TASK` | `{ projectId, taskId }` | Toggles `projects[id].tasks[taskId].done`; sets `lastActivityDate` |
+| `ADD_PROJECT` | `{ project }` | Appends project to `projects[]` |
+| `UPDATE_PROJECT` | `{ projectId, key, value }` | Sets `projects[id][key] = value` |
+| `ADD_REFLECTION` | `{ date, feel, tomorrowTasks[] }` | Appends to `reflectionLog` |
+| `SET_TOMORROW_TASKS` | `{ tasks[] }` | Sets `scheduledFor:'tomorrow'` on matched tasks; adds new ones |
+| `SET_WEEKLY_PRIORITIES` | `{ priorities: string[] }` | Replaces `weeklyPriorities` |
+| `ADD_GROCERY_ITEM` | `{ text }` | Appends `{ id, text, done: false }` to `groceryList` |
+| `TOGGLE_GROCERY_ITEM` | `{ id }` | Toggles `groceryList[id].done` |
+| `DELETE_GROCERY_ITEM` | `{ id }` | Removes item from `groceryList` |
 
 ### Context helper functions
 
@@ -296,7 +343,6 @@ Exposed alongside `state` and `dispatch` via `useApp()`:
 |---|---|---|
 | `updateTaskTime` | `(taskId: string, time: 'HH:MM') => void` | `UPDATE_TASK_TIME` |
 | `updateMealWindow` | `(slot: string, startTime: 'HH:MM', endTime: 'HH:MM') => void` | `UPDATE_MEAL_WINDOW` |
-| `ssDispatch` | `(action) => void` | Reducer dispatch for She Stitches state |
 
 ---
 
@@ -305,6 +351,12 @@ Exposed alongside `state` and `dispatch` via `useApp()`:
 ### Screen Names (state values in App.jsx)
 
 `'ignition'` · `'home'` · `'fitness'` · `'focus'` · `'inbox'` · `'finance'` · `'shestitches'` · `'settings'`
+
+**Overlay screens** (rendered as `position: fixed, z-index: 200` above all screens):
+
+- `EodReflection` — shown after 7pm if `lastReflectionDate` (localStorage) ≠ today
+- `WeeklyPlanning` — shown Sunday ≥5pm if `lastWeeklyPlanDate` is not within the current Mon–Sun week
+- Priority: ignition screen hides both; EodReflection takes priority over WeeklyPlanning (weekly plan shows only after reflection is complete)
 
 ---
 
@@ -475,7 +527,45 @@ Layout zones top to bottom:
 
 ---
 
-### 5.9 WorkoutPlayer (`WorkoutPlayer` component)
+### 5.9 EodReflection (overlay)
+
+**File:** `src/screens/EodReflection.jsx`
+**Trigger:** App opened after 7pm AND `localStorage.getItem('lastReflectionDate') !== today`. Rendered above all screens except ignition.
+**Nav:** Hidden (full-screen fixed overlay, `z-index: 200`).
+
+3 steps (same dark flow as MorningIgnition):
+
+**Step 1 — Review:** Heading "How did today go?". Today's tasks shown read-only with done/undone dot. Undone tasks show "carry?" with Yes / No pills — Yes adds task ID to local `carrySet`.
+
+**Step 2 — Feel:** Heading "How did today feel?". 5-option emoji picker (😴😐🙂😄⚡). Required before continuing.
+
+**Step 3 — Tomorrow's focus:** Heading "Tomorrow's focus." Pre-selected tasks: carried (from Step 1) → overdue (undone + dueTime < now) → scheduled. Max 3 shown, each swipe-right to remove. "+ Add" input inline. CTA "Set tomorrow →" dispatches `SET_TOMORROW_TASKS` + `ADD_REFLECTION`, sets `lastReflectionDate` in localStorage, calls `onComplete`.
+
+---
+
+### 5.10 WeeklyPlanning (overlay)
+
+**File:** `src/screens/WeeklyPlanning.jsx`
+**Trigger:** App opened on Sunday ≥5pm AND `lastWeeklyPlanDate` (localStorage) is not within the current Mon–Sun week.
+**Nav:** Hidden (full-screen fixed overlay, `z-index: 200`). Shows after EodReflection completes (not simultaneously).
+
+5 steps:
+
+**Step 1 — Week review:** "This week" heading. Stat rows: workouts completed (from `fitness.workoutLog` filtered to this week) · tasks done · She Stitches tasks done. Read-only.
+
+**Step 2 — Next week priorities:** "3 big things next week." 3 dark inline text inputs (optional). Saves via `SET_WEEKLY_PRIORITIES`.
+
+**Step 3 — Grocery list:** "Anything to grab this week?" Text input + add button. Items stored in `groceryList` (persists; unchecked items carry forward automatically). Existing items shown with tap-to-check and swipe-left-to-delete.
+
+**Step 4 — Training preview:** "Next week's training." 7-column Mon–Sun strip (read-only) showing next week's workout abbreviations (R / US / LS / ST / —). Muted summary line below: "X run days · Y strength days". CTA "Looks good →".
+
+**Step 5 — Project check-ins:** One screen per active project (`endDate > today`). Shows name, pace badge, tasks done, `getProjectPace` result. If behind: catch-up suggestion (`tasksRemaining / daysRemaining * 7`). Skipped if no active projects.
+
+**Final — Done:** "Week planned. ✦" / "See you Sunday." CTA sets `lastWeeklyPlanDate` and navigates home.
+
+---
+
+### 5.11 WorkoutPlayer (`WorkoutPlayer` component)
 
 **File:** `src/components/WorkoutPlayer.jsx`
 **Rendered by:** `App.jsx` as global overlay when `activeWorkout !== null`.
@@ -492,6 +582,12 @@ Full-screen `position: fixed` overlay (`z-index: 150`). Flows through `workout.s
 | `exercise` | `ExerciseSegment` | Set rows (tap to mark done); 60s rest countdown (skippable) between sets; HYROX badge if `segment.hyrox` |
 
 **Post-workout log:** (`PostWorkoutLog`) — elapsed timer, 5-emoji feel selector, notes textarea, "Save workout" → calls `onComplete({ date, type, title, duration, feel, notes, exercises[] })`. App.jsx dispatches `LOG_WORKOUT` and clears `activeWorkout`.
+
+---
+
+### `getProjectPace(project)` — `src/utils/projectUtils.js`
+
+See §4 for full documentation. Returns `{ status, projectedFinish, daysOver }`.
 
 ---
 
@@ -692,5 +788,6 @@ File: `.github/workflows/pages.yml`
 | 8 | PWA manifest + GitHub Pages deploy | ✅ Done | `public/manifest.json`, `public/icons/icon-192.png`, `public/icons/icon-512.png`, `vite.config.js`, `.github/workflows/pages.yml` |
 | 9 | Fitness tab, workout generator, settings, polish | ✅ Done | `src/utils/fitness.js`, `src/screens/Fitness.jsx`, `src/screens/Settings.jsx`, `src/components/WorkoutPlayer.jsx`, `src/components/FuelEditSheet.jsx`, `src/screens/Home.jsx` (training card, gear icon, greeting), `src/screens/Inbox.jsx` (ADD_TASK + flash), `src/screens/MorningIgnition.jsx` (meal labels), `src/context/AppContext.jsx` (profile/settings/fitness slices), `src/App.jsx` (4-tab nav, global WorkoutPlayer overlay) |
 | 11 | Finance transactions, fitness program dates, workout preview | ✅ Done | `src/context/AppContext.jsx` (transactions[], programStartDate/End, ADD_TRANSACTION, DELETE_TRANSACTION, UPDATE_FITNESS), `src/screens/Finance.jsx` (dynamic Plaid badge, live calculations, TransactionSheet, swipe-delete), `src/utils/fitness.js` (getWeekNumber, getPhase(startDate,endDate), shared WARMUP/COOLDOWN, section field on all segments), `src/screens/Fitness.jsx` (program-date header, weeks-to-race, expandable TodayCard preview), `src/screens/Settings.jsx` (Program section with date inputs) |
+| 12 | Projects system, EOD reflection, Sunday weekly planning | ✅ Done | `src/utils/projectUtils.js` (getProjectPace), `src/context/AppContext.jsx` (projects[], reflectionLog, weeklyPriorities, groceryList + all new actions, She Stitches migrated from ssState → projects[0], RESET_DAY carries tomorrow tasks), `src/screens/SheStitches.jsx` (reads projects[0], dispatches TOGGLE_PROJECT_TASK), `src/screens/Home.jsx` (pace status on goal card — border + badge by status), `src/screens/EodReflection.jsx` (3-step overlay: review/carry, feel, tomorrow tasks), `src/screens/WeeklyPlanning.jsx` (5-step overlay: week review, priorities, grocery, training preview, project check-ins), `src/App.jsx` (EodReflection + WeeklyPlanning overlay triggers with localStorage guards) |
 
 **Live URL:** https://lexthe-creator.github.io/verbose-octo-robot/

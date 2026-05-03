@@ -1,6 +1,6 @@
 import { createContext, useContext, useReducer, useEffect, useMemo } from 'react';
 
-/* ─── She Stitches seed data ──────────────────────────────────────────────── */
+/* ─── She Stitches seed tasks ─────────────────────────────────────────────── */
 const SS_TASKS = [
   // Month 1 — Week 1
   { id: 'ss1',  text: 'Create and name your Etsy shop (She Stitches)',        done: false, listings: 0, week: 1,  month: 1, tag: 'Etsy'      },
@@ -49,51 +49,54 @@ const SS_TASKS = [
   { id: 'ss37', text: 'Full 90-day review',                                    done: false, listings: 0, week: 12, month: 3, tag: 'Strategy'  },
 ]
 
-const SS_INITIAL = {
-  startDate: '2025-04-01',
-  tasks: SS_TASKS,
-}
+/* ─── Initial projects array ──────────────────────────────────────────────── */
+const INITIAL_PROJECTS = [
+  {
+    id:               'she-stitches',
+    name:             'She Stitches',
+    emoji:            '🪡',
+    startDate:        '2025-04-01',
+    endDate:          '2025-06-29',  // day 90 of 90
+    bufferDays:       7,
+    weeklyGoal:       null,
+    tasks:            SS_TASKS,
+    lastActivityDate: null,
+  },
+]
 
 /* ─── Initial state ───────────────────────────────────────────────────────── */
 const initialState = {
-  // Profile
   profile: {
-    name: 'Lex',                 // used in morning greeting
+    name: 'Lex',
   },
 
-  // App settings (user preferences + connection stubs)
   settings: {
-    gymAccess:          'bodyweight',  // 'bodyweight' | 'dumbbells' | 'gym'
-    plaidConnected:     false,
-    calendarConnected:  false,
-    theme:              'dark',        // 'dark' | 'light'
+    gymAccess:         'bodyweight',
+    plaidConnected:    false,
+    calendarConnected: false,
+    theme:             'dark',
   },
 
-  // Fitness training block. Phase is derived — call getPhase(programStartDate, programEndDate)
-  // from utils/fitness.js; don't read/write a stored phase field.
   fitness: {
-    weekNumber:       1,    // legacy — UI uses getWeekNumber(programStartDate) when set
-    programStartDate: null, // ISO date string (YYYY-MM-DD)
-    programEndDate:   null, // ISO date string — race date
-    workoutLog:       [],   // { date, type, duration, feel, notes, exercises[] }
+    weekNumber:       1,
+    programStartDate: null,
+    programEndDate:   null,
+    workoutLog:       [],
     todayComplete:    false,
   },
 
-  // Morning ignition
-  energyLevel:       null,      // 1–4 (😴 😐 🙂 ⚡)
-  confirmedTasks:    [],         // array of task ids confirmed in Brief
-  confirmedMeals:    [],         // ['breakfast','lunch','snack','dinner']
+  energyLevel:       null,
+  confirmedTasks:    [],
+  confirmedMeals:    [],
   workoutConfirmed:  false,
-  dayLockedAt:       null,       // ISO timestamp
+  dayLockedAt:       null,
 
-  // Tasks (3 things)
   tasks: [
     { id: 't1', text: 'Review project proposal', done: false, dueTime: '10:00', scheduledTime: null },
     { id: 't2', text: 'Reply to team messages',  done: false, dueTime: '12:00', scheduledTime: null },
     { id: 't3', text: 'Evening walk 30 min',      done: false, dueTime: '18:30', scheduledTime: null },
   ],
 
-  // Meals — startTime/endTime in 'HH:MM' 24h format; lateAfter mirrors endTime
   meals: {
     breakfast: { label: 'Breakfast', startTime: '07:00', endTime: '09:00', lateAfter: '09:00', eaten: false },
     lunch:     { label: 'Lunch',     startTime: '12:00', endTime: '14:00', lateAfter: '14:00', eaten: false },
@@ -101,23 +104,27 @@ const initialState = {
     dinner:    { label: 'Dinner',    startTime: '19:00', endTime: '21:00', lateAfter: '21:00', eaten: false },
   },
 
-  // Workout (Runna card)
   workout: {
-    type:     'Tempo Run',
-    duration: '45 min',
-    pace:     '5:20 / km',
-    time:     '18:30',
+    type:      'Tempo Run',
+    duration:  '45 min',
+    pace:      '5:20 / km',
+    time:      '18:30',
     confirmed: false,
   },
 
-  // Inbox
-  inboxItems: [],
-
-  // Finance transactions (persists across day resets)
-  transactions: [], // { id, merchant, amount, category, date }
-
-  // Focus timer
+  inboxItems:   [],
+  transactions: [],
   focusSessions: 0,
+
+  // Generic projects — She Stitches is projects[0]
+  projects: INITIAL_PROJECTS,
+
+  // EOD reflection log
+  reflectionLog: [],  // { date, feel, tomorrowTasks[] }
+
+  // Weekly planning
+  weeklyPriorities: [],   // string[]
+  groceryList:      [],   // { id, text, done }
 };
 
 /* ─── Reducer ─────────────────────────────────────────────────────────────── */
@@ -133,7 +140,6 @@ function reducer(state, action) {
       return { ...state, confirmedTasks: [...state.confirmedTasks, id] };
     }
 
-    // payload: { slot, startTime, endTime } — sets default windows on confirmation
     case 'CONFIRM_MEAL': {
       const { slot, startTime, endTime } = action.payload;
       if (state.confirmedMeals.includes(slot)) return state;
@@ -164,19 +170,12 @@ function reducer(state, action) {
       return { ...state, tasks };
     }
 
-    // payload: { text } — appends new task from inbox triage
     case 'ADD_TASK': {
       const { text } = action.payload;
-      const newTask = {
-        id:            Date.now(),
-        text,
-        done:          false,
-        scheduledTime: null,
-      };
+      const newTask = { id: Date.now(), text, done: false, scheduledTime: null };
       return { ...state, tasks: [...state.tasks, newTask] };
     }
 
-    // payload: { taskId, time: 'HH:MM' }
     case 'UPDATE_TASK_TIME': {
       const { taskId, time } = action.payload;
       const tasks = state.tasks.map(t =>
@@ -189,14 +188,10 @@ function reducer(state, action) {
       const slot = action.payload;
       return {
         ...state,
-        meals: {
-          ...state.meals,
-          [slot]: { ...state.meals[slot], eaten: true },
-        },
+        meals: { ...state.meals, [slot]: { ...state.meals[slot], eaten: true } },
       };
     }
 
-    // payload: { slot, startTime: 'HH:MM', endTime: 'HH:MM' }
     case 'UPDATE_MEAL_WINDOW': {
       const { slot, startTime, endTime } = action.payload;
       return {
@@ -209,34 +204,24 @@ function reducer(state, action) {
     }
 
     case 'ADD_INBOX_ITEM': {
-      const item = {
-        id:        `i${Date.now()}`,
-        text:      action.payload,
-        createdAt: new Date().toISOString(),
-      };
+      const item = { id: `i${Date.now()}`, text: action.payload, createdAt: new Date().toISOString() };
       return { ...state, inboxItems: [item, ...state.inboxItems] };
     }
 
     case 'REMOVE_INBOX_ITEM':
-      return {
-        ...state,
-        inboxItems: state.inboxItems.filter(i => i.id !== action.payload),
-      };
+      return { ...state, inboxItems: state.inboxItems.filter(i => i.id !== action.payload) };
 
     case 'INCREMENT_FOCUS_SESSIONS':
       return { ...state, focusSessions: state.focusSessions + 1 };
 
-    // payload: { name }
     case 'UPDATE_PROFILE':
       return { ...state, profile: { ...state.profile, ...action.payload } };
 
-    // payload: { key, value }
     case 'UPDATE_SETTINGS': {
       const { key, value } = action.payload;
       return { ...state, settings: { ...state.settings, [key]: value } };
     }
 
-    // payload: { date, type, duration, feel, notes, exercises }
     case 'LOG_WORKOUT':
       return {
         ...state,
@@ -248,76 +233,187 @@ function reducer(state, action) {
       };
 
     case 'INCREMENT_WEEK':
-      return {
-        ...state,
-        fitness: { ...state.fitness, weekNumber: state.fitness.weekNumber + 1 },
-      };
+      return { ...state, fitness: { ...state.fitness, weekNumber: state.fitness.weekNumber + 1 } };
 
-    // payload: { merchant, amount, category, date } — amount is signed (negative = spend)
     case 'ADD_TRANSACTION': {
-      const tx = { id: `tx${Date.now()}`, ...action.payload }
-      return { ...state, transactions: [tx, ...state.transactions] }
+      const tx = { id: `tx${Date.now()}`, ...action.payload };
+      return { ...state, transactions: [tx, ...state.transactions] };
     }
 
     case 'DELETE_TRANSACTION':
-      return { ...state, transactions: state.transactions.filter(t => t.id !== action.payload) }
+      return { ...state, transactions: state.transactions.filter(t => t.id !== action.payload) };
 
-    // payload: { key, value } — updates fitness state slice
     case 'UPDATE_FITNESS': {
-      const { key, value } = action.payload
-      return { ...state, fitness: { ...state.fitness, [key]: value } }
+      const { key, value } = action.payload;
+      return { ...state, fitness: { ...state.fitness, [key]: value } };
     }
 
-    case 'RESET_DAY':
+    // ── Projects ────────────────────────────────────────────────────────────
+
+    // payload: { projectId, taskId }
+    case 'TOGGLE_PROJECT_TASK': {
+      const { projectId, taskId } = action.payload;
+      return {
+        ...state,
+        projects: state.projects.map(p =>
+          p.id !== projectId ? p : {
+            ...p,
+            lastActivityDate: new Date().toISOString().slice(0, 10),
+            tasks: p.tasks.map(t => t.id === taskId ? { ...t, done: !t.done } : t),
+          }
+        ),
+      };
+    }
+
+    // payload: { project }
+    case 'ADD_PROJECT':
+      return { ...state, projects: [...state.projects, action.payload.project] };
+
+    // payload: { projectId, key, value }
+    case 'UPDATE_PROJECT': {
+      const { projectId, key, value } = action.payload;
+      return {
+        ...state,
+        projects: state.projects.map(p =>
+          p.id !== projectId ? p : { ...p, [key]: value }
+        ),
+      };
+    }
+
+    // ── EOD Reflection ──────────────────────────────────────────────────────
+
+    // payload: { date, feel, tomorrowTasks[] }
+    case 'ADD_REFLECTION':
+      return {
+        ...state,
+        reflectionLog: [...state.reflectionLog, action.payload],
+      };
+
+    // payload: { tasks[] } — sets scheduledFor:'tomorrow' on matching tasks; adds new ones
+    case 'SET_TOMORROW_TASKS': {
+      const incoming = action.payload.tasks || [];
+      const existingIds = new Set(state.tasks.map(t => String(t.id)));
+
+      const updated = state.tasks.map(t => {
+        const match = incoming.find(it => String(it.id) === String(t.id));
+        return match ? { ...t, scheduledFor: 'tomorrow' } : t;
+      });
+
+      const newTasks = incoming
+        .filter(it => !existingIds.has(String(it.id)))
+        .map(it => ({
+          id:           it.id ?? `t${Date.now()}_${Math.random().toString(36).slice(2)}`,
+          text:         it.text,
+          done:         false,
+          scheduledTime: null,
+          scheduledFor:  'tomorrow',
+        }));
+
+      return { ...state, tasks: [...updated, ...newTasks] };
+    }
+
+    // ── Weekly Planning ─────────────────────────────────────────────────────
+
+    // payload: { priorities: string[] }
+    case 'SET_WEEKLY_PRIORITIES':
+      return { ...state, weeklyPriorities: action.payload.priorities };
+
+    // payload: { text }
+    case 'ADD_GROCERY_ITEM': {
+      const item = { id: `g${Date.now()}`, text: action.payload.text, done: false };
+      return { ...state, groceryList: [...state.groceryList, item] };
+    }
+
+    // payload: { id }
+    case 'TOGGLE_GROCERY_ITEM':
+      return {
+        ...state,
+        groceryList: state.groceryList.map(g =>
+          g.id === action.payload.id ? { ...g, done: !g.done } : g
+        ),
+      };
+
+    // payload: { id }
+    case 'DELETE_GROCERY_ITEM':
+      return { ...state, groceryList: state.groceryList.filter(g => g.id !== action.payload.id) };
+
+    // ── Day reset ───────────────────────────────────────────────────────────
+
+    case 'RESET_DAY': {
+      // Carry forward any tasks explicitly scheduled for tomorrow
+      const carried = state.tasks
+        .filter(t => t.scheduledFor === 'tomorrow')
+        .map(({ scheduledFor, carryOver, done, ...rest }) => ({ ...rest, done: false }));
+
       return {
         ...initialState,
-        // Preserve cross-day state
-        profile:      state.profile,
-        settings:     state.settings,
-        fitness:      { ...state.fitness, todayComplete: false },
-        inboxItems:   state.inboxItems,
-        transactions: state.transactions,
+        profile:          state.profile,
+        settings:         state.settings,
+        fitness:          { ...state.fitness, todayComplete: false },
+        inboxItems:       state.inboxItems,
+        transactions:     state.transactions,
+        projects:         state.projects,
+        reflectionLog:    state.reflectionLog,
+        weeklyPriorities: state.weeklyPriorities,
+        groceryList:      state.groceryList,
+        tasks:            carried.length > 0 ? carried : initialState.tasks,
       };
+    }
 
     default:
       return state;
   }
 }
 
-/* ─── She Stitches reducer ────────────────────────────────────────────────── */
-function ssReducer(state, action) {
-  if (action.type === 'TOGGLE_SS_TASK') {
-    const tasks = state.tasks.map(t =>
-      t.id === action.payload ? { ...t, done: !t.done } : t
-    )
-    return { ...state, tasks }
-  }
-  return state
-}
-
 /* ─── Persistence helpers ─────────────────────────────────────────────────── */
 const STORAGE_KEY = 'aiml_state';
-const SS_KEY      = 'sheStitches';
+const SS_KEY      = 'sheStitches';  // legacy key — migrated on first load
+
+function loadLegacyProjects() {
+  try {
+    const raw = localStorage.getItem(SS_KEY);
+    if (!raw) return INITIAL_PROJECTS;
+    const ssData = JSON.parse(raw);
+    const doneMap = {};
+    ssData.tasks?.forEach(t => { doneMap[t.id] = t.done; });
+    return [{
+      ...INITIAL_PROJECTS[0],
+      startDate: ssData.startDate || INITIAL_PROJECTS[0].startDate,
+      tasks: SS_TASKS.map(t => ({ ...t, done: doneMap[t.id] ?? false })),
+    }];
+  } catch {
+    return INITIAL_PROJECTS;
+  }
+}
 
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return initialState;
-    const saved = JSON.parse(raw);
+    if (!raw) return { ...initialState, projects: loadLegacyProjects() };
 
-    // If dayLockedAt is from a previous calendar day, reset — but preserve
-    // cross-day state: profile, settings, fitness (minus todayComplete), inbox.
+    const saved = JSON.parse(raw);
+    const projects = saved.projects ?? loadLegacyProjects();
+
     if (saved.dayLockedAt) {
       const lockedDate = new Date(saved.dayLockedAt).toDateString();
       const today      = new Date().toDateString();
       if (lockedDate !== today) {
+        const carried = (saved.tasks || [])
+          .filter(t => t.scheduledFor === 'tomorrow')
+          .map(({ scheduledFor, carryOver, done, ...rest }) => ({ ...rest, done: false }));
+
         return {
           ...initialState,
-          profile:      { ...initialState.profile,  ...(saved.profile  || {}) },
-          settings:     { ...initialState.settings, ...(saved.settings || {}) },
-          fitness:      { ...initialState.fitness,  ...(saved.fitness  || {}), todayComplete: false },
-          inboxItems:   saved.inboxItems   || [],
-          transactions: saved.transactions || [],
+          profile:          { ...initialState.profile,  ...(saved.profile  || {}) },
+          settings:         { ...initialState.settings, ...(saved.settings || {}) },
+          fitness:          { ...initialState.fitness,  ...(saved.fitness  || {}), todayComplete: false },
+          inboxItems:       saved.inboxItems        || [],
+          transactions:     saved.transactions      || [],
+          projects,
+          reflectionLog:    saved.reflectionLog    || [],
+          weeklyPriorities: saved.weeklyPriorities || [],
+          groceryList:      saved.groceryList      || [],
+          tasks:            carried.length > 0 ? carried : initialState.tasks,
         };
       }
     }
@@ -325,56 +421,33 @@ function loadState() {
     return {
       ...initialState,
       ...saved,
-      // Deep-merge nested slices so new fields added post-release don't crash
-      profile:      { ...initialState.profile,  ...(saved.profile  || {}) },
-      settings:     { ...initialState.settings, ...(saved.settings || {}) },
-      fitness:      { ...initialState.fitness,  ...(saved.fitness  || {}) },
-      transactions: saved.transactions || [],
+      profile:          { ...initialState.profile,  ...(saved.profile  || {}) },
+      settings:         { ...initialState.settings, ...(saved.settings || {}) },
+      fitness:          { ...initialState.fitness,  ...(saved.fitness  || {}) },
+      transactions:     saved.transactions      || [],
+      projects,
+      reflectionLog:    saved.reflectionLog    || [],
+      weeklyPriorities: saved.weeklyPriorities || [],
+      groceryList:      saved.groceryList      || [],
     };
   } catch {
     return initialState;
   }
 }
 
-function loadSsState() {
-  try {
-    const raw = localStorage.getItem(SS_KEY);
-    if (!raw) return SS_INITIAL;
-    const saved = JSON.parse(raw);
-    // Merge saved done states onto fresh seed data (preserves task list updates)
-    const doneMap = {}
-    saved.tasks?.forEach(t => { doneMap[t.id] = t.done })
-    return {
-      ...SS_INITIAL,
-      startDate: saved.startDate || SS_INITIAL.startDate,
-      tasks: SS_INITIAL.tasks.map(t => ({ ...t, done: doneMap[t.id] ?? false })),
-    }
-  } catch {
-    return SS_INITIAL;
-  }
-}
-
 function saveState(state) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch { /* quota exceeded — silently skip */ }
-}
-
-function saveSsState(ssState) {
-  try {
-    localStorage.setItem(SS_KEY, JSON.stringify(ssState));
-  } catch {}
+  } catch { /* quota exceeded */ }
 }
 
 /* ─── Context ─────────────────────────────────────────────────────────────── */
 const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
-  const [state,   dispatch]   = useReducer(reducer,   undefined, loadState);
-  const [ssState, ssDispatch] = useReducer(ssReducer, undefined, loadSsState);
+  const [state, dispatch] = useReducer(reducer, undefined, loadState);
 
-  useEffect(() => { saveState(state);   }, [state]);
-  useEffect(() => { saveSsState(ssState); }, [ssState]);
+  useEffect(() => { saveState(state); }, [state]);
 
   function updateTaskTime(taskId, time) {
     dispatch({ type: 'UPDATE_TASK_TIME', payload: { taskId, time } });
@@ -384,19 +457,19 @@ export function AppProvider({ children }) {
     dispatch({ type: 'UPDATE_MEAL_WINDOW', payload: { slot, startTime, endTime } });
   }
 
-  const ssDoneCount     = useMemo(() => ssState.tasks.filter(t => t.done).length, [ssState.tasks])
-  const ssTotalCount    = ssState.tasks.length
-  const ssListingsCount = useMemo(() => ssState.tasks.filter(t => t.done).reduce((n, t) => n + (t.listings || 0), 0), [ssState.tasks])
-  const ssNextTask      = useMemo(() => ssState.tasks.find(t => !t.done)?.text ?? null, [ssState.tasks])
-  const ssDayOf90       = Math.min(
-    Math.max(1, Math.floor((Date.now() - new Date(ssState.startDate).getTime()) / 86_400_000) + 1),
-    90
-  )
+  // Computed helpers for She Stitches (projects[0])
+  const ssProject       = useMemo(() => state.projects?.[0] ?? null, [state.projects]);
+  const ssDoneCount     = useMemo(() => ssProject?.tasks.filter(t => t.done).length ?? 0, [ssProject]);
+  const ssTotalCount    = ssProject?.tasks.length ?? 0;
+  const ssListingsCount = useMemo(() => ssProject?.tasks.filter(t => t.done).reduce((n, t) => n + (t.listings || 0), 0) ?? 0, [ssProject]);
+  const ssNextTask      = useMemo(() => ssProject?.tasks.find(t => !t.done)?.text ?? null, [ssProject]);
+  const ssDayOf90       = ssProject
+    ? Math.min(Math.max(1, Math.floor((Date.now() - new Date(ssProject.startDate).getTime()) / 86_400_000) + 1), 90)
+    : 1;
 
   return (
     <AppContext.Provider value={{
       state, dispatch, updateTaskTime, updateMealWindow,
-      ssState, ssDispatch,
       ssDoneCount, ssTotalCount, ssListingsCount, ssNextTask, ssDayOf90,
     }}>
       {children}

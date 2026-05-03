@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useApp } from '../context/AppContext.jsx'
 import FuelEditSheet from '../components/FuelEditSheet.jsx'
 import { getTodayType, generateWorkout, WORKOUT_ICONS } from '../utils/fitness.js'
+import { getProjectPace } from '../utils/projectUtils.js'
 
 // ─── Time utilities ────────────────────────────────────────────────────────────
 
@@ -429,12 +430,37 @@ const fs = {
 
 // ─── She Stitches goal card ───────────────────────────────────────────────────
 
-function SsGoalCard({ doneCount, totalCount, listingsCount, nextTask, dayOf90, onTap }) {
-  const pct = totalCount ? Math.round((doneCount / totalCount) * 100) : 0
+const PACE_STYLES = {
+  on_track: {
+    border:     'var(--color-success)',
+    badgeBg:    'var(--color-success-bg)',
+    badgeColor: 'var(--color-success)',
+    label:      'On track',
+  },
+  buffer: {
+    border:     '#8A6A00',
+    badgeBg:    '#8A6A00',
+    badgeColor: '#F0C040',
+    label:      '7 days buffer',
+  },
+  behind: {
+    border:     'var(--color-danger)',
+    badgeBg:    'rgba(224,85,85,0.12)',
+    badgeColor: 'var(--color-danger)',
+    label:      'Behind',
+  },
+}
+
+function SsGoalCard({ doneCount, totalCount, listingsCount, nextTask, dayOf90, paceStatus, onTap }) {
+  const pct   = totalCount ? Math.round((doneCount / totalCount) * 100) : 0
+  const pace  = PACE_STYLES[paceStatus] ?? PACE_STYLES.on_track
 
   return (
-    <div style={ss.wrap} onClick={onTap} role="button" tabIndex={0}
-      onKeyDown={e => e.key === 'Enter' && onTap()}>
+    <div
+      style={{ ...ss.wrap, border: `0.5px solid ${pace.border}` }}
+      onClick={onTap} role="button" tabIndex={0}
+      onKeyDown={e => e.key === 'Enter' && onTap()}
+    >
       <div style={ss.topEdge} />
       <div style={ss.inner}>
         {/* Top row */}
@@ -446,6 +472,9 @@ function SsGoalCard({ doneCount, totalCount, listingsCount, nextTask, dayOf90, o
             <span style={ss.name}>90-Day Roadmap</span>
             <span style={ss.day}>Day {dayOf90} of 90</span>
           </div>
+          <span style={{ ...ss.paceBadge, background: pace.badgeBg, color: pace.badgeColor }}>
+            {pace.label}
+          </span>
           <span style={ss.arrow}>→</span>
         </div>
 
@@ -481,8 +510,16 @@ const ss = {
   wrap: {
     borderRadius: 'var(--radius-card)',
     overflow:     'hidden',
-    border:       'var(--border)',
     cursor:       'pointer',
+    transition:   'border-color 0.3s ease',
+  },
+  paceBadge: {
+    flexShrink:   0,
+    fontSize:     '10px',
+    fontWeight:   700,
+    padding:      '2px 8px',
+    borderRadius: 'var(--radius-pill)',
+    letterSpacing:'0.04em',
   },
   topEdge: {
     height:     '2px',
@@ -661,6 +698,12 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
 
   const currentMins = toMins(now)
 
+  const paceStatus = useMemo(() => {
+    const p = state.projects?.[0]
+    if (!p) return 'on_track'
+    return getProjectPace(p).status
+  }, [state.projects])
+
   // Next commitment label for burn bar
   const nextLabel = useMemo(() => {
     const candidates = []
@@ -765,6 +808,7 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
           listingsCount={ssListingsCount}
           nextTask={ssNextTask}
           dayOf90={ssDayOf90}
+          paceStatus={paceStatus}
           onTap={() => onNavigate && onNavigate('shestitches')}
         />
       </section>
