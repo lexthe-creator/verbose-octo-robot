@@ -32,9 +32,9 @@ GitHub Pages via `.github/workflows/pages.yml` — triggers on push to `main`. V
 
 **State** lives entirely in `src/context/AppContext.jsx` via `useReducer`. All components call `useApp()` to access `{ state, dispatch, updateTaskTime, updateMealWindow, ssDoneCount, ssTotalCount, ssListingsCount, ssNextTask, ssDayOf90 }`. State is persisted to `localStorage` under key `aiml_state` and rehydrated on load with a day-reset check (`dayLockedAt`). There is no server, no external API, no build-time env vars.
 
-**Screen values:** `'ignition'` · `'home'` · `'fitness'` · `'focus'` · `'inbox'` · `'finance'` · `'shestitches'` · `'settings'`
+**Screen values:** `'ignition'` · `'home'` · `'fitness'` · `'focus'` · `'inbox'` · `'finance'` · `'projects'` · `'settings'`
 
-Nav is hidden for: `ignition`, `focus`, `shestitches`, `settings`. The bottom nav is fixed, 72px, rendered in `App.jsx`.
+Nav is hidden for: `ignition`, `focus`, `projects`, `settings`. The bottom nav is fixed, 72px, rendered in `App.jsx`.
 
 **State shape highlights:**
 - `state.tasks[]` — the "3 things"; each `{ id, text, done, dueTime, scheduledTime, scheduledFor? }`
