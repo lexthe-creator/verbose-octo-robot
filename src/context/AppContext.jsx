@@ -242,9 +242,6 @@ function reducer(state, action) {
         },
       };
 
-    case 'INCREMENT_WEEK':
-      return { ...state, fitness: { ...state.fitness, weekNumber: state.fitness.weekNumber + 1 } };
-
     case 'ADD_TRANSACTION': {
       const tx = { id: `tx${Date.now()}`, ...action.payload };
       return { ...state, transactions: [tx, ...state.transactions] };
@@ -349,6 +346,7 @@ function reducer(state, action) {
 
     // ── Day reset ───────────────────────────────────────────────────────────
 
+    // TODO Step 15: wire to replace loadState() reset logic
     case 'RESET_DAY': {
       // Carry forward any tasks explicitly scheduled for tomorrow
       const carried = state.tasks
@@ -386,11 +384,18 @@ function loadLegacyProjects() {
     const ssData = JSON.parse(raw);
     const doneMap = {};
     ssData.tasks?.forEach(t => { doneMap[t.id] = t.done; });
-    return [{
+    const migrated = [{
       ...INITIAL_PROJECTS[0],
       startDate: ssData.startDate || INITIAL_PROJECTS[0].startDate,
       tasks: SS_TASKS.map(t => ({ ...t, done: doneMap[t.id] ?? false })),
     }];
+    // Only remove the legacy key once migration is verified non-empty
+    if (migrated.length > 0 && migrated[0].tasks?.length > 0) {
+      localStorage.removeItem(SS_KEY);
+    } else {
+      console.warn('[AppContext] Legacy migration verification failed — sheStitches key preserved');
+    }
+    return migrated;
   } catch {
     return INITIAL_PROJECTS;
   }

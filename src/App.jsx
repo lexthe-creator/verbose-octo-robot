@@ -85,7 +85,7 @@ export default function App() {
   const hideNav = (
     screen === 'ignition' ||
     screen === 'focus'    ||
-    screen === 'shestitches' ||
+    screen === 'projects' ||
     screen === 'settings'
   )
 
@@ -108,7 +108,7 @@ export default function App() {
         {screen === 'settings' && (
           <Settings onBack={() => navigate('home')} />
         )}
-        {screen === 'shestitches' && (
+        {screen === 'projects' && (
           <SheStitches onBack={() => navigate('home')} />
         )}
         {screen === 'focus' && (

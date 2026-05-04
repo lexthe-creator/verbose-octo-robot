@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useApp } from '../context/AppContext.jsx'
 import FuelEditSheet from '../components/FuelEditSheet.jsx'
-import { getTodayType, generateWorkout, WORKOUT_ICONS } from '../utils/fitness.js'
+import { getTodayType, generateWorkout, WORKOUT_ICONS, getWeekNumber } from '../utils/fitness.js'
 import { getProjectPace } from '../utils/projectUtils.js'
 
 // ─── Time utilities ────────────────────────────────────────────────────────────
@@ -59,20 +59,12 @@ function HeroClock({ now, name, onOpenFocus, onOpenSettings }) {
   const { time, colon, mins, ampm } = formatClockParts(now)
   return (
     <div style={hero.wrap}>
-      {/* Top row: greeting + gear + dev links */}
+      {/* Top row: greeting + gear */}
       <div style={hero.topRow}>
         <span style={hero.greeting}>{greeting(now, name)}</span>
-        <div style={hero.gearCol}>
-          <button style={hero.gearBtn} onClick={onOpenSettings} aria-label="Settings">
-            ⚙
-          </button>
-          <button style={hero.devLink} onClick={() => onNavigate && onNavigate('eod')}>
-            EOD Reflection →
-          </button>
-          <button style={hero.devLink} onClick={() => onNavigate && onNavigate('weekly')}>
-            Weekly Planning →
-          </button>
-        </div>
+        <button style={hero.gearBtn} onClick={onOpenSettings} aria-label="Settings">
+          ⚙
+        </button>
       </div>
       {/* Clock row */}
       <div style={hero.row}>
@@ -97,13 +89,6 @@ const hero = {
   wrap:    { padding: '20px 20px 0' },
   topRow:  { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' },
   greeting:{ fontSize: '13px', color: 'var(--color-muted)', fontWeight: 500 },
-  gearCol: {
-    display:       'flex',
-    flexDirection: 'column',
-    alignItems:    'flex-end',
-    gap:           '4px',
-    flexShrink:    0,
-  },
   gearBtn: {
     width:           '32px',
     height:          '32px',
@@ -117,16 +102,6 @@ const hero = {
     justifyContent:  'center',
     cursor:          'pointer',
     flexShrink:      0,
-  },
-  devLink: {
-    fontSize:   '11px',
-    color:      'var(--color-faint)',
-    background: 'none',
-    border:     'none',
-    cursor:     'pointer',
-    padding:    0,
-    textAlign:  'right',
-    lineHeight: 1.4,
   },
   row:   { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' },
   clockWrap: { display: 'flex', alignItems: 'baseline', gap: '4px' },
@@ -801,10 +776,10 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
         <TodayTrainingCard
           todayComplete={state.fitness.todayComplete}
           gymAccess={state.settings.gymAccess}
-          weekNumber={state.fitness.weekNumber}
+          weekNumber={getWeekNumber(state.fitness.programStartDate)}
           onStart={() => {
             const type    = getTodayType()
-            const workout = generateWorkout(type, state.settings.gymAccess, state.fitness.weekNumber)
+            const workout = generateWorkout(type, state.settings.gymAccess, getWeekNumber(state.fitness.programStartDate))
             onStartWorkout && onStartWorkout(workout)
           }}
         />
