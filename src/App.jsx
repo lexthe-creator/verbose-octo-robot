@@ -143,7 +143,7 @@ export default function App() {
       )}
 
       {/* EOD Reflection — shows after 7pm if not logged today; priority over weekly plan */}
-      {showReflection && screen !== 'ignition' && (
+      {showReflection && screen !== 'ignition' && screen !== 'focus' && (
         <EodReflection
           onComplete={() => {
             localStorage.setItem('lastReflectionDate', todayStr())

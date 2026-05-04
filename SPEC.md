@@ -151,6 +151,8 @@ vite.config.js            — base set to repo name for GitHub Pages
     pages.yml             — deploy on push to main
 ```
 
+**Overlay z-index hierarchy:** EodReflection and WeeklyPlanning render at z-index 200. WorkoutPlayer renders at z-index 150 — below both overlays.
+
 ---
 
 ## 4. AppContext State Shape
@@ -184,17 +186,17 @@ Source of truth: `src/context/AppContext.jsx`. Main state persisted to `localSto
   },
 
   // Morning Ignition
-  energyLevel:      null,       // number 1–4 | null (😴=1 😐=2 🙂=3 ⚡=4)
-  confirmedTasks:   [],         // string[] — task ids confirmed during Brief
-  confirmedMeals:   [],         // ('breakfast'|'lunch'|'snack'|'dinner')[]
+  energyLevel:      null,       // number 1–4 | null (😴=1 😐=2 🙂=3 ⚡=4) — stored after ignition; use to inform nextAction surfacing (deferred to Step 14)
+  confirmedTasks:   [],         // string[] — task ids confirmed during Brief; populated during ignition, purpose unresolved — candidate for removal in Step 15 architecture refactor
+  confirmedMeals:   [],         // ('breakfast'|'lunch'|'snack'|'dinner')[] — populated during ignition, purpose unresolved — candidate for removal in Step 15 architecture refactor
   workoutConfirmed: false,      // boolean
   dayLockedAt:      null,       // ISO 8601 string | null
 
   // Tasks — the "3 things"
   tasks: [
-    { id: 't1', text: string, done: boolean, dueTime: 'HH:MM', scheduledTime: 'HH:MM' | null },
-    { id: 't2', text: string, done: boolean, dueTime: 'HH:MM', scheduledTime: 'HH:MM' | null },
-    { id: 't3', text: string, done: boolean, dueTime: 'HH:MM', scheduledTime: 'HH:MM' | null },
+    { id: 't1', text: string, done: boolean, dueTime: 'HH:MM', scheduledTime: 'HH:MM' | null, priority: number },
+    { id: 't2', text: string, done: boolean, dueTime: 'HH:MM', scheduledTime: 'HH:MM' | null, priority: number },
+    { id: 't3', text: string, done: boolean, dueTime: 'HH:MM', scheduledTime: 'HH:MM' | null, priority: number },
   ],
 
   // Meals — all times in 'HH:MM' 24h format
@@ -208,11 +210,10 @@ Source of truth: `src/context/AppContext.jsx`. Main state persisted to `localSto
 
   // Workout (legacy morning ignition card)
   workout: {
-    type:      string,   // e.g. 'Tempo Run'
-    duration:  string,   // e.g. '45 min'
-    pace:      string,   // e.g. '5:20 / km'
-    time:      string,   // e.g. '6:30 PM'
-    confirmed: boolean,
+    type:     string,   // e.g. 'Tempo Run'
+    duration: string,   // e.g. '45 min'
+    pace:     string,   // e.g. '5:20 / km'
+    time:     string,   // e.g. '6:30 PM'
   },
 
   // Inbox
@@ -227,7 +228,7 @@ Source of truth: `src/context/AppContext.jsx`. Main state persisted to `localSto
   ],
 
   // Focus Timer
-  focusSessions: number,   // cumulative completed sessions
+  focusSessions: number,   // cumulative completed sessions — incremented in FocusTimer; display deferred to Step 14
 
   // Generic projects array — She Stitches is always projects[0]
   projects: [
@@ -307,7 +308,7 @@ Returns `{ status, projectedFinish, daysOver }`.
 | `SET_ENERGY` | `1–4` | Sets `energyLevel` |
 | `CONFIRM_TASK` | task `id` string | Appends to `confirmedTasks` (idempotent) |
 | `CONFIRM_MEAL` | `{ slot, startTime, endTime }` | Appends to `confirmedMeals`; sets `meals[slot].startTime/endTime/lateAfter` (idempotent) |
-| `CONFIRM_WORKOUT` | — | Sets `workoutConfirmed` + `workout.confirmed` to `true` |
+| `CONFIRM_WORKOUT` | — | Sets `workoutConfirmed` to `true` |
 | `LOCK_DAY` | — | Sets `dayLockedAt` to current ISO timestamp |
 | `TOGGLE_TASK` | task `id` string | Toggles `tasks[id].done` |
 | `UPDATE_TASK_TIME` | `{ taskId, time: 'HH:MM' }` | Sets `tasks[id].scheduledTime`; task appears in timeline |
@@ -319,9 +320,9 @@ Returns `{ status, projectedFinish, daysOver }`.
 | `UPDATE_PROFILE` | `{ name }` | Merges into `profile` |
 | `UPDATE_SETTINGS` | `{ key, value }` | Sets `settings[key] = value` |
 | `LOG_WORKOUT` | `{ date, type, title, duration, feel, notes, exercises[] }` | Appends to `fitness.workoutLog`; sets `fitness.todayComplete = true` |
-| `INCREMENT_WEEK` | — | Increments `fitness.weekNumber` by 1 (legacy — prefer `UPDATE_FITNESS { key: 'programStartDate' }`) |
 | `UPDATE_FITNESS` | `{ key, value }` | Sets `fitness[key] = value` — used for `programStartDate`, `programEndDate` |
-| `ADD_TASK` | `{ text }` | Appends `{ id: Date.now(), text, done: false, scheduledTime: null }` to `tasks` |
+| `ADD_TASK` | `{ text }` | Appends `{ id: Date.now(), text, done: false, scheduledTime: null, priority: tasks.length }` to `tasks` |
+| `REORDER_TASKS` | `{ orderedIds: string[] }` | Updates `tasks[].priority` based on new order |
 | `ADD_TRANSACTION` | `{ merchant, amount, category, date }` | Prepends new transaction to `transactions` (amount is signed) |
 | `DELETE_TRANSACTION` | transaction `id` string | Removes transaction from `transactions` |
 | `RESET_DAY` | — | Resets to `initialState`, preserves `profile`, `settings`, `fitness` (minus `todayComplete`), `inboxItems` |
@@ -770,6 +771,7 @@ File: `.github/workflows/pages.yml`
 - **iCloud / remote sync** — multi-device state
 - **V2 intensity blocks** — RPE-based effort scaling within phases
 - **V3 program builder** — custom week-by-week plan editor
+- **Workout time editing in Ignition** — allow adjusting workout time during Brief step (parallel to meal window editing via FuelEditSheet)
 
 ---
 

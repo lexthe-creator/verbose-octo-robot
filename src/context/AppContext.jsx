@@ -157,7 +157,6 @@ function reducer(state, action) {
       return {
         ...state,
         workoutConfirmed: true,
-        workout: { ...state.workout, confirmed: true },
       };
 
     case 'LOCK_DAY':
