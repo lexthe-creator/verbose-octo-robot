@@ -92,9 +92,9 @@ const initialState = {
   dayLockedAt:       null,
 
   tasks: [
-    { id: 't1', text: 'Review project proposal', done: false, dueTime: '10:00', scheduledTime: null },
-    { id: 't2', text: 'Reply to team messages',  done: false, dueTime: '12:00', scheduledTime: null },
-    { id: 't3', text: 'Evening walk 30 min',      done: false, dueTime: '18:30', scheduledTime: null },
+    { id: 't1', text: 'Review project proposal', done: false, dueTime: '10:00', scheduledTime: null, priority: 0 },
+    { id: 't2', text: 'Reply to team messages',  done: false, dueTime: '12:00', scheduledTime: null, priority: 1 },
+    { id: 't3', text: 'Evening walk 30 min',      done: false, dueTime: '18:30', scheduledTime: null, priority: 2 },
   ],
 
   meals: {
@@ -172,8 +172,18 @@ function reducer(state, action) {
 
     case 'ADD_TASK': {
       const { text } = action.payload;
-      const newTask = { id: Date.now(), text, done: false, scheduledTime: null };
+      const newTask = { id: Date.now(), text, done: false, scheduledTime: null, priority: state.tasks.length };
       return { ...state, tasks: [...state.tasks, newTask] };
+    }
+
+    case 'REORDER_TASKS': {
+      const { orderedIds } = action.payload;
+      const idIndex = Object.fromEntries(orderedIds.map((id, i) => [String(id), i]));
+      const tasks = state.tasks.map(t => ({
+        ...t,
+        priority: idIndex[String(t.id)] ?? t.priority,
+      }));
+      return { ...state, tasks };
     }
 
     case 'UPDATE_TASK_TIME': {

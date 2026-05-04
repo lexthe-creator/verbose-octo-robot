@@ -1,6 +1,15 @@
 import { useState, useRef } from 'react'
 import { useApp } from '../context/AppContext.jsx'
 import FuelEditSheet from '../components/FuelEditSheet.jsx'
+import {
+  DndContext, PointerSensor, TouchSensor,
+  useSensor, useSensors, closestCenter,
+} from '@dnd-kit/core'
+import {
+  SortableContext, useSortable, arrayMove,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 const ENERGY_OPTIONS = [
   { value: 1, emoji: '😴', label: 'Drained' },
@@ -389,6 +398,58 @@ const dt = {
   },
 }
 
+// ─── Sortable task row ────────────────────────────────────────────────────────
+function SortableTaskRow({ task, confirmed, onConfirm, onSkip }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: String(task.id),
+    disabled: confirmed,
+  })
+  const baseTransform = CSS.Transform.toString(transform) ?? ''
+  const scaleSuffix   = isDragging ? ' scale(1.02)' : ''
+  const outerStyle = {
+    display:    'flex',
+    alignItems: 'stretch',
+    transform:  (baseTransform + scaleSuffix) || undefined,
+    transition: isDragging ? undefined : transition,
+    opacity:    isDragging ? 0.9 : 1,
+    boxShadow:  isDragging ? '0 8px 24px rgba(0,0,0,0.5)' : undefined,
+    zIndex:     isDragging ? 100 : undefined,
+    position:   'relative',
+  }
+  return (
+    <div ref={setNodeRef} style={outerStyle}>
+      <div
+        {...(!confirmed ? listeners   : {})}
+        {...(!confirmed ? attributes  : {})}
+        style={{
+          width:          '20px',
+          flexShrink:     0,
+          display:        'flex',
+          alignItems:     'center',
+          justifyContent: 'center',
+          cursor:         confirmed ? 'default' : 'grab',
+          touchAction:    'none',
+          color:          'var(--color-faint)',
+          fontSize:       '14px',
+          userSelect:     'none',
+          opacity:        confirmed ? 0 : 0.4,
+        }}
+      >
+        ⠿
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <SwipeRow
+          label={task.text}
+          sublabel={task._new ? '' : task.dueTime}
+          confirmed={confirmed}
+          onConfirm={onConfirm}
+          onSkip={!confirmed ? onSkip : undefined}
+        />
+      </div>
+    </div>
+  )
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function MorningIgnition({ onComplete }) {
   const { state, dispatch } = useApp()
@@ -416,6 +477,22 @@ export default function MorningIgnition({ onComplete }) {
     return w
   })
   const [editingMealSlot, setEditingMealSlot] = useState(null)
+
+  // Drag-to-reorder
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+  )
+
+  function handleDragEnd(event) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    setBriefTasks(prev => {
+      const oldIndex = prev.findIndex(t => String(t.id) === active.id)
+      const newIndex = prev.findIndex(t => String(t.id) === over.id)
+      return arrayMove(prev, oldIndex, newIndex)
+    })
+  }
 
   // Dynamic totals
   const activeTasks   = briefTasks.filter(t => t.id !== exitingTaskId)
@@ -492,6 +569,10 @@ export default function MorningIgnition({ onComplete }) {
       .filter(t => t._new && localTasks.includes(t.id))
       .forEach(t => dispatch({ type: 'ADD_TASK', payload: { text: t.text } }))
 
+    // Persist drag-reorder priority for original tasks
+    const orderedIds = activeTasks.filter(t => !t._new).map(t => t.id)
+    dispatch({ type: 'REORDER_TASKS', payload: { orderedIds } })
+
     // Meals with local window overrides
     localMeals.forEach(slot => dispatch({
       type: 'CONFIRM_MEAL',
@@ -565,24 +646,19 @@ export default function MorningIgnition({ onComplete }) {
         <section style={s.section}>
           <p style={s.sectionLabel}>3 Things</p>
           <div style={s.stack}>
-            {activeTasks.map(task => (
-              <div
-                key={task.id}
-                style={{
-                  opacity:    exitingTaskId === task.id ? 0 : 1,
-                  transform:  exitingTaskId === task.id ? 'translateX(-40px)' : 'translateX(0)',
-                  transition: 'opacity 200ms ease, transform 200ms ease',
-                }}
-              >
-                <SwipeRow
-                  label={task.text}
-                  sublabel={task._new ? '' : task.dueTime}
-                  confirmed={localTasks.includes(task.id)}
-                  onConfirm={() => confirmTask(task.id)}
-                  onSkip={!localTasks.includes(task.id) ? () => skipTask(task.id) : undefined}
-                />
-              </div>
-            ))}
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={activeTasks.map(t => String(t.id))} strategy={verticalListSortingStrategy}>
+                {activeTasks.map(task => (
+                  <SortableTaskRow
+                    key={task.id}
+                    task={task}
+                    confirmed={localTasks.includes(task.id)}
+                    onConfirm={() => confirmTask(task.id)}
+                    onSkip={!localTasks.includes(task.id) ? () => skipTask(task.id) : undefined}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
 
             {/* Pending draft inputs */}
             {draftTasks.map(draft => (
