@@ -741,7 +741,7 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
     })
 
     Object.values(state.meals).forEach(meal => {
-      if (!meal.eaten) {
+      if (!meal.eaten && parseHHMM(meal.endTime) > currentMins) {
         const m = parseHHMM(meal.startTime)
         if (m > currentMins) candidates.push({ label: meal.label, timeMins: m })
       }
@@ -758,6 +758,12 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
     const away = next.timeMins - currentMins
     return `${next.label} in ${away} min`
   }, [state, currentMins])
+
+  const focusProject    = state.projects?.find(p => p.status === 'focus')
+  const focusProjectName = focusProject?.name ?? 'Projects'
+  const focusNextTask   = focusProject
+    ? focusProject.tasks?.find(t => !t.done)?.text ?? null
+    : 'Set a focus project in Projects'
 
   function handleToggleExpand(taskId) {
     setExpandedTask(prev => prev === taskId ? null : taskId)
@@ -824,17 +830,17 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
         </div>
       </section>
 
-      {/* 5 — She Stitches goal card */}
+      {/* 5 — Focus project goal card */}
       <section style={s.section}>
-        <p style={s.sectionLabel}>She Stitches Studio</p>
+        <p style={s.sectionLabel}>{focusProjectName}</p>
         <SsGoalCard
           doneCount={ssDoneCount}
           totalCount={ssTotalCount}
           listingsCount={ssListingsCount}
-          nextTask={ssNextTask}
+          nextTask={focusNextTask}
           dayOf90={ssDayOf90}
           paceStatus={paceStatus}
-          onTap={() => onNavigate && onNavigate('shestitches')}
+          onTap={() => onNavigate && onNavigate('projects')}
         />
       </section>
 

@@ -350,7 +350,7 @@ Exposed alongside `state` and `dispatch` via `useApp()`:
 
 ### Screen Names (state values in App.jsx)
 
-`'ignition'` · `'home'` · `'fitness'` · `'focus'` · `'inbox'` · `'finance'` · `'shestitches'` · `'settings'`
+`'ignition'` · `'home'` · `'fitness'` · `'focus'` · `'inbox'` · `'finance'` · `'projects'` · `'settings'`
 
 **Overlay screens** (rendered as `position: fixed, z-index: 200` above all screens):
 
@@ -420,11 +420,11 @@ Exposed alongside `state` and `dispatch` via `useApp()`:
 Layout zones top to bottom:
 
 1. **Hero time** — greeting line ("Good morning/afternoon/evening, {name}") + gear icon (32px circle, `#1E1E18` bg, `#2A2A22` border, `#8C8C7A` ⚙ icon) top-right → `onNavigate('settings')`. Below: DM Serif Display 52px clock. Colon in accent color. Right-aligned "⊙ Focus" pill. Full date below.
-2. **Burn bar** — 2px track, fills based on % of waking day elapsed (6am–11pm). Left: "X% of day gone". Right: next scheduled commitment countdown ("Tempo run in 47 min")
+2. **Burn bar** — 2px track, fills based on % of waking day elapsed (6am–11pm). Left: "X% of day gone". Right: `nextLabel` — next upcoming commitment ("Tempo run in 47 min"). `nextLabel` only surfaces future items: tasks where `scheduledTime > now`, meals where `endTime > now` (expired windows are skipped), workout if `workoutTime > now`. Shows nothing if no upcoming items.
 3. **Today's Training** — card showing today's generated workout (icon, title, subtitle). "Start →" button calls `onStartWorkout(workout)`; green "✓ Completed" state when `fitness.todayComplete`.
 4. **Today at a glance** — dark card, vertical timeline. Items: Morning ignition, Now marker, meals, scheduled tasks.
 5. **3 Things** — task rows. Tap to check off. Done: strikethrough + green + reduced opacity. Overdue badge on relevant items.
-6. **She Stitches Studio** — goal card (progress bar, listings, next task). Tap → `onNavigate('shestitches')`.
+6. **Focus project** — section label reads `state.projects?.find(p => p.status === 'focus')?.name ?? 'Projects'`. Goal card shows progress bar, listings, and next undone task from the focus project (`focusProject.tasks?.find(t => !t.done)?.text`). If no focus project, next task shows "Set a focus project in Projects". Tap → `onNavigate('projects')`.
 7. **Fuel gauge** — 4 meal slots (Breakfast / Lunch / Snack / Dinner). Tap slot body → `MARK_MEAL_EATEN`. Tap ◷ icon → `FuelEditSheet` bottom sheet for time editing.
 
 ---
@@ -472,7 +472,7 @@ Layout zones top to bottom:
 
 ---
 
-### 5.5 She Stitches Studio (`'shestitches'`)
+### 5.5 Projects (`'projects'`)
 
 **File:** `src/screens/SheStitches.jsx` ✅ Done
 **Trigger:** Tap the goal card on Home.
@@ -672,14 +672,14 @@ Used in Home screen fuel gauge slots.
 
 **Pattern:** `useState`-based screen switcher in `App.jsx` — no router library.
 
-**Screen values:** `'ignition'` · `'home'` · `'fitness'` · `'focus'` · `'inbox'` · `'finance'` · `'shestitches'` · `'settings'`
+**Screen values:** `'ignition'` · `'home'` · `'fitness'` · `'focus'` · `'inbox'` · `'finance'` · `'projects'` · `'settings'`
 
 **Bottom nav** (`src/App.jsx`):
 - 72px height, `#1A1A14` bg, `0.5px` top border
 - 4 tabs: Home `⌂` / Fitness `◉` / Inbox `◎` / Finance `◈`
 - Active: label + icon color → `#C17B56`, small 4px pip dot below icon
 - Fixed to bottom of the 393px column, `z-index: 100`
-- Hidden when `screen === 'ignition'` or `screen === 'focus'` or `screen === 'shestitches'` or `screen === 'settings'`
+- Hidden when `screen === 'ignition'` or `screen === 'focus'` or `screen === 'projects'` or `screen === 'settings'`
 
 **Global overlays** (rendered above nav in `App.jsx`):
 - `WorkoutPlayer` (z-index 150): shown when `activeWorkout !== null`; cleared on save or close
@@ -691,10 +691,10 @@ Used in Home screen fuel gauge slots.
 | `ignition` | `home` | `onComplete()` inside MorningIgnition Step 3 |
 | `home` | `focus` | `onOpenFocus()` prop |
 | `home` | `settings` | Gear icon in HeroClock → `onNavigate('settings')` |
-| `home` | `shestitches` | `onNavigate('shestitches')` via She Stitches goal card tap |
+| `home` | `projects` | `onNavigate('projects')` via She Stitches goal card tap |
 | `settings` | `home` | `onBack()` prop |
 | `focus` | `home` | `onClose()` prop |
-| `shestitches` | `home` | `onBack()` prop |
+| `projects` | `home` | `onBack()` prop |
 | `home` or `fitness` | WorkoutPlayer overlay | "Start →" button → `onStartWorkout(workout)` in App.jsx |
 | Any nav tab | target screen | Bottom nav tab tap |
 
