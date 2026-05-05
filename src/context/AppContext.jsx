@@ -199,7 +199,7 @@ function reducer(state, action) {
       const slot = action.payload;
       return {
         ...state,
-        meals: { ...state.meals, [slot]: { ...state.meals[slot], eaten: true } },
+        meals: { ...state.meals, [slot]: { ...state.meals[slot], eaten: !state.meals[slot].eaten } },
       };
     }
 

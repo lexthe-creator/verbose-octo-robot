@@ -259,7 +259,7 @@ const s = {
     minHeight:     '100dvh',
     background:    'var(--color-bg)',
     paddingTop:    'var(--safe-top)',
-    paddingBottom: 'calc(var(--safe-bottom) + var(--space-10))',
+    paddingBottom: 'calc(var(--safe-bottom) + var(--nav-height) + var(--space-6))',
     display:       'flex',
     flexDirection: 'column',
   },

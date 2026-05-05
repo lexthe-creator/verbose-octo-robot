@@ -1,7 +1,17 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useApp } from '../context/AppContext.jsx'
 import FuelEditSheet from '../components/FuelEditSheet.jsx'
-import { getTodayType, generateWorkout, WORKOUT_ICONS, getWeekNumber } from '../utils/fitness.js'
+import { getTodayType, generateWorkout, getWeekNumber } from '../utils/fitness.js'
+
+const WORKOUT_LABEL = {
+  easy_run:   'Run',
+  tempo_run:  'Run',
+  long_run:   'Run',
+  strength_a: 'Strength',
+  strength_b: 'Strength',
+  stretch:    'Stretch',
+  rest:       'Rest',
+}
 import { getProjectPace } from '../utils/projectUtils.js'
 
 // ─── Time utilities ────────────────────────────────────────────────────────────
@@ -397,11 +407,11 @@ function FuelSlot({ slotKey, meal, nowMins: currentMins, onMarkEaten, onOpenEdit
     <div style={{ ...fs.wrap, background: stateBg, border: `0.5px solid ${borderCol}` }}>
       <div style={fs.row}>
         {/* Tap body to mark eaten */}
-        <button style={fs.mainBtn} onClick={() => !eaten && onMarkEaten(slotKey)} disabled={eaten}>
+        <button style={fs.mainBtn} onClick={() => onMarkEaten(slotKey)}>
           <span style={{ ...fs.label, color: stateColor }}>
             {eaten ? '✓ ' : late ? '! ' : ''}{meal.label}
           </span>
-          <span style={fs.window}>{meal.startTime} – {meal.endTime}</span>
+          <span style={fs.window}>{formatMins(parseHHMM(meal.startTime))} – {formatMins(parseHHMM(meal.endTime))}</span>
         </button>
 
         {/* Clock icon — open bottom-sheet time editor */}
@@ -451,7 +461,7 @@ const PACE_STYLES = {
   },
 }
 
-function SsGoalCard({ doneCount, totalCount, listingsCount, nextTask, dayOf90, paceStatus, onTap }) {
+function SsGoalCard({ projectName, projectEmoji, doneCount, totalCount, listingsCount, nextTask, dayOf90, paceStatus, onTap }) {
   const pct   = totalCount ? Math.round((doneCount / totalCount) * 100) : 0
   const pace  = PACE_STYLES[paceStatus] ?? PACE_STYLES.on_track
 
@@ -466,10 +476,10 @@ function SsGoalCard({ doneCount, totalCount, listingsCount, nextTask, dayOf90, p
         {/* Top row */}
         <div style={ss.topRow}>
           <div style={ss.iconWrap}>
-            <span style={ss.icon}>🪡</span>
+            <span style={ss.icon}>{projectEmoji}</span>
           </div>
           <div style={ss.nameMeta}>
-            <span style={ss.name}>90-Day Roadmap</span>
+            <span style={ss.name}>{projectName}</span>
             <span style={ss.day}>Day {dayOf90} of 90</span>
           </div>
           <span style={{ ...ss.paceBadge, background: pace.badgeBg, color: pace.badgeColor }}>
@@ -615,7 +625,7 @@ function TodayTrainingCard({ todayComplete, gymAccess, weekNumber, onStart }) {
   return (
     <div style={tt.wrap}>
       <div style={tt.top}>
-        <span style={tt.icon}>{WORKOUT_ICONS[workout.type] || '🏋'}</span>
+        <span style={tt.typeTag}>{WORKOUT_LABEL[workout.type] ?? 'Workout'}</span>
         <div style={tt.info}>
           <p style={tt.name}>{workout.title}</p>
           <p style={tt.sub}>{workout.subtitle}</p>
@@ -652,7 +662,17 @@ const tt = {
     gap:           '12px',
   },
   top: { display: 'flex', alignItems: 'center', gap: '12px' },
-  icon: { fontSize: '26px', lineHeight: 1 },
+  typeTag: {
+    fontSize:      '10px',
+    fontWeight:    700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    color:         'var(--color-accent)',
+    background:    'var(--color-accent-bg)',
+    padding:       '3px 8px',
+    borderRadius:  'var(--radius-pill)',
+    flexShrink:    0,
+  },
   info: {
     flex:          1,
     display:       'flex',
@@ -806,6 +826,8 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
       <section style={s.section}>
         <p style={s.sectionLabel}>{focusProjectName}</p>
         <SsGoalCard
+          projectName={state.projects?.[0]?.name ?? 'Projects'}
+          projectEmoji={state.projects?.[0]?.emoji ?? '📋'}
           doneCount={ssDoneCount}
           totalCount={ssTotalCount}
           listingsCount={ssListingsCount}

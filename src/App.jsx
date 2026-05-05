@@ -32,10 +32,11 @@ function isThisWeek(dateStr) {
 }
 
 const NAV_TABS = [
-  { id: 'home',    label: 'Home',    icon: '⌂' },
-  { id: 'fitness', label: 'Fitness', icon: '◉' },
-  { id: 'inbox',   label: 'Inbox',   icon: '◎' },
-  { id: 'finance', label: 'Finance', icon: '◈' },
+  { id: 'home',     label: 'Home',     icon: '⌂' },
+  { id: 'fitness',  label: 'Fitness',  icon: '◉' },
+  { id: 'inbox',    label: 'Inbox',    icon: '◎' },
+  { id: 'projects', label: 'Projects', icon: '◧' },
+  { id: 'finance',  label: 'Finance',  icon: '◈' },
 ]
 
 export default function App() {
@@ -85,7 +86,6 @@ export default function App() {
   const hideNav = (
     screen === 'ignition' ||
     screen === 'focus'    ||
-    screen === 'projects' ||
     screen === 'settings'
   )
 

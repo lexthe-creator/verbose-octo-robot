@@ -72,16 +72,6 @@ export const WORKOUT_TITLES = {
   rest:       'Rest day',
 }
 
-export const WORKOUT_ICONS = {
-  easy_run:   '🏃',
-  tempo_run:  '⚡',
-  long_run:   '🛣',
-  strength_a: '💪',
-  strength_b: '💪',
-  stretch:    '🧘',
-  rest:       '☁',
-}
-
 // Monday–Sunday dates for the current calendar week
 export function getWeekDates(today = new Date()) {
   const dow = today.getDay()
