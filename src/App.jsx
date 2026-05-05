@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useApp } from './context/AppContext.jsx'
 import { SCREENS, NAV_TABS } from './constants/navigation.js'
 import { shouldShowNav } from './navigation/router.js'
@@ -19,10 +19,6 @@ import WeeklyPlanning  from './screens/WeeklyPlanning.jsx'
 
 export default function App() {
   const { state, dispatch } = useApp()
-
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', state.settings.theme || 'dark')
-  }, [state.settings.theme])
 
   const initialScreen = (() => {
     if (!state.dayLockedAt) return SCREENS.IGNITION

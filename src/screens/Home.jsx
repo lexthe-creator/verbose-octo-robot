@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useApp } from '../context/AppContext.jsx'
+import { useUser } from '../context/UserContext.jsx'
+import { useSettings } from '../context/SettingsContext.jsx'
 import FuelEditSheet from '../components/FuelEditSheet.jsx'
 import { getTodayType, generateWorkout, getWeekNumber } from '../utils/fitness.js'
 import { getProjectPace } from '../utils/projectUtils.js'
@@ -685,6 +687,8 @@ const tt = {
 export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
   const { state, dispatch, updateTaskTime, updateMealWindow,
           ssDoneCount, ssTotalCount, ssListingsCount, ssNextTask, ssDayOf90 } = useApp()
+  const { userState }     = useUser()
+  const { settingsState } = useSettings()
 
   const [now, setNow] = useState(() => new Date())
   const [expandedTask, setExpandedTask] = useState(null)
@@ -759,7 +763,7 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
       {/* 1 — Hero clock */}
       <HeroClock
         now={now}
-        name={state.profile.name}
+        name={userState.name}
         onOpenFocus={onOpenFocus}
         onOpenSettings={() => onNavigate(SCREENS.SETTINGS)}
       />
@@ -772,11 +776,11 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
         <p style={s.sectionLabel}>Today's Training</p>
         <TodayTrainingCard
           todayComplete={state.fitness.todayComplete}
-          gymAccess={state.settings.gymAccess}
+          gymAccess={settingsState.gymAccess}
           weekNumber={getWeekNumber(state.fitness.programStartDate)}
           onStart={() => {
             const type    = getTodayType()
-            const workout = generateWorkout(type, state.settings.gymAccess, getWeekNumber(state.fitness.programStartDate))
+            const workout = generateWorkout(type, settingsState.gymAccess, getWeekNumber(state.fitness.programStartDate))
             onStartWorkout && onStartWorkout(workout)
           }}
         />

@@ -1,6 +1,7 @@
 // TODO V2: Twilio SMS pipeline
 import { useState, useRef, useEffect } from 'react'
 import { useApp } from '../context/AppContext.jsx'
+import { useSettings } from '../context/SettingsContext.jsx'
 import { getTodayISO } from '../utils/time.js'
 import { getWeekDates } from '../utils/fitness.js'
 
@@ -406,8 +407,9 @@ const sh = {
 
 export default function Finance() {
   const { state, dispatch } = useApp()
+  const { settingsState }   = useSettings()
   const transactions   = state.transactions
-  const plaidConnected = state.settings.plaidConnected
+  const plaidConnected = settingsState.plaidConnected
 
   const [showSheet, setShowSheet] = useState(false)
 

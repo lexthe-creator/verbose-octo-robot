@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { useApp } from '../context/AppContext.jsx'
+import { useSettings } from '../context/SettingsContext.jsx'
 import FuelEditSheet from '../components/FuelEditSheet.jsx'
 import { generateWorkout, getTodayType, getWeekNumber } from '../utils/fitness.js'
 import { formatMealTime } from '../utils/time.js'
@@ -447,6 +448,7 @@ function SortableTaskRow({ task, confirmed, onConfirm, onSkip }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function MorningIgnition({ onComplete }) {
   const { state, dispatch } = useApp()
+  const { settingsState }   = useSettings()
   const [step, setStep] = useState('energy')
 
   // Local brief state
@@ -590,7 +592,7 @@ export default function MorningIgnition({ onComplete }) {
     if (!skippedSections.has('training') && localWorkout) {
       const todayType        = getTodayType()
       const weekNum          = getWeekNumber(state.fitness.programStartDate)
-      const generatedWorkout = generateWorkout(todayType, state.settings.gymAccess, weekNum)
+      const generatedWorkout = generateWorkout(todayType, settingsState.gymAccess, weekNum)
       dispatch({
         type:    'CONFIRM_WORKOUT',
         payload: {

@@ -67,17 +67,6 @@ const INITIAL_PROJECTS = [
 
 /* ─── Initial state ───────────────────────────────────────────────────────── */
 const initialState = {
-  profile: {
-    name: 'Lex',
-  },
-
-  settings: {
-    gymAccess:         'bodyweight',
-    plaidConnected:    false,
-    calendarConnected: false,
-    theme:             'dark',
-  },
-
   fitness: {
     weekNumber:       1,
     programStartDate: null,
@@ -225,14 +214,6 @@ function reducer(state, action) {
     case 'INCREMENT_FOCUS_SESSIONS':
       return { ...state, focusSessions: state.focusSessions + 1 };
 
-    case 'UPDATE_PROFILE':
-      return { ...state, profile: { ...state.profile, ...action.payload } };
-
-    case 'UPDATE_SETTINGS': {
-      const { key, value } = action.payload;
-      return { ...state, settings: { ...state.settings, [key]: value } };
-    }
-
     case 'LOG_WORKOUT':
       return {
         ...state,
@@ -356,8 +337,6 @@ function reducer(state, action) {
 
       return {
         ...initialState,
-        profile:          state.profile,
-        settings:         state.settings,
         fitness:          { ...state.fitness, todayComplete: false },
         inboxItems:       state.inboxItems,
         transactions:     state.transactions,
@@ -420,8 +399,6 @@ function loadState() {
 
         return {
           ...initialState,
-          profile:          { ...initialState.profile,  ...(saved.profile  || {}) },
-          settings:         { ...initialState.settings, ...(saved.settings || {}) },
           fitness:          { ...initialState.fitness,  ...(saved.fitness  || {}), todayComplete: false },
           inboxItems:       saved.inboxItems        || [],
           transactions:     saved.transactions      || [],
@@ -434,11 +411,11 @@ function loadState() {
       }
     }
 
+    // Strip legacy profile/settings so they don't re-enter aiml_state
+    const { profile: _p, settings: _s, ...restSaved } = saved;
     return {
       ...initialState,
-      ...saved,
-      profile:          { ...initialState.profile,  ...(saved.profile  || {}) },
-      settings:         { ...initialState.settings, ...(saved.settings || {}) },
+      ...restSaved,
       fitness:          { ...initialState.fitness,  ...(saved.fitness  || {}) },
       transactions:     saved.transactions      || [],
       projects,
