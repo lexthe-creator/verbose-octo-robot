@@ -289,7 +289,7 @@ const s = {
   },
   title: {
     fontFamily: 'var(--font-display)',
-    fontSize:   '24px',
+    fontSize:   '22px',
     color:      'var(--color-text)',
     lineHeight: 1,
   },

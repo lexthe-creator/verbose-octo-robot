@@ -190,11 +190,11 @@ const styles = {
     paddingBottom:  '6px',
   },
   tabIcon: {
-    fontSize:   '20px',
+    fontSize:   '15px',
     lineHeight: 1,
   },
   tabLabel: {
-    fontSize:      '10px',
+    fontSize:      '8px',
     fontWeight:    500,
     letterSpacing: '0.02em',
   },

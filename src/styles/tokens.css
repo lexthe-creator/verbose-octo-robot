@@ -89,8 +89,12 @@
   --space-12: 48px;
 
   /* ── Layout ──────────────────────────────────────────────────────────────── */
-  --nav-height:        72px;
+  --nav-height:        60px;
   --max-width:         393px;
+
+  /* ── Viewport targets ────────────────────────────────────────────────────── */
+  --viewport-min:      360px;
+  --viewport-target:   430px;
 
   /* ── Safe areas (iPhone 16 Pro) ─────────────────────────────────────────── */
   --safe-top:    env(safe-area-inset-top, 0px);

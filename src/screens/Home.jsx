@@ -97,7 +97,7 @@ const hero = {
   clockWrap: { display: 'flex', alignItems: 'baseline', gap: '4px' },
   clock: {
     fontFamily: 'var(--font-display)',
-    fontSize:   '52px',
+    fontSize:   '44px',
     lineHeight: 1,
     color:      'var(--color-text)',
     letterSpacing: '-1px',
@@ -636,7 +636,7 @@ const tt = {
     background:    'var(--color-card)',
     border:        'var(--border)',
     borderRadius:  'var(--radius-card)',
-    padding:       '14px',
+    padding:       '12px',
     display:       'flex',
     flexDirection: 'column',
     gap:           '12px',
