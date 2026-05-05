@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { useApp } from '../context/AppContext.jsx'
 import FuelEditSheet from '../components/FuelEditSheet.jsx'
+import { generateWorkout, getTodayType, getWeekNumber } from '../utils/fitness.js'
 import {
   DndContext, PointerSensor, TouchSensor,
   useSensor, useSensors, closestCenter,
@@ -245,18 +246,17 @@ function fmt24(hhmm) {
   return `${h12}:${String(m).padStart(2, '0')} ${ampm}`
 }
 
-function MealSlot({ label, startTime, endTime, confirmed, onConfirm, onEditTime }) {
+function MealSlot({ label, startTime, endTime, confirmed, onToggle, onEditTime }) {
   return (
     <div style={{
       ...mealStyles.slot,
       background: confirmed ? 'var(--color-success-bg)' : 'var(--color-card)',
       border:     confirmed ? '0.5px solid var(--color-success)' : 'var(--border)',
     }}>
-      {/* Tap main area to confirm */}
+      {/* Tap main area to toggle confirm */}
       <button
         style={mealStyles.mainBtn}
-        onClick={!confirmed ? onConfirm : undefined}
-        disabled={confirmed}
+        onClick={onToggle}
       >
         <span style={{ ...mealStyles.label, color: confirmed ? 'var(--color-success)' : 'var(--color-text)' }}>
           {confirmed ? '✓ ' : ''}{label}
@@ -458,8 +458,12 @@ export default function MorningIgnition({ onComplete }) {
   // Local brief state
   const [localEnergy,  setLocalEnergy]  = useState(state.energyLevel)
   const [localTasks,   setLocalTasks]   = useState([])  // confirmed task ids
-  const [localMeals,   setLocalMeals]   = useState([])  // confirmed meal slots
-  const [localWorkout, setLocalWorkout] = useState(false)
+  const [localMeals,   setLocalMeals]   = useState(['breakfast', 'lunch', 'snack', 'dinner'])
+  const [localWorkout, setLocalWorkout] = useState(true)
+
+  // Skip state — Set of section names ('tasks' | 'training' | 'meals')
+  const [skippedSections, setSkippedSections] = useState(new Set())
+  const [fadingSections,  setFadingSections]  = useState(new Set())
 
   // Task management in brief
   const [briefTasks, setBriefTasks]       = useState(
@@ -494,16 +498,13 @@ export default function MorningIgnition({ onComplete }) {
     })
   }
 
-  // Dynamic totals
-  const activeTasks   = briefTasks.filter(t => t.id !== exitingTaskId)
-  const TOTAL_ITEMS   = activeTasks.length + 1 + 4  // tasks + workout + meals
-  const confirmedCount = (
-    localTasks.filter(id => activeTasks.some(t => t.id === id)).length +
-    localMeals.length +
-    (localWorkout ? 1 : 0)
-  )
-  const progress     = TOTAL_ITEMS > 0 ? confirmedCount / TOTAL_ITEMS : 0
-  const allConfirmed = confirmedCount === TOTAL_ITEMS && draftTasks.length === 0
+  // Dynamic totals — progress tracks tasks only; meals + workout are optional
+  const activeTasks        = briefTasks.filter(t => t.id !== exitingTaskId)
+  const tasksSkipped       = skippedSections.has('tasks')
+  const taskTotal          = tasksSkipped ? 0 : activeTasks.length
+  const taskDone           = tasksSkipped ? 0 : localTasks.filter(id => activeTasks.some(t => t.id === id)).length
+  const progress           = taskTotal > 0 ? taskDone / taskTotal : (tasksSkipped ? 1 : 0)
+  const allConfirmed       = (tasksSkipped || taskDone >= taskTotal) && draftTasks.length === 0
 
   const today     = new Date()
   const dayLabel  = today.toLocaleDateString('en-US', { weekday: 'long' })
@@ -513,8 +514,18 @@ export default function MorningIgnition({ onComplete }) {
     if (!localTasks.includes(id)) setLocalTasks(prev => [...prev, id])
   }
 
-  function confirmMeal(slot) {
-    if (!localMeals.includes(slot)) setLocalMeals(prev => [...prev, slot])
+  function toggleMeal(slot) {
+    setLocalMeals(prev =>
+      prev.includes(slot) ? prev.filter(s => s !== slot) : [...prev, slot]
+    )
+  }
+
+  function skipSection(name) {
+    setFadingSections(prev => new Set(prev).add(name))
+    setTimeout(() => {
+      setSkippedSections(prev => new Set(prev).add(name))
+      setFadingSections(prev => { const s = new Set(prev); s.delete(name); return s })
+    }, 250)
   }
 
   function skipTask(id) {
@@ -559,27 +570,44 @@ export default function MorningIgnition({ onComplete }) {
   function handleLockDay() {
     dispatch({ type: 'SET_ENERGY', payload: localEnergy })
 
-    // Confirm original tasks
-    activeTasks
-      .filter(t => !t._new && localTasks.includes(t.id))
-      .forEach(t => dispatch({ type: 'CONFIRM_TASK', payload: t.id }))
+    // Tasks — only if section not skipped
+    if (!skippedSections.has('tasks')) {
+      activeTasks
+        .filter(t => !t._new && localTasks.includes(t.id))
+        .forEach(t => dispatch({ type: 'CONFIRM_TASK', payload: t.id }))
 
-    // Add + confirm new tasks
-    activeTasks
-      .filter(t => t._new && localTasks.includes(t.id))
-      .forEach(t => dispatch({ type: 'ADD_TASK', payload: { text: t.text } }))
+      activeTasks
+        .filter(t => t._new && localTasks.includes(t.id))
+        .forEach(t => dispatch({ type: 'ADD_TASK', payload: { text: t.text } }))
 
-    // Persist drag-reorder priority for original tasks
-    const orderedIds = activeTasks.filter(t => !t._new).map(t => t.id)
-    dispatch({ type: 'REORDER_TASKS', payload: { orderedIds } })
+      const orderedIds = activeTasks.filter(t => !t._new).map(t => t.id)
+      dispatch({ type: 'REORDER_TASKS', payload: { orderedIds } })
+    }
 
-    // Meals with local window overrides
-    localMeals.forEach(slot => dispatch({
-      type: 'CONFIRM_MEAL',
-      payload: { slot, ...mealWindows[slot] },
-    }))
+    // Meals — only if section not skipped
+    if (!skippedSections.has('meals')) {
+      localMeals.forEach(slot => dispatch({
+        type: 'CONFIRM_MEAL',
+        payload: { slot, ...mealWindows[slot] },
+      }))
+    }
 
-    if (localWorkout) dispatch({ type: 'CONFIRM_WORKOUT' })
+    // Workout — generate today's workout and write to state on confirm
+    if (!skippedSections.has('training') && localWorkout) {
+      const todayType        = getTodayType()
+      const weekNum          = getWeekNumber(state.fitness.programStartDate)
+      const generatedWorkout = generateWorkout(todayType, state.settings.gymAccess, weekNum)
+      dispatch({
+        type:    'CONFIRM_WORKOUT',
+        payload: {
+          type:     generatedWorkout.type,
+          title:    generatedWorkout.title,
+          duration: `${generatedWorkout.durationEst} min`,
+          segments: generatedWorkout.segments,
+        },
+      })
+    }
+
     dispatch({ type: 'LOCK_DAY' })
     setStep('locked')
   }
@@ -640,11 +668,15 @@ export default function MorningIgnition({ onComplete }) {
         <div style={s.progressTrack}>
           <div style={{ ...s.progressFill, width: `${progress * 100}%` }} />
         </div>
-        <p style={s.progressLabel}>{confirmedCount} of {TOTAL_ITEMS} confirmed</p>
+        <p style={s.progressLabel}>{taskDone} of {taskTotal} tasks confirmed</p>
 
         {/* 3 Things */}
-        <section style={s.section}>
-          <p style={s.sectionLabel}>3 Things</p>
+        {!skippedSections.has('tasks') && (
+        <section style={{ ...s.section, opacity: fadingSections.has('tasks') ? 0 : 1, transition: 'opacity 0.25s ease' }}>
+          <div style={s.sectionHeaderRow}>
+            <p style={s.sectionLabel}>3 Things</p>
+            <button style={s.skipLink} onClick={() => skipSection('tasks')}>Skip</button>
+          </div>
           <div style={s.stack}>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={activeTasks.map(t => String(t.id))} strategy={verticalListSortingStrategy}>
@@ -677,10 +709,15 @@ export default function MorningIgnition({ onComplete }) {
             </button>
           </div>
         </section>
+        )}
 
         {/* Training */}
-        <section style={s.section}>
-          <p style={s.sectionLabel}>Training</p>
+        {!skippedSections.has('training') && (
+        <section style={{ ...s.section, opacity: fadingSections.has('training') ? 0 : 1, transition: 'opacity 0.25s ease' }}>
+          <div style={s.sectionHeaderRow}>
+            <p style={s.sectionLabel}>Training</p>
+            <button style={s.skipLink} onClick={() => skipSection('training')}>Skip</button>
+          </div>
           <SwipeRow
             label={state.workout.type}
             sublabel={`${state.workout.duration} · ${state.workout.pace} · ${state.workout.time}`}
@@ -688,13 +725,18 @@ export default function MorningIgnition({ onComplete }) {
             onConfirm={() => setLocalWorkout(true)}
           />
         </section>
+        )}
 
         {/* Meals */}
-        <section style={s.section}>
+        {!skippedSections.has('meals') && (
+        <section style={{ ...s.section, opacity: fadingSections.has('meals') ? 0 : 1, transition: 'opacity 0.25s ease' }}>
           <div style={s.labelGroup}>
-            <p style={s.sectionLabel}>Set today's meal reminders</p>
+            <div style={s.sectionHeaderRow}>
+              <p style={s.sectionLabel}>Meal reminders</p>
+              <button style={s.skipLink} onClick={() => skipSection('meals')}>Skip</button>
+            </div>
             <p style={s.sectionHelper}>
-              Tap each window to confirm — tap the time to adjust it.
+              Tap a slot to toggle — tap the time to adjust it.
             </p>
           </div>
           <div style={s.mealGrid}>
@@ -705,12 +747,13 @@ export default function MorningIgnition({ onComplete }) {
                 startTime={mealWindows[slot]?.startTime ?? meal.startTime}
                 endTime={mealWindows[slot]?.endTime ?? meal.endTime}
                 confirmed={localMeals.includes(slot)}
-                onConfirm={() => confirmMeal(slot)}
+                onToggle={() => toggleMeal(slot)}
                 onEditTime={() => setEditingMealSlot(slot)}
               />
             ))}
           </div>
         </section>
+        )}
 
         {/* Lock button */}
         <div style={s.lockWrap}>
@@ -746,14 +789,18 @@ export default function MorningIgnition({ onComplete }) {
   }
 
   // ── Step 3: Locked ──────────────────────────────────────────────────────────
-  const confirmedTaskTexts = activeTasks
-    .filter(t => localTasks.includes(t.id))
-    .map(t => t.text)
+  const confirmedTaskTexts = skippedSections.has('tasks')
+    ? []
+    : activeTasks.filter(t => localTasks.includes(t.id)).map(t => t.text)
 
   const lockedItems = [
     ...confirmedTaskTexts,
-    `${state.workout.type} — ${state.workout.duration}`,
-    ...localMeals.map(slot => state.meals[slot]?.label ?? slot),
+    ...(!skippedSections.has('training') && localWorkout
+      ? [`${state.workout.type} — ${state.workout.duration}`]
+      : []),
+    ...(!skippedSections.has('meals')
+      ? localMeals.map(slot => state.meals[slot]?.label ?? slot)
+      : []),
   ]
 
   return (
@@ -893,6 +940,20 @@ const s = {
     letterSpacing: '0.08em',
     textTransform: 'uppercase',
     color:         'var(--color-muted)',
+  },
+  sectionHeaderRow: {
+    display:        'flex',
+    alignItems:     'center',
+    justifyContent: 'space-between',
+  },
+  skipLink: {
+    fontSize:   '11px',
+    color:      'var(--color-muted)',
+    background: 'none',
+    border:     'none',
+    cursor:     'pointer',
+    padding:    '2px 0',
+    fontFamily: 'var(--font-body)',
   },
   labelGroup: {
     display:       'flex',

@@ -185,7 +185,7 @@ function TxRow({ tx, onDelete }) {
     <div style={{ position: 'relative', borderRadius: '11px', overflow: 'hidden' }}>
       {/* Red delete zone revealed by swipe */}
       <div style={tx_s.deleteZone} onClick={handleDelete}>
-        <span style={{ color: '#E05555', fontSize: '12px', fontWeight: 700 }}>Delete</span>
+        <span style={{ color: 'var(--color-danger)', fontSize: '12px', fontWeight: 700 }}>Delete</span>
       </div>
       {/* Sliding row */}
       <div
@@ -220,7 +220,7 @@ const tx_s = {
     position:       'absolute',
     right:          0, top: 0, bottom: 0,
     width:          '72px',
-    background:     '#5A2020',
+    background:     'var(--color-danger-border)',
     display:        'flex',
     alignItems:     'center',
     justifyContent: 'center',
@@ -452,11 +452,11 @@ export default function Finance() {
           <h1 style={s.title}>Finance</h1>
           <div style={s.headerRight}>
             {plaidConnected ? (
-              <span style={{ ...s.badge, background: '#0C2A1E', color: '#1D9E75', border: '0.5px solid #1A4028' }}>
+              <span style={{ ...s.badge, background: 'var(--color-success-bg)', color: 'var(--color-success)', border: '0.5px solid var(--color-success-border)' }}>
                 ● Plaid connected
               </span>
             ) : (
-              <span style={{ ...s.badge, background: '#2A1010', color: '#E05555', border: '0.5px solid #5A2020' }}>
+              <span style={{ ...s.badge, background: 'var(--color-danger-bg)', color: 'var(--color-danger)', border: '0.5px solid var(--color-danger-border)' }}>
                 ● Not connected
               </span>
             )}

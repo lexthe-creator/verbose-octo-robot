@@ -6,7 +6,7 @@ import Home            from './screens/Home.jsx'
 import FocusTimer      from './screens/FocusTimer.jsx'
 import Inbox           from './screens/Inbox.jsx'
 import Finance         from './screens/Finance.jsx'
-import SheStitches     from './screens/SheStitches.jsx'
+import Projects        from './screens/Projects.jsx'
 import Settings        from './screens/Settings.jsx'
 import Fitness         from './screens/Fitness.jsx'
 import WorkoutPlayer   from './components/WorkoutPlayer.jsx'
@@ -109,7 +109,7 @@ export default function App() {
           <Settings onBack={() => navigate('home')} />
         )}
         {screen === 'projects' && (
-          <SheStitches onBack={() => navigate('home')} />
+          <Projects onBack={() => navigate('home')} />
         )}
         {screen === 'focus' && (
           <FocusTimer onClose={() => navigate('home')} />

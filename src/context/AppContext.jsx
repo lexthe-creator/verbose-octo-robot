@@ -61,6 +61,7 @@ const INITIAL_PROJECTS = [
     weeklyGoal:       null,
     tasks:            SS_TASKS,
     lastActivityDate: null,
+    status:           'focus',
   },
 ]
 
@@ -157,6 +158,7 @@ function reducer(state, action) {
       return {
         ...state,
         workoutConfirmed: true,
+        ...(action.payload ? { workout: { ...state.workout, ...action.payload } } : {}),
       };
 
     case 'LOCK_DAY':

@@ -475,14 +475,14 @@ Layout zones top to bottom:
 
 ### 5.5 Projects (`'projects'`)
 
-**File:** `src/screens/SheStitches.jsx` ✅ Done
+**File:** `src/screens/Projects.jsx` ✅ Done
 **Trigger:** Tap the goal card on Home.
 **Nav:** Hidden (full-screen, back arrow only).
 **Props:** `onBack()` → navigates to `'home'`.
 
 **Layout:** Header (← Home, italic title, subtitle) → Progress card (stats row + gradient bar) → 3 collapsible month cards → Weekly Rhythm 2×2 grid → The One Rule card.
 
-**State source:** `ssState` + computed helpers from `AppContext` (`ssDispatch` for `TOGGLE_SS_TASK`). Persisted to `localStorage` under key `'sheStitches'` — independent of daily reset.
+**State source:** `useApp()` + computed helpers from `AppContext` (`TOGGLE_PROJECT_TASK` dispatch). Persisted to `localStorage` under key `'aiml_state'` — independent of daily reset.
 
 ---
 

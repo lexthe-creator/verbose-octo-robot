@@ -343,7 +343,7 @@ export default function WeeklyPlanning({ onComplete }) {
     const PACE_LABELS = { on_track: 'On track', buffer: '7 days buffer', behind: 'Behind' }
     const PACE_COLORS = {
       on_track: { bg: 'var(--color-success-bg)', color: 'var(--color-success)' },
-      buffer:   { bg: '#8A6A00',                 color: '#F0C040' },
+      buffer:   { bg: 'var(--color-buffer-bg)',   color: 'var(--color-buffer)' },
       behind:   { bg: 'rgba(224,85,85,0.12)',    color: 'var(--color-danger)' },
     }
     const pc = PACE_COLORS[pace.status] ?? PACE_COLORS.on_track

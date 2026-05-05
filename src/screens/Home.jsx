@@ -438,9 +438,9 @@ const PACE_STYLES = {
     label:      'On track',
   },
   buffer: {
-    border:     '#8A6A00',
-    badgeBg:    '#8A6A00',
-    badgeColor: '#F0C040',
+    border:     'var(--color-buffer-bg)',
+    badgeBg:    'var(--color-buffer-bg)',
+    badgeColor: 'var(--color-buffer)',
     label:      '7 days buffer',
   },
   behind: {
@@ -734,11 +734,8 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
     return `${next.label} in ${away} min`
   }, [state, currentMins])
 
-  const focusProject    = state.projects?.find(p => p.status === 'focus')
-  const focusProjectName = focusProject?.name ?? 'Projects'
-  const focusNextTask   = focusProject
-    ? focusProject.tasks?.find(t => !t.done)?.text ?? null
-    : 'Set a focus project in Projects'
+  const focusProjectName = state.projects?.[0]?.name ?? 'Projects'
+  const focusNextTask    = ssNextTask ?? 'Set a focus project in Projects'
 
   function handleToggleExpand(taskId) {
     setExpandedTask(prev => prev === taskId ? null : taskId)
