@@ -2,6 +2,68 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+───────────────────────────────────────────
+ENGINEERING STANDARD
+───────────────────────────────────────────
+Every decision in this codebase is held to senior
+production engineer standards. Before writing or
+suggesting any code, apply this checklist:
+
+NAMING
+- Does this name communicate intent without comments?
+- No abbreviations unless universally understood
+- Components: PascalCase nouns (FocusProjectCard)
+- Utils: camelCase verbs (formatMealTime)
+- Constants: SCREAMING_SNAKE (WORKOUT_LABEL)
+- No legacy prefixes (no Ss*, no sheStitches*)
+
+ARCHITECTURE
+- Is state living in the right layer?
+- Is this duplicated somewhere it shouldn't be?
+- Will this pattern hold at 10x current complexity?
+- Single source of truth — no derived values stored
+- No business logic in components — utils only
+- No raw values in components — tokens and constants only
+
+DATA FLOW
+- Is every action the minimum change needed?
+- Are reducer cases pure with no side effects?
+- Is localStorage access isolated to one place?
+- Are derived values computed not stored?
+
+ERROR HANDLING
+- What happens when this receives null/undefined?
+- What happens on first launch with no state?
+- What happens after a failed migration?
+- Every optional chain needs a documented fallback
+
+EDGE CASES
+- Empty state: no data, first launch, cleared storage
+- Bad data: corrupted localStorage, missing fields
+- Stale data: day change mid-session, week rollover
+- Concurrent: multiple tabs, background/foreground switch
+
+REUSABILITY
+- If this pattern appears twice, extract it
+- Utilities live in utils/, never in components
+- Constants live in constants/, never inline
+- Types and shapes documented in SPEC.md
+
+CODE REVIEW BAR
+Before any commit ask:
+1. Would this pass a PR review at a production company?
+2. Could a new engineer understand this without asking?
+3. Is there a simpler way to do this?
+4. What breaks if this receives unexpected input?
+5. Does this introduce any tech debt?
+
+If the answer to #1 is no or unsure — flag it before
+implementing. Do not proceed without acknowledgment.
+
+This standard applies to every file, every function,
+every variable name, every data shape. No exceptions.
+───────────────────────────────────────────
+
 ## Commands
 
 ```bash
