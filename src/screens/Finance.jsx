@@ -1,6 +1,8 @@
 // TODO V2: Twilio SMS pipeline
 import { useState, useRef, useEffect } from 'react'
 import { useApp } from '../context/AppContext.jsx'
+import { getTodayISO } from '../utils/time.js'
+import { getWeekDates } from '../utils/fitness.js'
 
 const CATEGORIES = ['Food', 'Transport', 'Shopping', 'Health', 'Bills', 'Other']
 
@@ -21,22 +23,6 @@ function toDateStr(date) {
   return date.toISOString().slice(0, 10)
 }
 
-function todayDateStr() {
-  return toDateStr(new Date())
-}
-
-function getWeekDates() {
-  const today = new Date()
-  const dow = today.getDay()
-  const monOffset = dow === 0 ? -6 : 1 - dow
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(today)
-    d.setHours(0, 0, 0, 0)
-    d.setDate(today.getDate() + monOffset + i)
-    return d
-  })
-}
-
 // ─── Calculation helpers ───────────────────────────────────────────────────────
 
 function formatAmount(n) {
@@ -47,7 +33,7 @@ function formatAmount(n) {
 }
 
 function getTodaySpend(transactions) {
-  const today = todayDateStr()
+  const today = getTodayISO()
   return transactions
     .filter(t => t.date === today && t.amount < 0)
     .reduce((sum, t) => sum + Math.abs(t.amount), 0)
@@ -55,7 +41,7 @@ function getTodaySpend(transactions) {
 
 function getWeeklyBars(transactions) {
   const dates = getWeekDates()
-  const today = todayDateStr()
+  const today = getTodayISO()
   return dates.map((d, i) => {
     const ds = toDateStr(d)
     const amount = transactions
@@ -90,7 +76,7 @@ function hasOddCharge(transactions) {
 }
 
 function getTodayTransactions(transactions) {
-  const today = todayDateStr()
+  const today = getTodayISO()
   return transactions.filter(t => t.date === today)
   // already prepended newest-first via ADD_TRANSACTION
 }
@@ -251,7 +237,7 @@ function TransactionSheet({ onClose, onSave }) {
   const [amount,   setAmount]   = useState('')
   const [isIncome, setIsIncome] = useState(false)
   const [category, setCategory] = useState('Food')
-  const [date,     setDate]     = useState(todayDateStr())
+  const [date,     setDate]     = useState(getTodayISO())
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setVisible(true))

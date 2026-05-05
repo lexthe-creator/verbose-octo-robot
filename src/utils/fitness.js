@@ -58,16 +58,6 @@ export function getTodayType(date = new Date()) {
   return DAY_SCHEDULE[date.getDay()]
 }
 
-export const WORKOUT_TITLES = {
-  [WORKOUT_TYPES.EASY_RUN]:   'Easy Run',
-  [WORKOUT_TYPES.TEMPO_RUN]:  'Tempo Run',
-  [WORKOUT_TYPES.LONG_RUN]:   'Long Run',
-  [WORKOUT_TYPES.STRENGTH_A]: 'Strength A',
-  [WORKOUT_TYPES.STRENGTH_B]: 'Strength B',
-  [WORKOUT_TYPES.STRETCH]:    'Stretch / Rest',
-  [WORKOUT_TYPES.REST]:       'Rest day',
-}
-
 // Monday–Sunday dates for the current calendar week
 export function getWeekDates(today = new Date()) {
   const dow = today.getDay()

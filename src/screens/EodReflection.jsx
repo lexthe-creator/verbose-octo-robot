@@ -1,11 +1,6 @@
 import { useState, useRef, useMemo } from 'react'
 import { useApp } from '../context/AppContext.jsx'
-
-function parseHHMM(hhmm) {
-  if (!hhmm) return -1
-  const [h, m] = hhmm.split(':').map(Number)
-  return h * 60 + m
-}
+import { parseHHMM } from '../utils/time.js'
 
 const FEEL_OPTIONS = [
   { value: 1, emoji: '😴' },

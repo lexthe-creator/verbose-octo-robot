@@ -3,29 +3,15 @@ import { useApp } from '../context/AppContext.jsx'
 import FuelEditSheet from '../components/FuelEditSheet.jsx'
 import { getTodayType, generateWorkout, getWeekNumber } from '../utils/fitness.js'
 import { getProjectPace } from '../utils/projectUtils.js'
-import { formatMealTime } from '../utils/time.js'
+import { formatMealTime, parseHHMM, formatMins } from '../utils/time.js'
 import { SCREENS } from '../constants/navigation.js'
 import { WORKOUT_LABEL } from '../constants/fitness.js'
 import { PACE_STATUS } from '../constants/projects.js'
 
 // ─── Time utilities ────────────────────────────────────────────────────────────
 
-function parseHHMM(hhmm) {
-  if (!hhmm) return -1
-  const [h, m] = hhmm.split(':').map(Number)
-  return h * 60 + m
-}
-
 function toMins(date) {
   return date.getHours() * 60 + date.getMinutes()
-}
-
-function formatMins(totalMins) {
-  const h = Math.floor(totalMins / 60)
-  const m = totalMins % 60
-  const ampm = h >= 12 ? 'PM' : 'AM'
-  const h12 = h % 12 || 12
-  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`
 }
 
 function formatClockParts(date) {

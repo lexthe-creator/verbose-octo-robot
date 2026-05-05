@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useApp } from './context/AppContext.jsx'
 import { SCREENS, HIDE_NAV, NAV_TABS } from './constants/navigation.js'
+import { getTodayISO, isThisWeek } from './utils/time.js'
 
 import MorningIgnition from './screens/MorningIgnition.jsx'
 import Home            from './screens/Home.jsx'
@@ -13,24 +14,6 @@ import Fitness         from './screens/Fitness.jsx'
 import WorkoutPlayer   from './components/WorkoutPlayer.jsx'
 import EodReflection   from './screens/EodReflection.jsx'
 import WeeklyPlanning  from './screens/WeeklyPlanning.jsx'
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10)
-}
-
-function isThisWeek(dateStr) {
-  if (!dateStr) return false
-  const d   = new Date(dateStr)
-  const now = new Date()
-  const day = now.getDay()
-  const diffToMon = day === 0 ? -6 : 1 - day
-  const mon = new Date(now)
-  mon.setDate(now.getDate() + diffToMon)
-  mon.setHours(0, 0, 0, 0)
-  const nextMon = new Date(mon)
-  nextMon.setDate(mon.getDate() + 7)
-  return d >= mon && d < nextMon
-}
 
 export default function App() {
   const { state, dispatch } = useApp()
@@ -51,7 +34,7 @@ export default function App() {
     if (new URLSearchParams(window.location.search).get('eod') === '1') return true
     const h    = new Date().getHours()
     const last = localStorage.getItem('lastReflectionDate')
-    return h >= 19 && last !== todayStr()
+    return h >= 19 && last !== getTodayISO()
   })
 
   const [showWeeklyPlan, setShowWeeklyPlan] = useState(() => {
@@ -135,7 +118,7 @@ export default function App() {
       {showReflection && screen !== SCREENS.IGNITION && screen !== SCREENS.FOCUS && (
         <EodReflection
           onComplete={() => {
-            localStorage.setItem('lastReflectionDate', todayStr())
+            localStorage.setItem('lastReflectionDate', getTodayISO())
             setShowReflection(false)
           }}
         />
@@ -145,7 +128,7 @@ export default function App() {
       {showWeeklyPlan && !showReflection && screen !== SCREENS.IGNITION && (
         <WeeklyPlanning
           onComplete={() => {
-            localStorage.setItem('lastWeeklyPlanDate', todayStr())
+            localStorage.setItem('lastWeeklyPlanDate', getTodayISO())
             setShowWeeklyPlan(false)
           }}
         />
