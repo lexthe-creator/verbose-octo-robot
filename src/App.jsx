@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useApp } from './context/AppContext.jsx'
-import { SCREENS, HIDE_NAV, NAV_TABS } from './constants/navigation.js'
+import { SCREENS, NAV_TABS } from './constants/navigation.js'
+import { shouldShowNav } from './navigation/router.js'
+import { useNavigate } from './navigation/useNavigate.js'
 import { getTodayISO, isThisWeek } from './utils/time.js'
 
 import MorningIgnition from './screens/MorningIgnition.jsx'
@@ -22,11 +24,13 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', state.settings.theme || 'dark')
   }, [state.settings.theme])
 
-  const [screen, setScreen] = useState(() => {
+  const initialScreen = (() => {
     if (!state.dayLockedAt) return SCREENS.IGNITION
     const lockedDate = new Date(state.dayLockedAt).toDateString()
     return lockedDate === new Date().toDateString() ? SCREENS.HOME : SCREENS.IGNITION
-  })
+  })()
+
+  const { screen, navigate: navigateTo, goBack } = useNavigate(initialScreen)
 
   const [activeWorkout, setActiveWorkout] = useState(null)
 
@@ -47,7 +51,7 @@ export default function App() {
   function navigate(target) {
     if (target === SCREENS.EOD)    { setShowReflection(true); return }
     if (target === SCREENS.WEEKLY) { setShowWeeklyPlan(true); return }
-    setScreen(target)
+    navigateTo(target)
   }
 
   function handleStartWorkout(workout) {
@@ -59,7 +63,7 @@ export default function App() {
     setActiveWorkout(null)
   }
 
-  const hideNav = HIDE_NAV.includes(screen)
+  const hideNav = !shouldShowNav(screen)
 
   return (
     <div style={styles.root}>
@@ -78,13 +82,13 @@ export default function App() {
           <Fitness onStartWorkout={handleStartWorkout} />
         )}
         {screen === SCREENS.SETTINGS && (
-          <Settings onBack={() => navigate(SCREENS.HOME)} />
+          <Settings onBack={goBack} />
         )}
         {screen === SCREENS.PROJECTS && (
-          <Projects onBack={() => navigate(SCREENS.HOME)} />
+          <Projects onBack={goBack} />
         )}
         {screen === SCREENS.FOCUS && (
-          <FocusTimer onClose={() => navigate(SCREENS.HOME)} />
+          <FocusTimer onClose={goBack} />
         )}
         {screen === SCREENS.INBOX    && <Inbox />}
         {screen === SCREENS.FINANCE  && <Finance />}
