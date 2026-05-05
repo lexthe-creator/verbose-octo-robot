@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useApp } from './context/AppContext.jsx'
+import { SCREENS, HIDE_NAV, NAV_TABS } from './constants/navigation.js'
 
 import MorningIgnition from './screens/MorningIgnition.jsx'
 import Home            from './screens/Home.jsx'
@@ -31,14 +32,6 @@ function isThisWeek(dateStr) {
   return d >= mon && d < nextMon
 }
 
-const NAV_TABS = [
-  { id: 'home',     label: 'Home',     icon: '⌂' },
-  { id: 'fitness',  label: 'Fitness',  icon: '◉' },
-  { id: 'inbox',    label: 'Inbox',    icon: '◎' },
-  { id: 'projects', label: 'Projects', icon: '◧' },
-  { id: 'finance',  label: 'Finance',  icon: '◈' },
-]
-
 export default function App() {
   const { state, dispatch } = useApp()
 
@@ -47,9 +40,9 @@ export default function App() {
   }, [state.settings.theme])
 
   const [screen, setScreen] = useState(() => {
-    if (!state.dayLockedAt) return 'ignition'
+    if (!state.dayLockedAt) return SCREENS.IGNITION
     const lockedDate = new Date(state.dayLockedAt).toDateString()
-    return lockedDate === new Date().toDateString() ? 'home' : 'ignition'
+    return lockedDate === new Date().toDateString() ? SCREENS.HOME : SCREENS.IGNITION
   })
 
   const [activeWorkout, setActiveWorkout] = useState(null)
@@ -69,8 +62,8 @@ export default function App() {
   })
 
   function navigate(target) {
-    if (target === 'eod')    { setShowReflection(true);  return }
-    if (target === 'weekly') { setShowWeeklyPlan(true);  return }
+    if (target === SCREENS.EOD)    { setShowReflection(true); return }
+    if (target === SCREENS.WEEKLY) { setShowWeeklyPlan(true); return }
     setScreen(target)
   }
 
@@ -83,50 +76,46 @@ export default function App() {
     setActiveWorkout(null)
   }
 
-  const hideNav = (
-    screen === 'ignition' ||
-    screen === 'focus'    ||
-    screen === 'settings'
-  )
+  const hideNav = HIDE_NAV.includes(screen)
 
   return (
     <div style={styles.root}>
       <div style={{ ...styles.screenWrap, paddingBottom: hideNav ? 0 : 'var(--nav-height)' }}>
-        {screen === 'ignition' && (
-          <MorningIgnition onComplete={() => navigate('home')} />
+        {screen === SCREENS.IGNITION && (
+          <MorningIgnition onComplete={() => navigate(SCREENS.HOME)} />
         )}
-        {screen === 'home' && (
+        {screen === SCREENS.HOME && (
           <Home
-            onOpenFocus={() => navigate('focus')}
+            onOpenFocus={() => navigate(SCREENS.FOCUS)}
             onNavigate={navigate}
             onStartWorkout={handleStartWorkout}
           />
         )}
-        {screen === 'fitness' && (
+        {screen === SCREENS.FITNESS && (
           <Fitness onStartWorkout={handleStartWorkout} />
         )}
-        {screen === 'settings' && (
-          <Settings onBack={() => navigate('home')} />
+        {screen === SCREENS.SETTINGS && (
+          <Settings onBack={() => navigate(SCREENS.HOME)} />
         )}
-        {screen === 'projects' && (
-          <Projects onBack={() => navigate('home')} />
+        {screen === SCREENS.PROJECTS && (
+          <Projects onBack={() => navigate(SCREENS.HOME)} />
         )}
-        {screen === 'focus' && (
-          <FocusTimer onClose={() => navigate('home')} />
+        {screen === SCREENS.FOCUS && (
+          <FocusTimer onClose={() => navigate(SCREENS.HOME)} />
         )}
-        {screen === 'inbox' && <Inbox />}
-        {screen === 'finance' && <Finance />}
+        {screen === SCREENS.INBOX    && <Inbox />}
+        {screen === SCREENS.FINANCE  && <Finance />}
       </div>
 
       {!hideNav && (
         <nav style={styles.nav}>
           {NAV_TABS.map(tab => {
-            const active = screen === tab.id
+            const active = screen === tab.screen
             return (
               <button
-                key={tab.id}
+                key={tab.screen}
                 style={styles.tab}
-                onClick={() => navigate(tab.id)}
+                onClick={() => navigate(tab.screen)}
                 aria-label={tab.label}
               >
                 <span style={{ ...styles.tabIcon, color: active ? 'var(--color-accent)' : 'var(--color-muted)' }}>
@@ -143,7 +132,7 @@ export default function App() {
       )}
 
       {/* EOD Reflection — shows after 7pm if not logged today; priority over weekly plan */}
-      {showReflection && screen !== 'ignition' && screen !== 'focus' && (
+      {showReflection && screen !== SCREENS.IGNITION && screen !== SCREENS.FOCUS && (
         <EodReflection
           onComplete={() => {
             localStorage.setItem('lastReflectionDate', todayStr())
@@ -153,7 +142,7 @@ export default function App() {
       )}
 
       {/* Sunday Weekly Planning — shows Sunday ≥5pm if not planned this week */}
-      {showWeeklyPlan && !showReflection && screen !== 'ignition' && (
+      {showWeeklyPlan && !showReflection && screen !== SCREENS.IGNITION && (
         <WeeklyPlanning
           onComplete={() => {
             localStorage.setItem('lastWeeklyPlanDate', todayStr())

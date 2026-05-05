@@ -1,9 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useApp } from '../context/AppContext.jsx'
 import FuelEditSheet from '../components/FuelEditSheet.jsx'
-import { getTodayType, generateWorkout, getWeekNumber, WORKOUT_LABEL } from '../utils/fitness.js'
+import { getTodayType, generateWorkout, getWeekNumber } from '../utils/fitness.js'
 import { getProjectPace } from '../utils/projectUtils.js'
 import { formatMealTime } from '../utils/time.js'
+import { SCREENS } from '../constants/navigation.js'
+import { WORKOUT_LABEL } from '../constants/fitness.js'
+import { PACE_STATUS } from '../constants/projects.js'
 
 // ─── Time utilities ────────────────────────────────────────────────────────────
 
@@ -432,19 +435,19 @@ const fs = {
 // ─── She Stitches goal card ───────────────────────────────────────────────────
 
 const PACE_STYLES = {
-  on_track: {
+  [PACE_STATUS.ON_TRACK]: {
     border:     'var(--color-success)',
     badgeBg:    'var(--color-success-bg)',
     badgeColor: 'var(--color-success)',
     label:      'On track',
   },
-  buffer: {
+  [PACE_STATUS.BUFFER]: {
     border:     'var(--color-buffer-bg)',
     badgeBg:    'var(--color-buffer-bg)',
     badgeColor: 'var(--color-buffer)',
     label:      '7 days buffer',
   },
-  behind: {
+  [PACE_STATUS.BEHIND]: {
     border:     'var(--color-danger)',
     badgeBg:    'rgba(224,85,85,0.12)',
     badgeColor: 'var(--color-danger)',
@@ -454,7 +457,7 @@ const PACE_STYLES = {
 
 function FocusProjectCard({ projectName, projectEmoji, doneCount, totalCount, listingsCount, nextTask, dayOf90, paceStatus, onTap }) {
   const pct   = totalCount ? Math.round((doneCount / totalCount) * 100) : 0
-  const pace  = PACE_STYLES[paceStatus] ?? PACE_STYLES.on_track
+  const pace  = PACE_STYLES[paceStatus] ?? PACE_STYLES[PACE_STATUS.ON_TRACK]
 
   return (
     <div
@@ -772,7 +775,7 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
         now={now}
         name={state.profile.name}
         onOpenFocus={onOpenFocus}
-        onOpenSettings={() => onNavigate && onNavigate('settings')}
+        onOpenSettings={() => onNavigate && onNavigate(SCREENS.SETTINGS)}
       />
 
       {/* 2 — Burn bar */}
@@ -825,7 +828,7 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
           nextTask={focusNextTask}
           dayOf90={ssDayOf90}
           paceStatus={paceStatus}
-          onTap={() => onNavigate && onNavigate('projects')}
+          onTap={() => onNavigate && onNavigate(SCREENS.PROJECTS)}
         />
       </section>
 

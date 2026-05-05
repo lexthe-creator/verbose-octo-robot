@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../context/AppContext.jsx'
-import { getPhase, getWeekNumber, PHASE_LABELS } from '../utils/fitness.js'
+import { getPhase, getWeekNumber } from '../utils/fitness.js'
+import { GYM_ACCESS, PHASE_LABELS } from '../constants/fitness.js'
+import { THEMES } from '../constants/theme.js'
 
 const EQUIPMENT_OPTIONS = [
-  { value: 'bodyweight', label: 'Bodyweight' },
-  { value: 'dumbbells',  label: 'Dumbbells'  },
-  { value: 'gym',        label: 'Full gym'   },
+  { value: GYM_ACCESS.BODYWEIGHT, label: 'Bodyweight' },
+  { value: GYM_ACCESS.DUMBBELLS,  label: 'Dumbbells'  },
+  { value: GYM_ACCESS.GYM,        label: 'Full gym'   },
 ]
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
@@ -159,8 +161,8 @@ export default function Settings({ onBack }) {
         <div style={s.field}>
           <label style={s.fieldLabel}>Theme</label>
           <div style={{ ...s.pillRow, gridTemplateColumns: 'repeat(2, 1fr)' }}>
-            {['dark', 'light'].map(theme => {
-              const active = (state.settings.theme || 'dark') === theme
+            {[THEMES.DARK, THEMES.LIGHT].map(theme => {
+              const active = (state.settings.theme || THEMES.DARK) === theme
               return (
                 <button
                   key={theme}

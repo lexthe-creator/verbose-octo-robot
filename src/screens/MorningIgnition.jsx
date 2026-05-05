@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext.jsx'
 import FuelEditSheet from '../components/FuelEditSheet.jsx'
 import { generateWorkout, getTodayType, getWeekNumber } from '../utils/fitness.js'
 import { formatMealTime } from '../utils/time.js'
+import { MEAL_SLOTS } from '../constants/meals.js'
 import {
   DndContext, PointerSensor, TouchSensor,
   useSensor, useSensors, closestCenter,
@@ -451,7 +452,7 @@ export default function MorningIgnition({ onComplete }) {
   // Local brief state
   const [localEnergy,  setLocalEnergy]  = useState(state.energyLevel)
   const [localTasks,   setLocalTasks]   = useState([])  // confirmed task ids
-  const [localMeals,   setLocalMeals]   = useState(['breakfast', 'lunch', 'snack', 'dinner'])
+  const [localMeals,   setLocalMeals]   = useState(MEAL_SLOTS.map(s => s.id))
   const [localWorkout, setLocalWorkout] = useState(true)
 
   // Skip state — Set of section names ('tasks' | 'training' | 'meals')

@@ -1,22 +1,23 @@
 import { useState } from 'react'
 import { useApp } from '../context/AppContext.jsx'
 import {
-  getPhase, getWeekNumber, PHASE_LABELS,
+  getPhase, getWeekNumber,
   getTodayType, getWeekDates, getTypeForDay,
   generateWorkout,
 } from '../utils/fitness.js'
+import { WORKOUT_TYPES, PHASE_LABELS } from '../constants/fitness.js'
 
 const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 const DAY_NAMES  = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 const TYPE_ABBR = {
-  easy_run:   'R',
-  tempo_run:  'R',
-  long_run:   'R',
-  strength_a: 'US',
-  strength_b: 'LS',
-  stretch:    'ST',
-  rest:       '—',
+  [WORKOUT_TYPES.EASY_RUN]:   'R',
+  [WORKOUT_TYPES.TEMPO_RUN]:  'R',
+  [WORKOUT_TYPES.LONG_RUN]:   'R',
+  [WORKOUT_TYPES.STRENGTH_A]: 'US',
+  [WORKOUT_TYPES.STRENGTH_B]: 'LS',
+  [WORKOUT_TYPES.STRETCH]:    'ST',
+  [WORKOUT_TYPES.REST]:       '—',
 }
 
 const FEEL_LABELS = ['', 'drained', 'flat', 'good', 'great', 'charged']

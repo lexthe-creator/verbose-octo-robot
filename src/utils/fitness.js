@@ -1,3 +1,5 @@
+import { WORKOUT_TYPES, GYM_ACCESS, PHASES } from '../constants/fitness.js'
+
 // ─── Week number from program start date ────────────────────────────────────
 
 // Returns the current program week (1-indexed, minimum 1).
@@ -24,34 +26,28 @@ export function getPhase(programStartDate, programEndDate) {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const msLeft = end - today
-    if (msLeft <= 0) return 'race'
+    if (msLeft <= 0) return PHASES.RACE
     const weeksToEnd = Math.ceil(msLeft / (7 * 24 * 60 * 60 * 1000))
-    if (weeksToEnd <= 2)  return 'race'
-    if (weeksToEnd <= 10) return 'hyrox'
+    if (weeksToEnd <= 2)  return PHASES.RACE
+    if (weeksToEnd <= 10) return PHASES.HYROX
   }
   const week = getWeekNumber(programStartDate)
-  if (week >= 25) return 'race'
-  if (week >= 17) return 'hyrox'
-  return 'base'
-}
-
-export const PHASE_LABELS = {
-  base:  'Base Building',
-  hyrox: 'HYROX Prep',
-  race:  'Race Block',
+  if (week >= 25) return PHASES.RACE
+  if (week >= 17) return PHASES.HYROX
+  return PHASES.BASE
 }
 
 // ─── Weekly training split ──────────────────────────────────────────────────
 // Mon: Easy Run · Tue: Strength A · Wed: Stretch · Thu: Tempo Run
 // Fri: Strength B · Sat: Long Run · Sun: Rest
 const DAY_SCHEDULE = [
-  'rest',       // Sun
-  'easy_run',   // Mon
-  'strength_a', // Tue
-  'stretch',    // Wed
-  'tempo_run',  // Thu
-  'strength_b', // Fri
-  'long_run',   // Sat
+  WORKOUT_TYPES.REST,       // Sun
+  WORKOUT_TYPES.EASY_RUN,   // Mon
+  WORKOUT_TYPES.STRENGTH_A, // Tue
+  WORKOUT_TYPES.STRETCH,    // Wed
+  WORKOUT_TYPES.TEMPO_RUN,  // Thu
+  WORKOUT_TYPES.STRENGTH_B, // Fri
+  WORKOUT_TYPES.LONG_RUN,   // Sat
 ]
 
 export function getTypeForDay(dayOfWeek) {
@@ -63,23 +59,13 @@ export function getTodayType(date = new Date()) {
 }
 
 export const WORKOUT_TITLES = {
-  easy_run:   'Easy Run',
-  tempo_run:  'Tempo Run',
-  long_run:   'Long Run',
-  strength_a: 'Strength A',
-  strength_b: 'Strength B',
-  stretch:    'Stretch / Rest',
-  rest:       'Rest day',
-}
-
-export const WORKOUT_LABEL = {
-  easy_run:   'Run',
-  tempo_run:  'Run',
-  long_run:   'Run',
-  strength_a: 'Strength',
-  strength_b: 'Strength',
-  stretch:    'Stretch',
-  rest:       'Rest',
+  [WORKOUT_TYPES.EASY_RUN]:   'Easy Run',
+  [WORKOUT_TYPES.TEMPO_RUN]:  'Tempo Run',
+  [WORKOUT_TYPES.LONG_RUN]:   'Long Run',
+  [WORKOUT_TYPES.STRENGTH_A]: 'Strength A',
+  [WORKOUT_TYPES.STRENGTH_B]: 'Strength B',
+  [WORKOUT_TYPES.STRETCH]:    'Stretch / Rest',
+  [WORKOUT_TYPES.REST]:       'Rest day',
 }
 
 // Monday–Sunday dates for the current calendar week
@@ -121,19 +107,19 @@ const COOLDOWN = [
 // ─── Exercise libraries ──────────────────────────────────────────────────────
 
 const STRENGTH_A = {
-  bodyweight: [
+  [GYM_ACCESS.BODYWEIGHT]: [
     { name: 'Push-ups',      sets: 3, reps: '12'  },
     { name: 'Pike push-ups', sets: 3, reps: '10'  },
     { name: 'Dips',          sets: 3, reps: '10'  },
     { name: 'Plank',         sets: 3, reps: '45s' },
   ],
-  dumbbells: [
+  [GYM_ACCESS.DUMBBELLS]: [
     { name: 'DB Shoulder press',  sets: 3, reps: '10' },
     { name: 'DB Chest press',     sets: 3, reps: '10' },
     { name: 'Lateral raises',     sets: 3, reps: '12' },
     { name: 'DB Tricep overhead', sets: 3, reps: '12' },
   ],
-  gym: [
+  [GYM_ACCESS.GYM]: [
     { name: 'Barbell bench press',   sets: 3, reps: '8'  },
     { name: 'Cable lateral raise',   sets: 3, reps: '12' },
     { name: 'Overhead press',        sets: 3, reps: '8'  },
@@ -142,19 +128,19 @@ const STRENGTH_A = {
 }
 
 const STRENGTH_B = {
-  bodyweight: [
+  [GYM_ACCESS.BODYWEIGHT]: [
     { name: 'Squats',        sets: 3, reps: '15'      },
     { name: 'Lunges',        sets: 3, reps: '12 each' },
     { name: 'Glute bridges', sets: 3, reps: '15'      },
     { name: 'Inverted rows', sets: 3, reps: '10'      },
   ],
-  dumbbells: [
+  [GYM_ACCESS.DUMBBELLS]: [
     { name: 'DB Romanian deadlift', sets: 3, reps: '10'      },
     { name: 'DB Goblet squat',      sets: 3, reps: '12'      },
     { name: 'DB Row',               sets: 3, reps: '10 each' },
     { name: 'DB Curl',              sets: 3, reps: '12'      },
   ],
-  gym: [
+  [GYM_ACCESS.GYM]: [
     { name: 'Barbell squat',     sets: 3, reps: '8'  },
     { name: 'Cable row',         sets: 3, reps: '10' },
     { name: 'Lat pulldown',      sets: 3, reps: '10' },
@@ -182,7 +168,7 @@ function hyroxStation(week) {
 export function generateWorkout(type, gymAccess, week) {
   switch (type) {
 
-    case 'rest':
+    case WORKOUT_TYPES.REST:
       return {
         type, title: 'Rest day',
         subtitle:    'Recovery — no session today',
@@ -190,7 +176,7 @@ export function generateWorkout(type, gymAccess, week) {
         segments:    [],
       }
 
-    case 'easy_run': {
+    case WORKOUT_TYPES.EASY_RUN: {
       const main  = easyRunMinutes(week)
       const total = main + 8  // warmup ~3.5 + cooldown ~4
       return {
@@ -205,7 +191,7 @@ export function generateWorkout(type, gymAccess, week) {
       }
     }
 
-    case 'tempo_run': {
+    case WORKOUT_TYPES.TEMPO_RUN: {
       const tempo = tempoMinutes(week)
       const total = tempo + 18  // warmup ~3.5 + easy5 + easy5 + cooldown ~4
       return {
@@ -222,7 +208,7 @@ export function generateWorkout(type, gymAccess, week) {
       }
     }
 
-    case 'long_run': {
+    case WORKOUT_TYPES.LONG_RUN: {
       const main  = longRunMinutes(week)
       const total = main + 8
       return {
@@ -237,19 +223,19 @@ export function generateWorkout(type, gymAccess, week) {
       }
     }
 
-    case 'strength_a':
-    case 'strength_b': {
-      const source = type === 'strength_a' ? STRENGTH_A : STRENGTH_B
-      const list   = (source[gymAccess] || source.bodyweight).slice()
+    case WORKOUT_TYPES.STRENGTH_A:
+    case WORKOUT_TYPES.STRENGTH_B: {
+      const source = type === WORKOUT_TYPES.STRENGTH_A ? STRENGTH_A : STRENGTH_B
+      const list   = (source[gymAccess] || source[GYM_ACCESS.BODYWEIGHT]).slice()
 
       const hy = hyroxStation(week)
       if (hy) list[list.length - 1] = hy
 
-      const focus = type === 'strength_a' ? 'Push + Core' : 'Pull + Legs'
+      const focus = type === WORKOUT_TYPES.STRENGTH_A ? 'Push + Core' : 'Pull + Legs'
 
       return {
         type,
-        title:       type === 'strength_a' ? 'Strength A' : 'Strength B',
+        title:       type === WORKOUT_TYPES.STRENGTH_A ? 'Strength A' : 'Strength B',
         subtitle:    `${focus} · ~40 min`,
         durationEst: 40,
         segments: [
@@ -268,7 +254,7 @@ export function generateWorkout(type, gymAccess, week) {
       }
     }
 
-    case 'stretch':
+    case WORKOUT_TYPES.STRETCH:
       return {
         type, title: 'Stretch / Rest',
         subtitle:    'Mobility · ~12 min',

@@ -1,3 +1,5 @@
+import { PACE_STATUS } from '../constants/projects.js'
+
 const MS_PER_DAY = 86_400_000
 
 export function getProjectPace(project) {
@@ -15,7 +17,7 @@ export function getProjectPace(project) {
   const tasksDone      = project.tasks.filter(t => t.done).length
   const avgDailyRate   = tasksDone > 0 ? tasksDone / daysElapsed : 1
 
-  const daysToFinish   = Math.ceil(tasksRemaining / avgDailyRate)
+  const daysToFinish    = Math.ceil(tasksRemaining / avgDailyRate)
   const projectedFinish = new Date(today)
   projectedFinish.setDate(today.getDate() + daysToFinish)
 
@@ -23,11 +25,11 @@ export function getProjectPace(project) {
   bufferEnd.setDate(endDate.getDate() + (project.bufferDays ?? 7))
 
   let status
-  if (projectedFinish <= endDate)        status = 'on_track'
-  else if (projectedFinish <= bufferEnd) status = 'buffer'
-  else                                   status = 'behind'
+  if (projectedFinish <= endDate)        status = PACE_STATUS.ON_TRACK
+  else if (projectedFinish <= bufferEnd) status = PACE_STATUS.BUFFER
+  else                                   status = PACE_STATUS.BEHIND
 
-  const daysOver = status === 'behind'
+  const daysOver = status === PACE_STATUS.BEHIND
     ? Math.ceil((projectedFinish - bufferEnd) / MS_PER_DAY)
     : 0
 
