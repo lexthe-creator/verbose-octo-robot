@@ -761,7 +761,7 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
         now={now}
         name={state.profile.name}
         onOpenFocus={onOpenFocus}
-        onOpenSettings={() => onNavigate && onNavigate(SCREENS.SETTINGS)}
+        onOpenSettings={() => onNavigate(SCREENS.SETTINGS)}
       />
 
       {/* 2 — Burn bar */}
@@ -814,7 +814,7 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
           nextTask={focusNextTask}
           dayOf90={ssDayOf90}
           paceStatus={paceStatus}
-          onTap={() => onNavigate && onNavigate(SCREENS.PROJECTS)}
+          onTap={() => onNavigate(SCREENS.PROJECTS)}
         />
       </section>
 
