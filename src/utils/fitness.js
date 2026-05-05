@@ -72,6 +72,16 @@ export const WORKOUT_TITLES = {
   rest:       'Rest day',
 }
 
+export const WORKOUT_LABEL = {
+  easy_run:   'Run',
+  tempo_run:  'Run',
+  long_run:   'Run',
+  strength_a: 'Strength',
+  strength_b: 'Strength',
+  stretch:    'Stretch',
+  rest:       'Rest',
+}
+
 // Monday–Sunday dates for the current calendar week
 export function getWeekDates(today = new Date()) {
   const dow = today.getDay()

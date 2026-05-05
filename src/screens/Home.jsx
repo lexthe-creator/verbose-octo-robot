@@ -1,18 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useApp } from '../context/AppContext.jsx'
 import FuelEditSheet from '../components/FuelEditSheet.jsx'
-import { getTodayType, generateWorkout, getWeekNumber } from '../utils/fitness.js'
-
-const WORKOUT_LABEL = {
-  easy_run:   'Run',
-  tempo_run:  'Run',
-  long_run:   'Run',
-  strength_a: 'Strength',
-  strength_b: 'Strength',
-  stretch:    'Stretch',
-  rest:       'Rest',
-}
+import { getTodayType, generateWorkout, getWeekNumber, WORKOUT_LABEL } from '../utils/fitness.js'
 import { getProjectPace } from '../utils/projectUtils.js'
+import { formatMealTime } from '../utils/time.js'
 
 // ─── Time utilities ────────────────────────────────────────────────────────────
 
@@ -411,7 +402,7 @@ function FuelSlot({ slotKey, meal, nowMins: currentMins, onMarkEaten, onOpenEdit
           <span style={{ ...fs.label, color: stateColor }}>
             {eaten ? '✓ ' : late ? '! ' : ''}{meal.label}
           </span>
-          <span style={fs.window}>{formatMins(parseHHMM(meal.startTime))} – {formatMins(parseHHMM(meal.endTime))}</span>
+          <span style={fs.window}>{formatMealTime(meal.startTime)} – {formatMealTime(meal.endTime)}</span>
         </button>
 
         {/* Clock icon — open bottom-sheet time editor */}
@@ -461,7 +452,7 @@ const PACE_STYLES = {
   },
 }
 
-function SsGoalCard({ projectName, projectEmoji, doneCount, totalCount, listingsCount, nextTask, dayOf90, paceStatus, onTap }) {
+function FocusProjectCard({ projectName, projectEmoji, doneCount, totalCount, listingsCount, nextTask, dayOf90, paceStatus, onTap }) {
   const pct   = totalCount ? Math.round((doneCount / totalCount) * 100) : 0
   const pace  = PACE_STYLES[paceStatus] ?? PACE_STYLES.on_track
 
@@ -825,7 +816,7 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
       {/* 5 — Focus project goal card */}
       <section style={s.section}>
         <p style={s.sectionLabel}>{focusProjectName}</p>
-        <SsGoalCard
+        <FocusProjectCard
           projectName={state.projects?.[0]?.name ?? 'Projects'}
           projectEmoji={state.projects?.[0]?.emoji ?? '📋'}
           doneCount={ssDoneCount}

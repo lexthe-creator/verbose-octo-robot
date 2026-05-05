@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { useApp } from '../context/AppContext.jsx'
 import FuelEditSheet from '../components/FuelEditSheet.jsx'
 import { generateWorkout, getTodayType, getWeekNumber } from '../utils/fitness.js'
+import { formatMealTime } from '../utils/time.js'
 import {
   DndContext, PointerSensor, TouchSensor,
   useSensor, useSensors, closestCenter,
@@ -238,14 +239,6 @@ const swipeStyles = {
 
 // ─── Meal tap slot ────────────────────────────────────────────────────────────
 
-function fmt24(hhmm) {
-  if (!hhmm) return ''
-  const [h, m] = hhmm.split(':').map(Number)
-  const ampm = h >= 12 ? 'PM' : 'AM'
-  const h12  = h % 12 || 12
-  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`
-}
-
 function MealSlot({ label, startTime, endTime, confirmed, onToggle, onEditTime }) {
   return (
     <div style={{
@@ -266,10 +259,10 @@ function MealSlot({ label, startTime, endTime, confirmed, onToggle, onEditTime }
       {/* Time text — tap to edit */}
       {!confirmed ? (
         <button style={mealStyles.timeBtn} onClick={onEditTime}>
-          {fmt24(startTime)} – {fmt24(endTime)}
+          {formatMealTime(startTime)} – {formatMealTime(endTime)}
         </button>
       ) : (
-        <span style={mealStyles.timeConfirmed}>{fmt24(startTime)} – {fmt24(endTime)}</span>
+        <span style={mealStyles.timeConfirmed}>{formatMealTime(startTime)} – {formatMealTime(endTime)}</span>
       )}
     </div>
   )
