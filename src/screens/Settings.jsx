@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { useApp } from '../context/AppContext.jsx'
 import { useUser } from '../context/UserContext.jsx'
 import { useSettings } from '../context/SettingsContext.jsx'
+import { useFitness } from '../context/index.js'
 import { getPhase, getWeekNumber } from '../utils/fitness.js'
 import { GYM_ACCESS, PHASE_LABELS } from '../constants/fitness.js'
 import { THEMES } from '../constants/theme.js'
@@ -15,9 +15,9 @@ const EQUIPMENT_OPTIONS = [
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
 export default function Settings({ onBack }) {
-  const { state, dispatch }             = useApp()
-  const { userState, userDispatch }     = useUser()
+  const { userState, userDispatch }         = useUser()
   const { settingsState, settingsDispatch } = useSettings()
+  const { fitnessState, fitnessDispatch }   = useFitness()
   const [nameDraft, setNameDraft] = useState(userState.name)
   const [sheetKind, setSheetKind] = useState(null)  // 'plaid' | 'calendar' | null
 
@@ -32,7 +32,7 @@ export default function Settings({ onBack }) {
     settingsDispatch({ type: 'UPDATE_SETTING', payload: { key: 'gymAccess', value } })
   }
 
-  const { programStartDate, programEndDate } = state.fitness
+  const { programStartDate, programEndDate } = fitnessState
   const phaseKey = getPhase(programStartDate, programEndDate)
   const weekNum  = getWeekNumber(programStartDate)
 
@@ -99,7 +99,7 @@ export default function Settings({ onBack }) {
             type="date"
             style={s.input}
             value={programStartDate || ''}
-            onChange={e => dispatch({
+            onChange={e => fitnessDispatch({
               type:    'UPDATE_FITNESS',
               payload: { key: 'programStartDate', value: e.target.value || null },
             })}
@@ -111,7 +111,7 @@ export default function Settings({ onBack }) {
             type="date"
             style={s.input}
             value={programEndDate || ''}
-            onChange={e => dispatch({
+            onChange={e => fitnessDispatch({
               type:    'UPDATE_FITNESS',
               payload: { key: 'programEndDate', value: e.target.value || null },
             })}

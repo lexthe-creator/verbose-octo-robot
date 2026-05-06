@@ -66,19 +66,9 @@ const INITIAL_PROJECTS = [
 ]
 
 /* ─── Initial state ───────────────────────────────────────────────────────── */
-// Day plan state (tasks, meals, workout, etc.) now lives in DayContext.
+// Day plan state lives in DayContext. Fitness lives in FitnessContext. Inbox lives in InboxContext.
 const initialState = {
-  fitness: {
-    weekNumber:       1,
-    programStartDate: null,
-    programEndDate:   null,
-    workoutLog:       [],
-    todayComplete:    false,
-  },
-
-  inboxItems:       [],
   transactions:     [],
-  focusSessions:    0,
   projects:         INITIAL_PROJECTS,
   reflectionLog:    [],
   weeklyPriorities: [],
@@ -89,27 +79,6 @@ const initialState = {
 function reducer(state, action) {
   switch (action.type) {
 
-    case 'ADD_INBOX_ITEM': {
-      const item = { id: `i${Date.now()}`, text: action.payload, createdAt: new Date().toISOString() };
-      return { ...state, inboxItems: [item, ...state.inboxItems] };
-    }
-
-    case 'REMOVE_INBOX_ITEM':
-      return { ...state, inboxItems: state.inboxItems.filter(i => i.id !== action.payload) };
-
-    case 'INCREMENT_FOCUS_SESSIONS':
-      return { ...state, focusSessions: state.focusSessions + 1 };
-
-    case 'LOG_WORKOUT':
-      return {
-        ...state,
-        fitness: {
-          ...state.fitness,
-          workoutLog:    [...state.fitness.workoutLog, action.payload],
-          todayComplete: true,
-        },
-      };
-
     case 'ADD_TRANSACTION': {
       const tx = { id: `tx${Date.now()}`, ...action.payload };
       return { ...state, transactions: [tx, ...state.transactions] };
@@ -117,11 +86,6 @@ function reducer(state, action) {
 
     case 'DELETE_TRANSACTION':
       return { ...state, transactions: state.transactions.filter(t => t.id !== action.payload) };
-
-    case 'UPDATE_FITNESS': {
-      const { key, value } = action.payload;
-      return { ...state, fitness: { ...state.fitness, [key]: value } };
-    }
 
     // ── Projects ────────────────────────────────────────────────────────────
 
@@ -213,31 +177,6 @@ function loadLegacyProjects() {
   }
 }
 
-// Determines whether fitness.todayComplete should be true on load.
-// Reads aiml_day for dayLockedAt (one-way init read — no React dependency).
-// Falls back to legacy aiml_state.dayLockedAt during the migration window.
-function resolveTodayComplete(saved) {
-  const stored = saved.fitness?.todayComplete ?? false;
-  try {
-    const dayRaw = localStorage.getItem('aiml_day');
-    if (dayRaw) {
-      const dayStored = JSON.parse(dayRaw);
-      const dayLockedAt = dayStored.version === 1 ? dayStored.data?.dayLockedAt : null;
-      if (dayLockedAt && new Date(dayLockedAt).toDateString() !== new Date().toDateString()) {
-        return false;
-      }
-      return stored;
-    }
-    // Legacy fallback: dayLockedAt still present in old aiml_state
-    if (saved.dayLockedAt && new Date(saved.dayLockedAt).toDateString() !== new Date().toDateString()) {
-      return false;
-    }
-    return stored;
-  } catch {
-    return stored;
-  }
-}
-
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -245,21 +184,20 @@ function loadState() {
 
     const saved = JSON.parse(raw);
     const projects = saved.projects ?? loadLegacyProjects();
-    const todayComplete = resolveTodayComplete(saved);
 
-    // Strip legacy and day-plan fields so they don't re-enter aiml_state
+    // Strip legacy, day-plan, fitness, and inbox fields so they don't re-enter aiml_state
     const {
       profile: _p, settings: _s,
       dayLockedAt: _dl, energyLevel: _el, workoutConfirmed: _wc,
       confirmedTasks: _ct, confirmedMeals: _cm,
       tasks: _tasks, meals: _meals, workout: _wo,
+      fitness: _fitness, inboxItems: _ii, focusSessions: _fs,
       ...restSaved
     } = saved;
 
     return {
       ...initialState,
       ...restSaved,
-      fitness:          { ...initialState.fitness, ...(saved.fitness || {}), todayComplete },
       transactions:     saved.transactions      || [],
       projects,
       reflectionLog:    saved.reflectionLog    || [],

@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { useApp } from './context/AppContext.jsx'
-import { useDay } from './context/index.js'
+import { useDay, useFitness } from './context/index.js'
 import { SCREENS, NAV_TABS } from './constants/navigation.js'
 import { shouldShowNav } from './navigation/router.js'
 import { useNavigate } from './navigation/useNavigate.js'
@@ -19,8 +18,8 @@ import EodReflection   from './screens/EodReflection.jsx'
 import WeeklyPlanning  from './screens/WeeklyPlanning.jsx'
 
 export default function App() {
-  const { state, dispatch } = useApp()
-  const { dayState }        = useDay()
+  const { dayState }          = useDay()
+  const { fitnessDispatch }   = useFitness()
 
   const initialScreen = (() => {
     if (!dayState.dayLockedAt) return SCREENS.IGNITION
@@ -57,7 +56,7 @@ export default function App() {
   }
 
   function handleWorkoutComplete(log) {
-    dispatch({ type: 'LOG_WORKOUT', payload: log })
+    fitnessDispatch({ type: 'LOG_WORKOUT', payload: log })
     setActiveWorkout(null)
   }
 

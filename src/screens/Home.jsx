@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useApp } from '../context/AppContext.jsx'
 import { useUser } from '../context/UserContext.jsx'
 import { useSettings } from '../context/SettingsContext.jsx'
-import { useDay } from '../context/index.js'
+import { useDay, useFitness } from '../context/index.js'
 import FuelEditSheet from '../components/FuelEditSheet.jsx'
 import { getTodayType, generateWorkout, getWeekNumber } from '../utils/fitness.js'
 import { getProjectPace } from '../utils/projectUtils.js'
@@ -686,11 +686,12 @@ const tt = {
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
-  const { state, dispatch,
+  const { state,
           ssDoneCount, ssTotalCount, ssListingsCount, ssNextTask, ssDayOf90 } = useApp()
   const { userState }                                  = useUser()
   const { settingsState }                              = useSettings()
   const { dayState, dayDispatch, updateTaskTime, updateMealWindow } = useDay()
+  const { fitnessState }                               = useFitness()
 
   const [now, setNow] = useState(() => new Date())
   const [expandedTask, setExpandedTask] = useState(null)
@@ -777,12 +778,12 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
       <section style={s.section}>
         <p style={s.sectionLabel}>Today's Training</p>
         <TodayTrainingCard
-          todayComplete={state.fitness.todayComplete}
+          todayComplete={fitnessState.todayComplete}
           gymAccess={settingsState.gymAccess}
-          weekNumber={getWeekNumber(state.fitness.programStartDate)}
+          weekNumber={getWeekNumber(fitnessState.programStartDate)}
           onStart={() => {
             const type    = getTodayType()
-            const workout = generateWorkout(type, settingsState.gymAccess, getWeekNumber(state.fitness.programStartDate))
+            const workout = generateWorkout(type, settingsState.gymAccess, getWeekNumber(fitnessState.programStartDate))
             onStartWorkout && onStartWorkout(workout)
           }}
         />

@@ -1,3 +1,5 @@
-export { UserProvider, useUser }         from './UserContext'
-export { SettingsProvider, useSettings } from './SettingsContext'
-export { DayProvider, useDay }           from './DayContext'
+export { UserProvider, useUser }           from './UserContext'
+export { SettingsProvider, useSettings }   from './SettingsContext'
+export { DayProvider, useDay }             from './DayContext'
+export { FitnessProvider, useFitness }     from './FitnessContext'
+export { InboxProvider, useInbox }         from './InboxContext'

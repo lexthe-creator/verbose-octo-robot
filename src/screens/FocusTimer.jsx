@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useApp } from '../context/AppContext.jsx'
+import { useFitness } from '../context/index.js'
 
 const PRESETS        = [15, 25, 45, 60]
 const TOTAL_SESSIONS = 4
@@ -19,7 +19,7 @@ function ringStroke(progress, isDone) {
 }
 
 export default function FocusTimer({ onClose }) {
-  const { dispatch } = useApp()
+  const { fitnessDispatch } = useFitness()
 
   const [selectedMins,       setSelectedMins]       = useState(25)
   const [timeLeft,           setTimeLeft]           = useState(25 * 60)
@@ -45,7 +45,7 @@ export default function FocusTimer({ onClose }) {
     const nextCompleted = Math.min(completedSessions + 1, TOTAL_SESSIONS)
     setStatus('done')
     setCompletedSessions(nextCompleted)
-    dispatch({ type: 'INCREMENT_FOCUS_SESSIONS' })
+    fitnessDispatch({ type: 'INCREMENT_FOCUS_SESSIONS' })
     const timeout = setTimeout(() => {
       setTimeLeft(selectedMins * 60)
       setStatus('ready')
@@ -94,7 +94,7 @@ export default function FocusTimer({ onClose }) {
     const nextCompleted = Math.min(completedSessions + 1, TOTAL_SESSIONS)
     setStatus('done')
     setCompletedSessions(nextCompleted)
-    dispatch({ type: 'INCREMENT_FOCUS_SESSIONS' })
+    fitnessDispatch({ type: 'INCREMENT_FOCUS_SESSIONS' })
     setTimeout(() => {
       setTimeLeft(selectedMins * 60)
       setStatus('ready')
