@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useApp } from '../context/AppContext.jsx'
 import { useUser } from '../context/UserContext.jsx'
 import { useSettings } from '../context/SettingsContext.jsx'
+import { useDay } from '../context/index.js'
 import FuelEditSheet from '../components/FuelEditSheet.jsx'
 import { getTodayType, generateWorkout, getWeekNumber } from '../utils/fitness.js'
 import { getProjectPace } from '../utils/projectUtils.js'
@@ -685,10 +686,11 @@ const tt = {
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
-  const { state, dispatch, updateTaskTime, updateMealWindow,
+  const { state, dispatch,
           ssDoneCount, ssTotalCount, ssListingsCount, ssNextTask, ssDayOf90 } = useApp()
-  const { userState }     = useUser()
-  const { settingsState } = useSettings()
+  const { userState }                                  = useUser()
+  const { settingsState }                              = useSettings()
+  const { dayState, dayDispatch, updateTaskTime, updateMealWindow } = useDay()
 
   const [now, setNow] = useState(() => new Date())
   const [expandedTask, setExpandedTask] = useState(null)
@@ -712,23 +714,23 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
   const nextLabel = useMemo(() => {
     const candidates = []
 
-    state.tasks.forEach(t => {
+    dayState.tasks.forEach(t => {
       if (t.scheduledTime && !t.done) {
         const m = parseHHMM(t.scheduledTime)
         if (m > currentMins) candidates.push({ label: t.text.split(' ').slice(0, 2).join(' '), timeMins: m })
       }
     })
 
-    Object.values(state.meals).forEach(meal => {
+    Object.values(dayState.meals).forEach(meal => {
       if (!meal.eaten && parseHHMM(meal.endTime) > currentMins) {
         const m = parseHHMM(meal.startTime)
         if (m > currentMins) candidates.push({ label: meal.label, timeMins: m })
       }
     })
 
-    if (state.workoutConfirmed) {
-      const m = parseHHMM(state.workout.time)
-      if (m > currentMins) candidates.push({ label: state.workout.type, timeMins: m })
+    if (dayState.workoutConfirmed) {
+      const m = parseHHMM(dayState.workout.time)
+      if (m > currentMins) candidates.push({ label: dayState.workout.type, timeMins: m })
     }
 
     if (candidates.length === 0) return null
@@ -736,7 +738,7 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
     const next = candidates[0]
     const away = next.timeMins - currentMins
     return `${next.label} in ${away} min`
-  }, [state, currentMins])
+  }, [dayState, currentMins])
 
   const focusProjectName = state.projects?.[0]?.name ?? 'Projects'
   const focusNextTask    = ssNextTask ?? 'Set a focus project in Projects'
@@ -746,7 +748,7 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
   }
 
   function handleToggleDone(taskId) {
-    dispatch({ type: 'TOGGLE_TASK', payload: taskId })
+    dayDispatch({ type: 'TOGGLE_TASK', payload: taskId })
   }
 
   function handleTimeSelect(taskId, time) {
@@ -755,7 +757,7 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
   }
 
   function handleMarkEaten(slot) {
-    dispatch({ type: 'MARK_MEAL_EATEN', payload: slot })
+    dayDispatch({ type: 'MARK_MEAL_EATEN', payload: slot })
   }
 
   return (
@@ -787,13 +789,13 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
       </section>
 
       {/* 4 — Timeline */}
-      <Timeline state={state} now={now} />
+      <Timeline state={dayState} now={now} />
 
       {/* 5 — 3 Things */}
       <section style={s.section}>
         <p style={s.sectionLabel}>3 Things</p>
         <div style={s.stack}>
-          {state.tasks.map(task => (
+          {dayState.tasks.map(task => (
             <TaskRow
               key={task.id}
               task={task}
@@ -826,7 +828,7 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
       <section style={s.section}>
         <p style={s.sectionLabel}>Fuel</p>
         <div style={s.mealGrid}>
-          {Object.entries(state.meals).map(([slot, meal]) => (
+          {Object.entries(dayState.meals).map(([slot, meal]) => (
             <FuelSlot
               key={slot}
               slotKey={slot}
@@ -841,7 +843,7 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
 
       {editingSlot && (
         <FuelEditSheet
-          meal={state.meals[editingSlot]}
+          meal={dayState.meals[editingSlot]}
           onClose={() => setEditingSlot(null)}
           onSave={(start, end) => {
             updateMealWindow(editingSlot, start, end)

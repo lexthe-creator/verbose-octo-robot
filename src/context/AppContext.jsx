@@ -66,6 +66,7 @@ const INITIAL_PROJECTS = [
 ]
 
 /* ─── Initial state ───────────────────────────────────────────────────────── */
+// Day plan state (tasks, meals, workout, etc.) now lives in DayContext.
 const initialState = {
   fitness: {
     weekNumber:       1,
@@ -75,133 +76,18 @@ const initialState = {
     todayComplete:    false,
   },
 
-  energyLevel:       null,
-  confirmedTasks:    [],
-  confirmedMeals:    [],
-  workoutConfirmed:  false,
-  dayLockedAt:       null,
-
-  tasks: [
-    { id: 't1', text: 'Review project proposal', done: false, dueTime: '10:00', scheduledTime: null, priority: 0 },
-    { id: 't2', text: 'Reply to team messages',  done: false, dueTime: '12:00', scheduledTime: null, priority: 1 },
-    { id: 't3', text: 'Evening walk 30 min',      done: false, dueTime: '18:30', scheduledTime: null, priority: 2 },
-  ],
-
-  meals: {
-    breakfast: { label: 'Breakfast', startTime: '07:00', endTime: '09:00', lateAfter: '09:00', eaten: false },
-    lunch:     { label: 'Lunch',     startTime: '12:00', endTime: '14:00', lateAfter: '14:00', eaten: false },
-    snack:     { label: 'Snack',     startTime: '15:00', endTime: '17:00', lateAfter: '17:00', eaten: false },
-    dinner:    { label: 'Dinner',    startTime: '19:00', endTime: '21:00', lateAfter: '21:00', eaten: false },
-  },
-
-  workout: {
-    type:      'Tempo Run',
-    duration:  '45 min',
-    pace:      '5:20 / km',
-    time:      '18:30',
-    confirmed: false,
-  },
-
-  inboxItems:   [],
-  transactions: [],
-  focusSessions: 0,
-
-  // Generic projects — She Stitches is projects[0]
-  projects: INITIAL_PROJECTS,
-
-  // EOD reflection log
-  reflectionLog: [],  // { date, feel, tomorrowTasks[] }
-
-  // Weekly planning
-  weeklyPriorities: [],   // string[]
-  groceryList:      [],   // { id, text, done }
+  inboxItems:       [],
+  transactions:     [],
+  focusSessions:    0,
+  projects:         INITIAL_PROJECTS,
+  reflectionLog:    [],
+  weeklyPriorities: [],
+  groceryList:      [],
 };
 
 /* ─── Reducer ─────────────────────────────────────────────────────────────── */
 function reducer(state, action) {
   switch (action.type) {
-
-    case 'SET_ENERGY':
-      return { ...state, energyLevel: action.payload };
-
-    case 'CONFIRM_TASK': {
-      const id = action.payload;
-      if (state.confirmedTasks.includes(id)) return state;
-      return { ...state, confirmedTasks: [...state.confirmedTasks, id] };
-    }
-
-    case 'CONFIRM_MEAL': {
-      const { slot, startTime, endTime } = action.payload;
-      if (state.confirmedMeals.includes(slot)) return state;
-      return {
-        ...state,
-        confirmedMeals: [...state.confirmedMeals, slot],
-        meals: {
-          ...state.meals,
-          [slot]: { ...state.meals[slot], startTime, endTime, lateAfter: endTime },
-        },
-      };
-    }
-
-    case 'CONFIRM_WORKOUT':
-      return {
-        ...state,
-        workoutConfirmed: true,
-        ...(action.payload ? { workout: { ...state.workout, ...action.payload } } : {}),
-      };
-
-    case 'LOCK_DAY':
-      return { ...state, dayLockedAt: new Date().toISOString() };
-
-    case 'TOGGLE_TASK': {
-      const tasks = state.tasks.map(t =>
-        t.id === action.payload ? { ...t, done: !t.done } : t
-      );
-      return { ...state, tasks };
-    }
-
-    case 'ADD_TASK': {
-      const { text } = action.payload;
-      const newTask = { id: Date.now(), text, done: false, scheduledTime: null, priority: state.tasks.length };
-      return { ...state, tasks: [...state.tasks, newTask] };
-    }
-
-    case 'REORDER_TASKS': {
-      const { orderedIds } = action.payload;
-      const idIndex = Object.fromEntries(orderedIds.map((id, i) => [String(id), i]));
-      const tasks = state.tasks.map(t => ({
-        ...t,
-        priority: idIndex[String(t.id)] ?? t.priority,
-      }));
-      return { ...state, tasks };
-    }
-
-    case 'UPDATE_TASK_TIME': {
-      const { taskId, time } = action.payload;
-      const tasks = state.tasks.map(t =>
-        t.id === taskId ? { ...t, scheduledTime: time } : t
-      );
-      return { ...state, tasks };
-    }
-
-    case 'MARK_MEAL_EATEN': {
-      const slot = action.payload;
-      return {
-        ...state,
-        meals: { ...state.meals, [slot]: { ...state.meals[slot], eaten: !state.meals[slot].eaten } },
-      };
-    }
-
-    case 'UPDATE_MEAL_WINDOW': {
-      const { slot, startTime, endTime } = action.payload;
-      return {
-        ...state,
-        meals: {
-          ...state.meals,
-          [slot]: { ...state.meals[slot], startTime, endTime, lateAfter: endTime },
-        },
-      };
-    }
 
     case 'ADD_INBOX_ITEM': {
       const item = { id: `i${Date.now()}`, text: action.payload, createdAt: new Date().toISOString() };
@@ -239,7 +125,6 @@ function reducer(state, action) {
 
     // ── Projects ────────────────────────────────────────────────────────────
 
-    // payload: { projectId, taskId }
     case 'TOGGLE_PROJECT_TASK': {
       const { projectId, taskId } = action.payload;
       return {
@@ -254,11 +139,9 @@ function reducer(state, action) {
       };
     }
 
-    // payload: { project }
     case 'ADD_PROJECT':
       return { ...state, projects: [...state.projects, action.payload.project] };
 
-    // payload: { projectId, key, value }
     case 'UPDATE_PROJECT': {
       const { projectId, key, value } = action.payload;
       return {
@@ -271,49 +154,22 @@ function reducer(state, action) {
 
     // ── EOD Reflection ──────────────────────────────────────────────────────
 
-    // payload: { date, feel, tomorrowTasks[] }
     case 'ADD_REFLECTION':
       return {
         ...state,
         reflectionLog: [...state.reflectionLog, action.payload],
       };
 
-    // payload: { tasks[] } — sets scheduledFor:'tomorrow' on matching tasks; adds new ones
-    case 'SET_TOMORROW_TASKS': {
-      const incoming = action.payload.tasks || [];
-      const existingIds = new Set(state.tasks.map(t => String(t.id)));
-
-      const updated = state.tasks.map(t => {
-        const match = incoming.find(it => String(it.id) === String(t.id));
-        return match ? { ...t, scheduledFor: 'tomorrow' } : t;
-      });
-
-      const newTasks = incoming
-        .filter(it => !existingIds.has(String(it.id)))
-        .map(it => ({
-          id:           it.id ?? `t${Date.now()}_${Math.random().toString(36).slice(2)}`,
-          text:         it.text,
-          done:         false,
-          scheduledTime: null,
-          scheduledFor:  'tomorrow',
-        }));
-
-      return { ...state, tasks: [...updated, ...newTasks] };
-    }
-
     // ── Weekly Planning ─────────────────────────────────────────────────────
 
-    // payload: { priorities: string[] }
     case 'SET_WEEKLY_PRIORITIES':
       return { ...state, weeklyPriorities: action.payload.priorities };
 
-    // payload: { text }
     case 'ADD_GROCERY_ITEM': {
       const item = { id: `g${Date.now()}`, text: action.payload.text, done: false };
       return { ...state, groceryList: [...state.groceryList, item] };
     }
 
-    // payload: { id }
     case 'TOGGLE_GROCERY_ITEM':
       return {
         ...state,
@@ -322,31 +178,8 @@ function reducer(state, action) {
         ),
       };
 
-    // payload: { id }
     case 'DELETE_GROCERY_ITEM':
       return { ...state, groceryList: state.groceryList.filter(g => g.id !== action.payload.id) };
-
-    // ── Day reset ───────────────────────────────────────────────────────────
-
-    // TODO Step 15: wire to replace loadState() reset logic
-    case 'RESET_DAY': {
-      // Carry forward any tasks explicitly scheduled for tomorrow
-      const carried = state.tasks
-        .filter(t => t.scheduledFor === 'tomorrow')
-        .map(({ scheduledFor, carryOver, done, ...rest }) => ({ ...rest, done: false }));
-
-      return {
-        ...initialState,
-        fitness:          { ...state.fitness, todayComplete: false },
-        inboxItems:       state.inboxItems,
-        transactions:     state.transactions,
-        projects:         state.projects,
-        reflectionLog:    state.reflectionLog,
-        weeklyPriorities: state.weeklyPriorities,
-        groceryList:      state.groceryList,
-        tasks:            carried.length > 0 ? carried : initialState.tasks,
-      };
-    }
 
     default:
       return state;
@@ -369,7 +202,6 @@ function loadLegacyProjects() {
       startDate: ssData.startDate || INITIAL_PROJECTS[0].startDate,
       tasks: SS_TASKS.map(t => ({ ...t, done: doneMap[t.id] ?? false })),
     }];
-    // Only remove the legacy key once migration is verified non-empty
     if (migrated.length > 0 && migrated[0].tasks?.length > 0) {
       localStorage.removeItem(SS_KEY);
     } else {
@@ -381,6 +213,31 @@ function loadLegacyProjects() {
   }
 }
 
+// Determines whether fitness.todayComplete should be true on load.
+// Reads aiml_day for dayLockedAt (one-way init read — no React dependency).
+// Falls back to legacy aiml_state.dayLockedAt during the migration window.
+function resolveTodayComplete(saved) {
+  const stored = saved.fitness?.todayComplete ?? false;
+  try {
+    const dayRaw = localStorage.getItem('aiml_day');
+    if (dayRaw) {
+      const dayStored = JSON.parse(dayRaw);
+      const dayLockedAt = dayStored.version === 1 ? dayStored.data?.dayLockedAt : null;
+      if (dayLockedAt && new Date(dayLockedAt).toDateString() !== new Date().toDateString()) {
+        return false;
+      }
+      return stored;
+    }
+    // Legacy fallback: dayLockedAt still present in old aiml_state
+    if (saved.dayLockedAt && new Date(saved.dayLockedAt).toDateString() !== new Date().toDateString()) {
+      return false;
+    }
+    return stored;
+  } catch {
+    return stored;
+  }
+}
+
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -388,35 +245,21 @@ function loadState() {
 
     const saved = JSON.parse(raw);
     const projects = saved.projects ?? loadLegacyProjects();
+    const todayComplete = resolveTodayComplete(saved);
 
-    if (saved.dayLockedAt) {
-      const lockedDate = new Date(saved.dayLockedAt).toDateString();
-      const today      = new Date().toDateString();
-      if (lockedDate !== today) {
-        const carried = (saved.tasks || [])
-          .filter(t => t.scheduledFor === 'tomorrow')
-          .map(({ scheduledFor, carryOver, done, ...rest }) => ({ ...rest, done: false }));
+    // Strip legacy and day-plan fields so they don't re-enter aiml_state
+    const {
+      profile: _p, settings: _s,
+      dayLockedAt: _dl, energyLevel: _el, workoutConfirmed: _wc,
+      confirmedTasks: _ct, confirmedMeals: _cm,
+      tasks: _tasks, meals: _meals, workout: _wo,
+      ...restSaved
+    } = saved;
 
-        return {
-          ...initialState,
-          fitness:          { ...initialState.fitness,  ...(saved.fitness  || {}), todayComplete: false },
-          inboxItems:       saved.inboxItems        || [],
-          transactions:     saved.transactions      || [],
-          projects,
-          reflectionLog:    saved.reflectionLog    || [],
-          weeklyPriorities: saved.weeklyPriorities || [],
-          groceryList:      saved.groceryList      || [],
-          tasks:            carried.length > 0 ? carried : initialState.tasks,
-        };
-      }
-    }
-
-    // Strip legacy profile/settings so they don't re-enter aiml_state
-    const { profile: _p, settings: _s, ...restSaved } = saved;
     return {
       ...initialState,
       ...restSaved,
-      fitness:          { ...initialState.fitness,  ...(saved.fitness  || {}) },
+      fitness:          { ...initialState.fitness, ...(saved.fitness || {}), todayComplete },
       transactions:     saved.transactions      || [],
       projects,
       reflectionLog:    saved.reflectionLog    || [],
@@ -442,14 +285,6 @@ export function AppProvider({ children }) {
 
   useEffect(() => { saveState(state); }, [state]);
 
-  function updateTaskTime(taskId, time) {
-    dispatch({ type: 'UPDATE_TASK_TIME', payload: { taskId, time } });
-  }
-
-  function updateMealWindow(slot, startTime, endTime) {
-    dispatch({ type: 'UPDATE_MEAL_WINDOW', payload: { slot, startTime, endTime } });
-  }
-
   // Computed helpers for She Stitches (projects[0])
   const ssProject       = useMemo(() => state.projects?.[0] ?? null, [state.projects]);
   const ssDoneCount     = useMemo(() => ssProject?.tasks.filter(t => t.done).length ?? 0, [ssProject]);
@@ -462,7 +297,7 @@ export function AppProvider({ children }) {
 
   return (
     <AppContext.Provider value={{
-      state, dispatch, updateTaskTime, updateMealWindow,
+      state, dispatch,
       ssDoneCount, ssTotalCount, ssListingsCount, ssNextTask, ssDayOf90,
     }}>
       {children}

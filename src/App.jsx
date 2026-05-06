@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useApp } from './context/AppContext.jsx'
+import { useDay } from './context/index.js'
 import { SCREENS, NAV_TABS } from './constants/navigation.js'
 import { shouldShowNav } from './navigation/router.js'
 import { useNavigate } from './navigation/useNavigate.js'
@@ -19,10 +20,11 @@ import WeeklyPlanning  from './screens/WeeklyPlanning.jsx'
 
 export default function App() {
   const { state, dispatch } = useApp()
+  const { dayState }        = useDay()
 
   const initialScreen = (() => {
-    if (!state.dayLockedAt) return SCREENS.IGNITION
-    const lockedDate = new Date(state.dayLockedAt).toDateString()
+    if (!dayState.dayLockedAt) return SCREENS.IGNITION
+    const lockedDate = new Date(dayState.dayLockedAt).toDateString()
     return lockedDate === new Date().toDateString() ? SCREENS.HOME : SCREENS.IGNITION
   })()
 

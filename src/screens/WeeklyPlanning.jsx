@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { useApp } from '../context/AppContext.jsx'
+import { useDay } from '../context/index.js'
 import { getTypeForDay, getWeekNumber } from '../utils/fitness.js'
 import { getProjectPace } from '../utils/projectUtils.js'
 
@@ -134,6 +135,7 @@ const STEPS = ['week-review', 'priorities', 'grocery', 'training', 'projects', '
 
 export default function WeeklyPlanning({ onComplete }) {
   const { state, dispatch } = useApp()
+  const { dayState }        = useDay()
 
   const [stepIdx,      setStepIdx]      = useState(0)
   const [priorities,   setPriorities]   = useState(['', '', ''])
@@ -164,7 +166,7 @@ export default function WeeklyPlanning({ onComplete }) {
     return d >= weekStart && d < weekEnd
   }).length
 
-  const tasksDoneCount = state.tasks.filter(t => t.done).length
+  const tasksDoneCount = dayState.tasks.filter(t => t.done).length
 
   const ssProject   = state.projects?.[0]
   const ssThisWeek  = ssProject?.tasks.filter(t => t.done).length ?? 0

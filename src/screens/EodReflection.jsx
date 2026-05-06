@@ -1,5 +1,6 @@
-import { useState, useRef, useMemo } from 'react'
+import { useState, useRef } from 'react'
 import { useApp } from '../context/AppContext.jsx'
+import { useDay } from '../context/index.js'
 import { parseHHMM } from '../utils/time.js'
 
 const FEEL_OPTIONS = [
@@ -85,7 +86,8 @@ const rsr = {
 // ─── Main component ────────────────────────────────────────────────────────────
 
 export default function EodReflection({ onComplete }) {
-  const { state, dispatch } = useApp()
+  const { dispatch }              = useApp()
+  const { dayState, dayDispatch } = useDay()
   const [step,         setStep]         = useState('review')
   const [carrySet,     setCarrySet]     = useState(() => new Set())
   const [feel,         setFeel]         = useState(null)
@@ -94,7 +96,7 @@ export default function EodReflection({ onComplete }) {
   const addInputRef = useRef(null)
 
   const today    = new Date().toISOString().slice(0, 10)
-  const undone   = state.tasks.filter(t => !t.done)
+  const undone   = dayState.tasks.filter(t => !t.done)
 
   function toggleCarry(id) {
     setCarrySet(prev => {
@@ -106,13 +108,13 @@ export default function EodReflection({ onComplete }) {
 
   function buildTomorrow() {
     const nowMins    = new Date().getHours() * 60 + new Date().getMinutes()
-    const carried    = state.tasks.filter(t => carrySet.has(t.id))
+    const carried    = dayState.tasks.filter(t => carrySet.has(t.id))
     const carriedIds = new Set(carried.map(t => t.id))
-    const overdue    = state.tasks.filter(t =>
+    const overdue    = dayState.tasks.filter(t =>
       !t.done && !carriedIds.has(t.id) && t.dueTime && parseHHMM(t.dueTime) < nowMins
     )
     const overdueIds = new Set(overdue.map(t => t.id))
-    const scheduled  = state.tasks.filter(t =>
+    const scheduled  = dayState.tasks.filter(t =>
       !t.done && !carriedIds.has(t.id) && !overdueIds.has(t.id) && t.scheduledTime
     )
     return [...carried, ...overdue, ...scheduled].slice(0, 3)
@@ -138,8 +140,8 @@ export default function EodReflection({ onComplete }) {
 
   function handleFinish() {
     const tasks = tomorrowList || []
-    dispatch({ type: 'SET_TOMORROW_TASKS', payload: { tasks } })
-    dispatch({ type: 'ADD_REFLECTION',     payload: { date: today, feel, tomorrowTasks: tasks.map(t => t.text) } })
+    dayDispatch({ type: 'SET_TOMORROW_TASKS', payload: { tasks } })
+    dispatch({ type: 'ADD_REFLECTION', payload: { date: today, feel, tomorrowTasks: tasks.map(t => t.text) } })
     onComplete()
   }
 
@@ -152,7 +154,7 @@ export default function EodReflection({ onComplete }) {
           <h1 style={s.heading}>How did today go?</h1>
 
           <div style={s.taskList}>
-            {state.tasks.map(task => (
+            {dayState.tasks.map(task => (
               <div key={task.id} style={s.reviewRow}>
                 <div style={{ ...s.statusDot, background: task.done ? 'var(--color-success)' : 'var(--color-faint)' }} />
                 <span style={{

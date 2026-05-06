@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { useApp } from '../context/AppContext.jsx'
+import { useDay } from '../context/index.js'
 
 function formatTimestamp(iso) {
   const diff = Date.now() - new Date(iso).getTime()
@@ -58,6 +59,7 @@ function InboxItem({ item, exiting, flashing, onAction }) {
 
 export default function Inbox() {
   const { state, dispatch } = useApp()
+  const { dayDispatch }     = useDay()
   const [inputText, setInputText] = useState('')
   const [exitingId, setExitingId] = useState(null)
   const [flashingId, setFlashingId] = useState(null)
@@ -81,7 +83,7 @@ export default function Inbox() {
     if (action === 'task') {
       const item = state.inboxItems.find(i => i.id === itemId)
       if (!item) return
-      dispatch({ type: 'ADD_TASK', payload: { text: item.text } })
+      dayDispatch({ type: 'ADD_TASK', payload: { text: item.text } })
       setFlashingId(itemId)
       setTimeout(() => {
         setFlashingId(null)

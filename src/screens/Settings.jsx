@@ -15,7 +15,7 @@ const EQUIPMENT_OPTIONS = [
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
 export default function Settings({ onBack }) {
-  const { state }                       = useApp()
+  const { state, dispatch }             = useApp()
   const { userState, userDispatch }     = useUser()
   const { settingsState, settingsDispatch } = useSettings()
   const [nameDraft, setNameDraft] = useState(userState.name)
