@@ -1,6 +1,5 @@
 import { useState, useRef } from 'react'
-import { useApp } from '../context/AppContext.jsx'
-import { useDay } from '../context/index.js'
+import { useDay, usePlanning } from '../context/index.js'
 import { parseHHMM } from '../utils/time.js'
 
 const FEEL_OPTIONS = [
@@ -86,7 +85,7 @@ const rsr = {
 // ─── Main component ────────────────────────────────────────────────────────────
 
 export default function EodReflection({ onComplete }) {
-  const { dispatch }              = useApp()
+  const { planningDispatch }      = usePlanning()
   const { dayState, dayDispatch } = useDay()
   const [step,         setStep]         = useState('review')
   const [carrySet,     setCarrySet]     = useState(() => new Set())
@@ -141,7 +140,7 @@ export default function EodReflection({ onComplete }) {
   function handleFinish() {
     const tasks = tomorrowList || []
     dayDispatch({ type: 'SET_TOMORROW_TASKS', payload: { tasks } })
-    dispatch({ type: 'ADD_REFLECTION', payload: { date: today, feel, tomorrowTasks: tasks.map(t => t.text) } })
+    planningDispatch({ type: 'ADD_REFLECTION', payload: { date: today, feel, tomorrowTasks: tasks.map(t => t.text) } })
     onComplete()
   }
 

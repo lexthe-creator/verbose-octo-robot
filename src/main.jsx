@@ -2,8 +2,11 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
-import { AppProvider } from './context/AppContext.jsx'
-import { SettingsProvider, UserProvider, DayProvider, FitnessProvider, InboxProvider } from './context/index.js'
+import {
+  SettingsProvider, UserProvider, FitnessProvider,
+  DayProvider, InboxProvider,
+  ProjectsProvider, FinanceProvider, PlanningProvider,
+} from './context/index.js'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -12,9 +15,13 @@ createRoot(document.getElementById('root')).render(
         <FitnessProvider>
           <DayProvider>
             <InboxProvider>
-              <AppProvider>
-                <App />
-              </AppProvider>
+              <ProjectsProvider>
+                <FinanceProvider>
+                  <PlanningProvider>
+                    <App />
+                  </PlanningProvider>
+                </FinanceProvider>
+              </ProjectsProvider>
             </InboxProvider>
           </DayProvider>
         </FitnessProvider>

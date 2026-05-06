@@ -1,6 +1,5 @@
 import { useState, useRef } from 'react'
-import { useApp } from '../context/AppContext.jsx'
-import { useDay, useFitness } from '../context/index.js'
+import { useDay, useFitness, useProjects, usePlanning } from '../context/index.js'
 import { getTypeForDay, getWeekNumber } from '../utils/fitness.js'
 import { getProjectPace } from '../utils/projectUtils.js'
 
@@ -134,9 +133,10 @@ const gr = {
 const STEPS = ['week-review', 'priorities', 'grocery', 'training', 'projects', 'done']
 
 export default function WeeklyPlanning({ onComplete }) {
-  const { state, dispatch } = useApp()
-  const { dayState }        = useDay()
-  const { fitnessState }    = useFitness()
+  const { projectsState }             = useProjects()
+  const { planningState, planningDispatch } = usePlanning()
+  const { dayState }                  = useDay()
+  const { fitnessState }              = useFitness()
 
   const [stepIdx,      setStepIdx]      = useState(0)
   const [priorities,   setPriorities]   = useState(['', '', ''])
@@ -169,7 +169,7 @@ export default function WeeklyPlanning({ onComplete }) {
 
   const tasksDoneCount = dayState.tasks.filter(t => t.done).length
 
-  const ssProject   = state.projects?.[0]
+  const ssProject   = projectsState.projects[0] ?? null
   const ssThisWeek  = ssProject?.tasks.filter(t => t.done).length ?? 0
 
   const nextWeekDates = getNextWeekDates()
@@ -177,7 +177,7 @@ export default function WeeklyPlanning({ onComplete }) {
   const runDays       = nextWeekTypes.filter(t => ['easy_run','tempo_run','long_run'].includes(t)).length
   const strengthDays  = nextWeekTypes.filter(t => ['strength_a','strength_b'].includes(t)).length
 
-  const activeProjects = state.projects.filter(p => new Date(p.endDate) > today)
+  const activeProjects = projectsState.projects.filter(p => new Date(p.endDate) > today)
 
   // ── Step: Week review ──────────────────────────────────────────────────────
   if (step === 'week-review') {
@@ -237,7 +237,7 @@ export default function WeeklyPlanning({ onComplete }) {
             style={s.cta}
             onClick={() => {
               const filled = priorities.filter(p => p.trim())
-              dispatch({ type: 'SET_WEEKLY_PRIORITIES', payload: { priorities: filled } })
+              planningDispatch({ type: 'SET_WEEKLY_PRIORITIES', payload: { priorities: filled } })
               next()
             }}
           >
@@ -253,7 +253,7 @@ export default function WeeklyPlanning({ onComplete }) {
     function addGrocery() {
       const text = groceryDraft.trim()
       if (!text) return
-      dispatch({ type: 'ADD_GROCERY_ITEM', payload: { text } })
+      planningDispatch({ type: 'ADD_GROCERY_ITEM', payload: { text } })
       setGroceryDraft('')
     }
 
@@ -281,14 +281,14 @@ export default function WeeklyPlanning({ onComplete }) {
           </div>
 
           {/* Existing items */}
-          {state.groceryList.length > 0 && (
+          {planningState.groceryList.length > 0 && (
             <div style={s.groceryList}>
-              {state.groceryList.map(item => (
+              {planningState.groceryList.map(item => (
                 <GroceryRow
                   key={item.id}
                   item={item}
-                  onToggle={() => dispatch({ type: 'TOGGLE_GROCERY_ITEM', payload: { id: item.id } })}
-                  onDelete={() => dispatch({ type: 'DELETE_GROCERY_ITEM', payload: { id: item.id } })}
+                  onToggle={() => planningDispatch({ type: 'TOGGLE_GROCERY_ITEM', payload: { id: item.id } })}
+                  onDelete={() => planningDispatch({ type: 'DELETE_GROCERY_ITEM', payload: { id: item.id } })}
                 />
               ))}
             </div>

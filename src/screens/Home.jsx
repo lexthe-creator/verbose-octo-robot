@@ -1,8 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
-import { useApp } from '../context/AppContext.jsx'
 import { useUser } from '../context/UserContext.jsx'
 import { useSettings } from '../context/SettingsContext.jsx'
-import { useDay, useFitness } from '../context/index.js'
+import { useDay, useFitness, useProjects, getFocusProject, getProjectStats } from '../context/index.js'
 import FuelEditSheet from '../components/FuelEditSheet.jsx'
 import { getTodayType, generateWorkout, getWeekNumber } from '../utils/fitness.js'
 import { getProjectPace } from '../utils/projectUtils.js'
@@ -686,8 +685,7 @@ const tt = {
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
-  const { state,
-          ssDoneCount, ssTotalCount, ssListingsCount, ssNextTask, ssDayOf90 } = useApp()
+  const { projectsState }                              = useProjects()
   const { userState }                                  = useUser()
   const { settingsState }                              = useSettings()
   const { dayState, dayDispatch, updateTaskTime, updateMealWindow } = useDay()
@@ -705,11 +703,18 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
 
   const currentMins = toMins(now)
 
+  const focusProject = useMemo(
+    () => getFocusProject(projectsState.projects),
+    [projectsState.projects]
+  )
+  const { doneCount, totalCount, listingsCount, nextTask, dayOf90 } = useMemo(
+    () => getProjectStats(focusProject),
+    [focusProject]
+  )
   const paceStatus = useMemo(() => {
-    const p = state.projects?.[0]
-    if (!p) return 'on_track'
-    return getProjectPace(p).status
-  }, [state.projects])
+    if (!focusProject) return 'on_track'
+    return getProjectPace(focusProject).status
+  }, [focusProject])
 
   // Next commitment label for burn bar
   const nextLabel = useMemo(() => {
@@ -741,8 +746,8 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
     return `${next.label} in ${away} min`
   }, [dayState, currentMins])
 
-  const focusProjectName = state.projects?.[0]?.name ?? 'Projects'
-  const focusNextTask    = ssNextTask ?? 'Set a focus project in Projects'
+  const focusProjectName = focusProject?.name ?? 'Projects'
+  const focusNextTask    = nextTask ?? 'Set a focus project in Projects'
 
   function handleToggleExpand(taskId) {
     setExpandedTask(prev => prev === taskId ? null : taskId)
@@ -813,13 +818,13 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
       <section style={s.section}>
         <p style={s.sectionLabel}>{focusProjectName}</p>
         <FocusProjectCard
-          projectName={state.projects?.[0]?.name ?? 'Projects'}
-          projectEmoji={state.projects?.[0]?.emoji ?? '📋'}
-          doneCount={ssDoneCount}
-          totalCount={ssTotalCount}
-          listingsCount={ssListingsCount}
+          projectName={focusProject?.name ?? 'Projects'}
+          projectEmoji={focusProject?.emoji ?? '📋'}
+          doneCount={doneCount}
+          totalCount={totalCount}
+          listingsCount={listingsCount}
           nextTask={focusNextTask}
-          dayOf90={ssDayOf90}
+          dayOf90={dayOf90}
           paceStatus={paceStatus}
           onTap={() => onNavigate(SCREENS.PROJECTS)}
         />

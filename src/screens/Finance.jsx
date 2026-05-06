@@ -1,7 +1,11 @@
 // TODO V2: Twilio SMS pipeline
 import { useState, useRef, useEffect } from 'react'
-import { useApp } from '../context/AppContext.jsx'
 import { useSettings } from '../context/SettingsContext.jsx'
+import {
+  useFinance,
+  getTodaySpend, getWeeklySpend, getWeekTotal,
+  getFourWeekAvg, getOddTransaction, getTodayTransactions,
+} from '../context/index.js'
 import { getTodayISO } from '../utils/time.js'
 import { getWeekDates } from '../utils/fitness.js'
 
@@ -18,13 +22,7 @@ const CATEGORY_EMOJI = {
 
 const DAY_INITIAL = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 
-// ─── Date helpers ──────────────────────────────────────────────────────────────
-
-function toDateStr(date) {
-  return date.toISOString().slice(0, 10)
-}
-
-// ─── Calculation helpers ───────────────────────────────────────────────────────
+// ─── Formatting helpers ────────────────────────────────────────────────────────
 
 function formatAmount(n) {
   const abs     = Math.abs(n)
@@ -33,53 +31,16 @@ function formatAmount(n) {
   return { dollars, cents, sign: n < 0 ? '-' : '+' }
 }
 
-function getTodaySpend(transactions) {
-  const today = getTodayISO()
-  return transactions
-    .filter(t => t.date === today && t.amount < 0)
-    .reduce((sum, t) => sum + Math.abs(t.amount), 0)
-}
-
 function getWeeklyBars(transactions) {
-  const dates = getWeekDates()
-  const today = getTodayISO()
-  return dates.map((d, i) => {
-    const ds = toDateStr(d)
-    const amount = transactions
-      .filter(t => t.date === ds && t.amount < 0)
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0)
-    return { day: DAY_INITIAL[i], amount, isToday: ds === today }
-  })
-}
-
-function getWeekTotal(transactions) {
-  const dateSet = new Set(getWeekDates().map(d => toDateStr(d)))
-  return transactions
-    .filter(t => dateSet.has(t.date) && t.amount < 0)
-    .reduce((sum, t) => sum + Math.abs(t.amount), 0)
-}
-
-function getFourWeekAvg(transactions) {
-  const today = new Date()
-  const totals = [7, 14, 21, 28].map(daysBack => {
-    const d = new Date(today)
-    d.setDate(today.getDate() - daysBack)
-    const ds = toDateStr(d)
-    return transactions
-      .filter(t => t.date === ds && t.amount < 0)
-      .reduce((sum, t) => sum + Math.abs(t.amount), 0)
-  })
-  return totals.reduce((a, b) => a + b, 0) / 4
-}
-
-function hasOddCharge(transactions) {
-  return transactions.some(t => Math.abs(t.amount) > 200)
-}
-
-function getTodayTransactions(transactions) {
-  const today = getTodayISO()
-  return transactions.filter(t => t.date === today)
-  // already prepended newest-first via ADD_TRANSACTION
+  const weekly = getWeeklySpend(transactions)
+  const today  = getTodayISO()
+  const dates  = getWeekDates()
+  const keys   = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+  return dates.map((d, i) => ({
+    day:     DAY_INITIAL[i],
+    amount:  weekly[keys[i]],
+    isToday: d.toISOString().slice(0, 10) === today,
+  }))
 }
 
 // ─── Weekly bar chart ─────────────────────────────────────────────────────────
@@ -406,9 +367,9 @@ const sh = {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function Finance() {
-  const { state, dispatch } = useApp()
-  const { settingsState }   = useSettings()
-  const transactions   = state.transactions
+  const { financeState, financeDispatch } = useFinance()
+  const { settingsState }                 = useSettings()
+  const transactions   = financeState.transactions
   const plaidConnected = settingsState.plaidConnected
 
   const [showSheet, setShowSheet] = useState(false)
@@ -417,10 +378,12 @@ export default function Finance() {
   const weeklyBars = getWeeklyBars(transactions)
   const weekTotal  = getWeekTotal(transactions)
   const fourWkAvg  = getFourWeekAvg(transactions)
-  const isOdd      = hasOddCharge(transactions)
+  const oddTx      = getOddTransaction(transactions)
   const todayList  = getTodayTransactions(transactions)
 
   const { dollars, cents } = formatAmount(todaySpend)
+
+  const isOdd = oddTx !== null
 
   let comparisonLine
   if (fourWkAvg === 0) {
@@ -492,7 +455,7 @@ export default function Finance() {
               <TxRow
                 key={tx.id}
                 tx={tx}
-                onDelete={() => dispatch({ type: 'DELETE_TRANSACTION', payload: tx.id })}
+                onDelete={() => financeDispatch({ type: 'DELETE_TRANSACTION', payload: { id: tx.id } })}
               />
             ))}
           </div>
@@ -502,7 +465,7 @@ export default function Finance() {
       {showSheet && (
         <TransactionSheet
           onClose={() => setShowSheet(false)}
-          onSave={payload => dispatch({ type: 'ADD_TRANSACTION', payload })}
+          onSave={payload => financeDispatch({ type: 'ADD_TRANSACTION', payload })}
         />
       )}
     </div>

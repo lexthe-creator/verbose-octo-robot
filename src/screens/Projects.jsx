@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useApp } from '../context/AppContext.jsx'
+import { useProjects, getFocusProject, getProjectStats } from '../context/index.js'
 
 // ─── Tag config ───────────────────────────────────────────────────────────────
 
@@ -84,9 +84,8 @@ const tr = {
 
 // ─── Month card ───────────────────────────────────────────────────────────────
 
-function MonthCard({ month, tasks, defaultOpen }) {
+function MonthCard({ month, tasks, projectId, dispatch, defaultOpen }) {
   const [open, setOpen] = useState(defaultOpen)
-  const { dispatch } = useApp()
 
   const monthTasks  = tasks.filter(t => t.month === month.num)
   const donePct     = monthTasks.length
@@ -123,7 +122,7 @@ function MonthCard({ month, tasks, defaultOpen }) {
                   <SsTaskRow
                     key={task.id}
                     task={task}
-                    onToggle={() => dispatch({ type: 'TOGGLE_PROJECT_TASK', payload: { projectId: 'she-stitches', taskId: task.id } })}
+                    onToggle={() => dispatch({ type: 'TOGGLE_PROJECT_TASK', payload: { projectId, taskId: task.id } })}
                   />
                 ))}
               </div>
@@ -153,9 +152,30 @@ const mc = {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function Projects({ onBack }) {
-  const { state, ssDoneCount, ssTotalCount, ssListingsCount, ssDayOf90 } = useApp()
+  const { projectsState, projectsDispatch } = useProjects()
+  const focusProject = getFocusProject(projectsState.projects)
+  const { doneCount, totalCount, listingsCount, dayOf90 } = getProjectStats(focusProject)
 
-  const pct = ssTotalCount ? Math.round((ssDoneCount / ssTotalCount) * 100) : 0
+  const pct = totalCount ? Math.round((doneCount / totalCount) * 100) : 0
+
+  if (!focusProject) {
+    return (
+      <div style={s.screen}>
+        <div style={s.header}>
+          <button style={s.back} onClick={onBack}>← Home</button>
+          <h1 style={s.title}>Projects</h1>
+        </div>
+        <div style={s.empty}>
+          <span style={s.emptyIcon}>📋</span>
+          <p style={s.emptyText}>No active project yet.</p>
+          <p style={s.emptyHint}>Create a project to start tracking your goals.</p>
+        </div>
+      </div>
+    )
+  }
+
+  const [firstName, ...rest] = focusProject.name.split(' ')
+  const titleRest = rest.join(' ')
 
   return (
     <div style={s.screen}>
@@ -163,7 +183,7 @@ export default function Projects({ onBack }) {
       <div style={s.header}>
         <button style={s.back} onClick={onBack}>← Home</button>
         <h1 style={s.title}>
-          She <span style={{ color: 'var(--color-accent)' }}>Stitches</span>
+          {firstName}{titleRest && <> <span style={{ color: 'var(--color-accent)' }}>{titleRest}</span></>}
         </h1>
         <p style={s.subtitle}>90-DAY LAUNCH ROADMAP</p>
       </div>
@@ -175,17 +195,17 @@ export default function Projects({ onBack }) {
           {/* Stats row */}
           <div style={s.statsRow}>
             <div style={s.stat}>
-              <span style={s.statNum}>{ssDoneCount}</span>
+              <span style={s.statNum}>{doneCount}</span>
               <span style={s.statLabel}>TASKS DONE</span>
             </div>
             <div style={s.divider} />
             <div style={s.stat}>
-              <span style={s.statNum}>{ssListingsCount}</span>
+              <span style={s.statNum}>{listingsCount}</span>
               <span style={s.statLabel}>LISTINGS LIVE</span>
             </div>
             <div style={s.divider} />
             <div style={s.stat}>
-              <span style={s.statNum}>{ssDayOf90}</span>
+              <span style={s.statNum}>{dayOf90}</span>
               <span style={s.statLabel}>DAY OF 90</span>
             </div>
           </div>
@@ -209,7 +229,9 @@ export default function Projects({ onBack }) {
           <MonthCard
             key={month.num}
             month={month}
-            tasks={state.projects?.[0]?.tasks ?? []}
+            tasks={focusProject.tasks}
+            projectId={focusProject.id}
+            dispatch={projectsDispatch}
             defaultOpen={i === 0}
           />
         ))}
@@ -262,6 +284,34 @@ const s = {
     paddingBottom: 'calc(var(--safe-bottom) + var(--nav-height) + var(--space-6))',
     display:       'flex',
     flexDirection: 'column',
+  },
+
+  // Empty state
+  empty: {
+    flex:           1,
+    display:        'flex',
+    flexDirection:  'column',
+    alignItems:     'center',
+    justifyContent: 'center',
+    gap:            'var(--space-2)',
+    padding:        'var(--space-10) 20px',
+  },
+  emptyIcon: {
+    fontSize:   '40px',
+    lineHeight: 1,
+    marginBottom: '4px',
+  },
+  emptyText: {
+    fontSize:   '16px',
+    fontWeight: 600,
+    color:      'var(--color-text)',
+    textAlign:  'center',
+  },
+  emptyHint: {
+    fontSize:   '13px',
+    color:      'var(--color-muted)',
+    textAlign:  'center',
+    lineHeight: 1.4,
   },
 
   // Header

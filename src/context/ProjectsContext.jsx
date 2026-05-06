@@ -1,4 +1,9 @@
-import { createContext, useContext, useReducer, useEffect, useMemo } from 'react';
+import { createContext, useContext, useReducer, useEffect } from 'react'
+import { PROJECT_STATUS } from '../constants/projects.js'
+
+const PROJECTS_STORAGE_KEY = 'aiml_projects'
+const SCHEMA_VERSION       = 1
+const SS_KEY               = 'sheStitches'  // legacy key — migrated once, then deleted
 
 /* ─── She Stitches seed tasks ─────────────────────────────────────────────── */
 const SS_TASKS = [
@@ -49,48 +54,107 @@ const SS_TASKS = [
   { id: 'ss37', text: 'Full 90-day review',                                    done: false, listings: 0, week: 12, month: 3, tag: 'Strategy'  },
 ]
 
-/* ─── Initial projects array ──────────────────────────────────────────────── */
+/* ─── Initial projects ────────────────────────────────────────────────────── */
 const INITIAL_PROJECTS = [
   {
     id:               'she-stitches',
     name:             'She Stitches',
     emoji:            '🪡',
     startDate:        '2025-04-01',
-    endDate:          '2025-06-29',  // day 90 of 90
+    endDate:          '2025-06-29',
     bufferDays:       7,
     weeklyGoal:       null,
     tasks:            SS_TASKS,
     lastActivityDate: null,
-    status:           'focus',
+    status:           PROJECT_STATUS.FOCUS,
   },
 ]
 
-/* ─── Initial state ───────────────────────────────────────────────────────── */
-// Day plan state lives in DayContext. Fitness lives in FitnessContext. Inbox lives in InboxContext.
-const initialState = {
-  transactions:     [],
-  projects:         INITIAL_PROJECTS,
-  reflectionLog:    [],
-  weeklyPriorities: [],
-  groceryList:      [],
-};
+const initialProjectsState = { projects: INITIAL_PROJECTS }
+
+/* ─── Selectors ───────────────────────────────────────────────────────────── */
+export function getFocusProject(projects) {
+  return projects.find(p => p.status === PROJECT_STATUS.FOCUS) ?? null
+}
+
+export function getProjectStats(project) {
+  if (!project) return { doneCount: 0, totalCount: 0, listingsCount: 0, nextTask: null, dayOf90: 1 }
+  const tasks         = project.tasks ?? []
+  const doneCount     = tasks.filter(t => t.done).length
+  const totalCount    = tasks.length
+  const listingsCount = tasks.filter(t => t.done).reduce((n, t) => n + (t.listings || 0), 0)
+  const nextTask      = tasks.find(t => !t.done)?.text ?? null
+  const dayOf90       = Math.min(
+    Math.max(1, Math.floor((Date.now() - new Date(project.startDate).getTime()) / 86_400_000) + 1),
+    90
+  )
+  return { doneCount, totalCount, listingsCount, nextTask, dayOf90 }
+}
+
+/* ─── Legacy migration ────────────────────────────────────────────────────── */
+function loadLegacyProjects() {
+  try {
+    const raw = localStorage.getItem(SS_KEY)
+    if (!raw) return INITIAL_PROJECTS
+    const ssData  = JSON.parse(raw)
+    const doneMap = {}
+    ssData.tasks?.forEach(t => { doneMap[t.id] = t.done })
+    const migrated = [{
+      ...INITIAL_PROJECTS[0],
+      startDate: ssData.startDate || INITIAL_PROJECTS[0].startDate,
+      tasks:     SS_TASKS.map(t => ({ ...t, done: doneMap[t.id] ?? false })),
+    }]
+    if (migrated.length > 0 && migrated[0].tasks?.length > 0) {
+      localStorage.removeItem(SS_KEY)
+    } else {
+      console.warn('[ProjectsContext] Legacy migration check failed — sheStitches key preserved')
+    }
+    return migrated
+  } catch {
+    return INITIAL_PROJECTS
+  }
+}
+
+/* ─── Persistence ─────────────────────────────────────────────────────────── */
+function loadProjectsState() {
+  try {
+    const raw = localStorage.getItem(PROJECTS_STORAGE_KEY)
+    if (raw) {
+      const stored = JSON.parse(raw)
+      if (stored.version === SCHEMA_VERSION) return { ...initialProjectsState, ...stored.data }
+      return initialProjectsState
+    }
+    // One-time migration from legacy aiml_state
+    const legacyRaw = localStorage.getItem('aiml_state')
+    if (legacyRaw) {
+      try {
+        const parsed   = JSON.parse(legacyRaw)
+        const projects = parsed.projects ?? loadLegacyProjects()
+        return { ...initialProjectsState, projects }
+      } catch {
+        return { ...initialProjectsState, projects: loadLegacyProjects() }
+      }
+    }
+    return { ...initialProjectsState, projects: loadLegacyProjects() }
+  } catch {
+    return initialProjectsState
+  }
+}
+
+function saveProjectsState(state) {
+  try {
+    localStorage.setItem(
+      PROJECTS_STORAGE_KEY,
+      JSON.stringify({ version: SCHEMA_VERSION, data: state })
+    )
+  } catch { /* quota exceeded */ }
+}
 
 /* ─── Reducer ─────────────────────────────────────────────────────────────── */
-function reducer(state, action) {
+export function projectsReducer(state, action) {
   switch (action.type) {
-
-    case 'ADD_TRANSACTION': {
-      const tx = { id: `tx${Date.now()}`, ...action.payload };
-      return { ...state, transactions: [tx, ...state.transactions] };
-    }
-
-    case 'DELETE_TRANSACTION':
-      return { ...state, transactions: state.transactions.filter(t => t.id !== action.payload) };
-
-    // ── Projects ────────────────────────────────────────────────────────────
-
     case 'TOGGLE_PROJECT_TASK': {
-      const { projectId, taskId } = action.payload;
+      const { projectId, taskId } = action.payload
       return {
         ...state,
         projects: state.projects.map(p =>
@@ -100,151 +164,41 @@ function reducer(state, action) {
             tasks: p.tasks.map(t => t.id === taskId ? { ...t, done: !t.done } : t),
           }
         ),
-      };
+      }
     }
-
     case 'ADD_PROJECT':
-      return { ...state, projects: [...state.projects, action.payload.project] };
-
+      return { ...state, projects: [...state.projects, action.payload.project] }
     case 'UPDATE_PROJECT': {
-      const { projectId, key, value } = action.payload;
+      const { projectId, key, value } = action.payload
       return {
         ...state,
         projects: state.projects.map(p =>
           p.id !== projectId ? p : { ...p, [key]: value }
         ),
-      };
+      }
     }
-
-    // ── EOD Reflection ──────────────────────────────────────────────────────
-
-    case 'ADD_REFLECTION':
-      return {
-        ...state,
-        reflectionLog: [...state.reflectionLog, action.payload],
-      };
-
-    // ── Weekly Planning ─────────────────────────────────────────────────────
-
-    case 'SET_WEEKLY_PRIORITIES':
-      return { ...state, weeklyPriorities: action.payload.priorities };
-
-    case 'ADD_GROCERY_ITEM': {
-      const item = { id: `g${Date.now()}`, text: action.payload.text, done: false };
-      return { ...state, groceryList: [...state.groceryList, item] };
-    }
-
-    case 'TOGGLE_GROCERY_ITEM':
-      return {
-        ...state,
-        groceryList: state.groceryList.map(g =>
-          g.id === action.payload.id ? { ...g, done: !g.done } : g
-        ),
-      };
-
-    case 'DELETE_GROCERY_ITEM':
-      return { ...state, groceryList: state.groceryList.filter(g => g.id !== action.payload.id) };
-
     default:
-      return state;
+      return state
   }
-}
-
-/* ─── Persistence helpers ─────────────────────────────────────────────────── */
-const STORAGE_KEY = 'aiml_state';
-const SS_KEY      = 'sheStitches';  // legacy key — migrated on first load
-
-function loadLegacyProjects() {
-  try {
-    const raw = localStorage.getItem(SS_KEY);
-    if (!raw) return INITIAL_PROJECTS;
-    const ssData = JSON.parse(raw);
-    const doneMap = {};
-    ssData.tasks?.forEach(t => { doneMap[t.id] = t.done; });
-    const migrated = [{
-      ...INITIAL_PROJECTS[0],
-      startDate: ssData.startDate || INITIAL_PROJECTS[0].startDate,
-      tasks: SS_TASKS.map(t => ({ ...t, done: doneMap[t.id] ?? false })),
-    }];
-    if (migrated.length > 0 && migrated[0].tasks?.length > 0) {
-      localStorage.removeItem(SS_KEY);
-    } else {
-      console.warn('[AppContext] Legacy migration verification failed — sheStitches key preserved');
-    }
-    return migrated;
-  } catch {
-    return INITIAL_PROJECTS;
-  }
-}
-
-function loadState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { ...initialState, projects: loadLegacyProjects() };
-
-    const saved = JSON.parse(raw);
-    const projects = saved.projects ?? loadLegacyProjects();
-
-    // Strip legacy, day-plan, fitness, and inbox fields so they don't re-enter aiml_state
-    const {
-      profile: _p, settings: _s,
-      dayLockedAt: _dl, energyLevel: _el, workoutConfirmed: _wc,
-      confirmedTasks: _ct, confirmedMeals: _cm,
-      tasks: _tasks, meals: _meals, workout: _wo,
-      fitness: _fitness, inboxItems: _ii, focusSessions: _fs,
-      ...restSaved
-    } = saved;
-
-    return {
-      ...initialState,
-      ...restSaved,
-      transactions:     saved.transactions      || [],
-      projects,
-      reflectionLog:    saved.reflectionLog    || [],
-      weeklyPriorities: saved.weeklyPriorities || [],
-      groceryList:      saved.groceryList      || [],
-    };
-  } catch {
-    return initialState;
-  }
-}
-
-function saveState(state) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch { /* quota exceeded */ }
 }
 
 /* ─── Context ─────────────────────────────────────────────────────────────── */
-const AppContext = createContext(null);
+const ProjectsContext = createContext(null)
 
-export function AppProvider({ children }) {
-  const [state, dispatch] = useReducer(reducer, undefined, loadState);
+export function ProjectsProvider({ children }) {
+  const [projectsState, projectsDispatch] = useReducer(projectsReducer, undefined, loadProjectsState)
 
-  useEffect(() => { saveState(state); }, [state]);
-
-  // Computed helpers for She Stitches (projects[0])
-  const ssProject       = useMemo(() => state.projects?.[0] ?? null, [state.projects]);
-  const ssDoneCount     = useMemo(() => ssProject?.tasks.filter(t => t.done).length ?? 0, [ssProject]);
-  const ssTotalCount    = ssProject?.tasks.length ?? 0;
-  const ssListingsCount = useMemo(() => ssProject?.tasks.filter(t => t.done).reduce((n, t) => n + (t.listings || 0), 0) ?? 0, [ssProject]);
-  const ssNextTask      = useMemo(() => ssProject?.tasks.find(t => !t.done)?.text ?? null, [ssProject]);
-  const ssDayOf90       = ssProject
-    ? Math.min(Math.max(1, Math.floor((Date.now() - new Date(ssProject.startDate).getTime()) / 86_400_000) + 1), 90)
-    : 1;
+  useEffect(() => { saveProjectsState(projectsState) }, [projectsState])
 
   return (
-    <AppContext.Provider value={{
-      state, dispatch,
-      ssDoneCount, ssTotalCount, ssListingsCount, ssNextTask, ssDayOf90,
-    }}>
+    <ProjectsContext.Provider value={{ projectsState, projectsDispatch }}>
       {children}
-    </AppContext.Provider>
-  );
+    </ProjectsContext.Provider>
+  )
 }
 
-export function useApp() {
-  const ctx = useContext(AppContext);
-  if (!ctx) throw new Error('useApp must be used inside <AppProvider>');
-  return ctx;
+export function useProjects() {
+  const ctx = useContext(ProjectsContext)
+  if (!ctx) throw new Error('useProjects must be used inside <ProjectsProvider>')
+  return ctx
 }
