@@ -119,13 +119,19 @@ All tokens live in `src/styles/tokens.css` as CSS custom properties. Imported gl
 
 ```
 src/
-  main.jsx                — entry, wraps app in <AppProvider>
+  main.jsx                — entry, provider tree (see below)
   App.jsx                 — screen switcher + fixed bottom nav
   index.css               — single @import of tokens.css
   styles/
     tokens.css            — all design tokens + reset
   context/
-    AppContext.jsx         — global state (useReducer + localStorage)
+    index.js              — barrel re-exports for all contexts
+    AppContext.jsx         — projects, reflectionLog, weeklyPriorities, groceryList, transactions
+    DayContext.jsx         — tasks, meals, workout, energyLevel, dayLockedAt
+    UserContext.jsx        — profile (name)
+    SettingsContext.jsx    — gymAccess, plaidConnected, calendarConnected, theme
+    FitnessContext.jsx     — programStartDate/End, workoutLog, todayComplete, focusSessions
+    InboxContext.jsx       — inboxItems, taskPool, calendarItems, notes
   screens/
     MorningIgnition.jsx   — 3-step ignition flow
     Home.jsx              — main daily screen (clock, training card, timeline, tasks, fuel)
@@ -151,84 +157,46 @@ vite.config.js            — base set to repo name for GitHub Pages
     pages.yml             — deploy on push to main
 ```
 
+**Provider tree** (outermost → innermost):
+```
+SettingsProvider > UserProvider > FitnessProvider > DayProvider > InboxProvider > AppProvider > App
+```
+
+**localStorage keys:**
+| Key | Context | Schema |
+|---|---|---|
+| `aiml_state` | AppContext | raw JSON (legacy format, no version wrapper) |
+| `aiml_day` | DayContext | `{ version: 1, data: {...} }` |
+| `aiml_user` | UserContext | `{ version: 1, data: {...} }` |
+| `aiml_settings` | SettingsContext | `{ version: 1, data: {...} }` |
+| `aiml_fitness` | FitnessContext | `{ version: 1, data: {...} }` |
+| `aiml_inbox` | InboxContext | `{ version: 1, data: {...} }` |
+
+Each new context migrates from `aiml_state` on first launch (one-time, non-destructive — `aiml_state` is preserved for backward compatibility).
+
 **Overlay z-index hierarchy:** EodReflection and WeeklyPlanning render at z-index 200. WorkoutPlayer renders at z-index 150 — below both overlays.
 
 ---
 
-## 4. AppContext State Shape
+## 4. Context State Shapes
 
-Source of truth: `src/context/AppContext.jsx`. Main state persisted to `localStorage` under key `aiml_state`. Resets to `initialState` on new calendar day (checked against `dayLockedAt`). Inbox items, profile, settings, and fitness persist across day resets.
+State is split across six domain contexts. Each has its own localStorage key and schema version.
 
-**She Stitches** is now `projects[0]` in the generic `projects[]` array. The legacy `'sheStitches'` localStorage key is migrated on first load.
+---
+
+### 4.1 AppContext (`aiml_state`)
+
+Persists: projects, reflectionLog, weeklyPriorities, groceryList, transactions. Day-plan fields (tasks, meals, workout, energyLevel, dayLockedAt) have moved to DayContext. Fitness has moved to FitnessContext. Inbox has moved to InboxContext.
+
+**She Stitches** is `projects[0]` in the generic `projects[]` array. The legacy `'sheStitches'` localStorage key is migrated on first load.
 
 ```js
 {
-  // Profile (persists across days)
-  profile: {
-    name: 'Lex',   // shown in Home greeting
-  },
-
-  // App settings (persists across days)
-  settings: {
-    gymAccess:         'bodyweight',  // 'bodyweight' | 'dumbbells' | 'gym'
-    plaidConnected:    false,         // stub — V2
-    calendarConnected: false,         // stub — V2
-  },
-
-  // Fitness training block (persists across days; todayComplete resets)
-  // Phase is DERIVED — call getPhase(programStartDate, programEndDate) from utils/fitness.js.
-  fitness: {
-    weekNumber:       1,    // legacy fallback; use getWeekNumber(programStartDate) in UI
-    programStartDate: null, // ISO date string (YYYY-MM-DD)
-    programEndDate:   null, // ISO date string — race day
-    workoutLog:       [],   // { date, type, title, duration, feel, notes, exercises[] }[]
-    todayComplete:    false,
-  },
-
-  // Morning Ignition
-  energyLevel:      null,       // number 1–4 | null (😴=1 😐=2 🙂=3 ⚡=4) — stored after ignition; use to inform nextAction surfacing (deferred to Step 14)
-  confirmedTasks:   [],         // string[] — task ids confirmed during Brief; populated during ignition, purpose unresolved — candidate for removal in Step 15 architecture refactor
-  confirmedMeals:   [],         // ('breakfast'|'lunch'|'snack'|'dinner')[] — populated during ignition, purpose unresolved — candidate for removal in Step 15 architecture refactor
-  workoutConfirmed: false,      // boolean
-  dayLockedAt:      null,       // ISO 8601 string | null
-
-  // Tasks — the "3 things"
-  tasks: [
-    { id: 't1', text: string, done: boolean, dueTime: 'HH:MM', scheduledTime: 'HH:MM' | null, priority: number },
-    { id: 't2', text: string, done: boolean, dueTime: 'HH:MM', scheduledTime: 'HH:MM' | null, priority: number },
-    { id: 't3', text: string, done: boolean, dueTime: 'HH:MM', scheduledTime: 'HH:MM' | null, priority: number },
-  ],
-
-  // Meals — all times in 'HH:MM' 24h format
-  // lateAfter mirrors endTime; set on CONFIRM_MEAL or UPDATE_MEAL_WINDOW
-  meals: {
-    breakfast: { label: 'Breakfast', startTime: '07:00', endTime: '09:00', lateAfter: '09:00', eaten: boolean },
-    lunch:     { label: 'Lunch',     startTime: '12:00', endTime: '14:00', lateAfter: '14:00', eaten: boolean },
-    snack:     { label: 'Snack',     startTime: '15:00', endTime: '17:00', lateAfter: '17:00', eaten: boolean },
-    dinner:    { label: 'Dinner',    startTime: '19:00', endTime: '21:00', lateAfter: '21:00', eaten: boolean },
-  },
-
-  // Workout (legacy morning ignition card)
-  workout: {
-    type:     string,   // e.g. 'Tempo Run'
-    duration: string,   // e.g. '45 min'
-    pace:     string,   // e.g. '5:20 / km'
-    time:     string,   // e.g. '6:30 PM'
-  },
-
-  // Inbox
-  inboxItems: [
-    { id: string, text: string, createdAt: ISO8601 },
-  ],
-
-  // Finance transactions (persists across day resets)
+  // Finance transactions
   transactions: [
     { id: string, merchant: string, amount: number, category: string, date: 'YYYY-MM-DD' },
     // amount is signed: negative = spend, positive = income
   ],
-
-  // Focus Timer
-  focusSessions: number,   // cumulative completed sessions — incremented in FocusTimer; display deferred to Step 14
 
   // Generic projects array — She Stitches is always projects[0]
   projects: [
@@ -268,6 +236,52 @@ Source of truth: `src/context/AppContext.jsx`. Main state persisted to `localSto
 }
 ```
 
+---
+
+### 4.2 FitnessContext (`aiml_fitness`, schema v1)
+
+```js
+{
+  programStartDate: null,  // ISO date string (YYYY-MM-DD) | null
+  programEndDate:   null,  // ISO date string — race day | null
+  workoutLog: [
+    { date: ISO8601, type: string, title: string, duration: number, feel: number, notes: string, exercises: [] }
+  ],
+  todayComplete:  false,   // true only if workoutLog[last].date === today; resets automatically on new day
+  focusSessions:  0,       // lifetime counter — never resets
+}
+```
+
+`todayComplete` is self-contained: on load, FitnessContext checks `workoutLog[last].date === getTodayISO()` — no cross-context dependency.
+
+Phase is **derived** — call `getPhase(programStartDate, programEndDate)`. Never stored.
+Week number is **derived** — call `getWeekNumber(programStartDate)`. Never stored.
+
+---
+
+### 4.3 InboxContext (`aiml_inbox`, schema v1)
+
+```js
+{
+  inboxItems: [
+    { id: string, text: string, createdAt: ISO8601 },  // prepended on capture
+  ],
+  taskPool: [
+    { id: string, text: string, createdAt: ISO8601, assignedDate: null },  // TRIAGE_TO_TASK destination
+  ],
+  calendarItems: [
+    { id: string, text: string, date: null, time: null, createdAt: ISO8601 },  // TRIAGE_TO_CALENDAR destination (V1 stub)
+  ],
+  notes: [
+    { id: string, text: string, createdAt: ISO8601 },  // TRIAGE_TO_NOTE destination
+  ],
+}
+```
+
+`taskPool`, `calendarItems`, `notes` are V1 placeholders — UI for these destinations is deferred.
+
+---
+
 ### `src/utils/projectUtils.js` — `getProjectPace(project)`
 
 Returns `{ status, projectedFinish, daysOver }`.
@@ -301,44 +315,74 @@ Returns `{ status, projectedFinish, daysOver }`.
 | `ssNextTask` | `string \| null` | Text of first undone task |
 | `ssDayOf90` | `number` | `min(daysSinceStartDate, 90)` |
 
-### Dispatch Actions
+### AppContext dispatch actions (`dispatch`)
 
 | Action type | Payload | Effect |
 |---|---|---|
-| `SET_ENERGY` | `1–4` | Sets `energyLevel` |
-| `CONFIRM_TASK` | task `id` string | Appends to `confirmedTasks` (idempotent) |
-| `CONFIRM_MEAL` | `{ slot, startTime, endTime }` | Appends to `confirmedMeals`; sets `meals[slot].startTime/endTime/lateAfter` (idempotent) |
-| `CONFIRM_WORKOUT` | — | Sets `workoutConfirmed` to `true` |
-| `LOCK_DAY` | — | Sets `dayLockedAt` to current ISO timestamp |
-| `TOGGLE_TASK` | task `id` string | Toggles `tasks[id].done` |
-| `UPDATE_TASK_TIME` | `{ taskId, time: 'HH:MM' }` | Sets `tasks[id].scheduledTime`; task appears in timeline |
-| `MARK_MEAL_EATEN` | slot string | Sets `meals[slot].eaten` to `true`. Used by fuel slot tap (body). Does NOT touch time fields. |
-| `UPDATE_MEAL_WINDOW` | `{ slot, startTime, endTime }` | Updates `meals[slot].startTime/endTime/lateAfter`. Used by fuel slot time editor (◷ icon). Does NOT touch `eaten`. |
-| `ADD_INBOX_ITEM` | text string | Prepends new item to `inboxItems` |
-| `REMOVE_INBOX_ITEM` | item `id` string | Filters item from `inboxItems` |
-| `INCREMENT_FOCUS_SESSIONS` | — | Increments `focusSessions` by 1 |
-| `UPDATE_PROFILE` | `{ name }` | Merges into `profile` |
-| `UPDATE_SETTINGS` | `{ key, value }` | Sets `settings[key] = value` |
-| `LOG_WORKOUT` | `{ date, type, title, duration, feel, notes, exercises[] }` | Appends to `fitness.workoutLog`; sets `fitness.todayComplete = true` |
-| `UPDATE_FITNESS` | `{ key, value }` | Sets `fitness[key] = value` — used for `programStartDate`, `programEndDate` |
-| `ADD_TASK` | `{ text }` | Appends `{ id: Date.now(), text, done: false, scheduledTime: null, priority: tasks.length }` to `tasks` |
-| `REORDER_TASKS` | `{ orderedIds: string[] }` | Updates `tasks[].priority` based on new order |
 | `ADD_TRANSACTION` | `{ merchant, amount, category, date }` | Prepends new transaction to `transactions` (amount is signed) |
 | `DELETE_TRANSACTION` | transaction `id` string | Removes transaction from `transactions` |
-| `RESET_DAY` | — | Resets to `initialState`, preserves `profile`, `settings`, `fitness` (minus `todayComplete`), `inboxItems` |
 | `TOGGLE_PROJECT_TASK` | `{ projectId, taskId }` | Toggles `projects[id].tasks[taskId].done`; sets `lastActivityDate` |
 | `ADD_PROJECT` | `{ project }` | Appends project to `projects[]` |
 | `UPDATE_PROJECT` | `{ projectId, key, value }` | Sets `projects[id][key] = value` |
 | `ADD_REFLECTION` | `{ date, feel, tomorrowTasks[] }` | Appends to `reflectionLog` |
-| `SET_TOMORROW_TASKS` | `{ tasks[] }` | Sets `scheduledFor:'tomorrow'` on matched tasks; adds new ones |
 | `SET_WEEKLY_PRIORITIES` | `{ priorities: string[] }` | Replaces `weeklyPriorities` |
 | `ADD_GROCERY_ITEM` | `{ text }` | Appends `{ id, text, done: false }` to `groceryList` |
 | `TOGGLE_GROCERY_ITEM` | `{ id }` | Toggles `groceryList[id].done` |
 | `DELETE_GROCERY_ITEM` | `{ id }` | Removes item from `groceryList` |
 
-### Context helper functions
+### DayContext dispatch actions (`dayDispatch`)
 
-Exposed alongside `state` and `dispatch` via `useApp()`:
+| Action type | Payload | Effect |
+|---|---|---|
+| `SET_ENERGY` | `1–4` | Sets `energyLevel` |
+| `CONFIRM_TASK` | task `id` string | Appends to `confirmedTasks` (idempotent) |
+| `CONFIRM_MEAL` | `{ slot, startTime, endTime }` | Sets `meals[slot].startTime/endTime/lateAfter` (idempotent) |
+| `CONFIRM_WORKOUT` | `{ type, title, duration, segments, time? }` | Sets `workoutConfirmed: true`, writes `workout` fields |
+| `LOCK_DAY` | — | Sets `dayLockedAt` to current ISO timestamp |
+| `TOGGLE_TASK` | task `id` string | Toggles `tasks[id].done` |
+| `UPDATE_TASK_TIME` | `{ taskId, time: 'HH:MM' }` | Sets `tasks[id].scheduledTime`; task appears in timeline |
+| `MARK_MEAL_EATEN` | slot string | Sets `meals[slot].eaten` to `true`. Does NOT touch time fields. |
+| `UPDATE_MEAL_WINDOW` | `{ slot, startTime, endTime }` | Updates `meals[slot].startTime/endTime/lateAfter`. Does NOT touch `eaten`. |
+| `ADD_TASK` | `{ text }` | Appends new task to `tasks` |
+| `REORDER_TASKS` | `{ orderedIds: string[] }` | Updates `tasks[].priority` based on new order |
+| `RESET_DAY` | — | Resets day-plan state; tasks with `scheduledFor:'tomorrow'` carry forward |
+
+### FitnessContext dispatch actions (`fitnessDispatch`)
+
+| Action type | Payload | Effect |
+|---|---|---|
+| `LOG_WORKOUT` | `{ date, type, title, duration, feel, notes, exercises[] }` | Appends entry to `workoutLog`; sets `todayComplete: true` |
+| `UPDATE_FITNESS` | `{ key, value }` | Sets `fitnessState[key] = value` — used for `programStartDate`, `programEndDate` |
+| `INCREMENT_FOCUS_SESSIONS` | — | Increments `focusSessions` by 1 |
+
+### InboxContext dispatch actions (`inboxDispatch`)
+
+| Action type | Payload | Effect |
+|---|---|---|
+| `ADD_INBOX_ITEM` | `{ text }` | Prepends new item to `inboxItems` |
+| `REMOVE_INBOX_ITEM` | `{ id }` | Removes item from `inboxItems` |
+| `TRIAGE_TO_TASK` | `{ id, text }` | Removes from `inboxItems`; appends to `taskPool` |
+| `TRIAGE_TO_CALENDAR` | `{ id, text, date?, time? }` | Removes from `inboxItems`; appends to `calendarItems` (V1 stub) |
+| `TRIAGE_TO_NOTE` | `{ id, text }` | Removes from `inboxItems`; appends to `notes` |
+| `DELETE_POOL_TASK` | `{ id }` | Removes from `taskPool` |
+| `DELETE_CALENDAR_ITEM` | `{ id }` | Removes from `calendarItems` |
+| `DELETE_NOTE` | `{ id }` | Removes from `notes` |
+
+### UserContext dispatch actions (`userDispatch`)
+
+| Action type | Payload | Effect |
+|---|---|---|
+| `UPDATE_PROFILE` | `{ key, value }` | Sets `userState[key] = value` (e.g. `name`) |
+
+### SettingsContext dispatch actions (`settingsDispatch`)
+
+| Action type | Payload | Effect |
+|---|---|---|
+| `UPDATE_SETTING` | `{ key, value }` | Sets `settingsState[key] = value` |
+
+### DayContext helper functions
+
+Exposed via `useDay()`:
 
 | Function | Signature | Dispatches |
 |---|---|---|

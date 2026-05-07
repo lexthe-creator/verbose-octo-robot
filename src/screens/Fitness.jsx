@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useApp } from '../context/AppContext.jsx'
+import { useFitness } from '../context/index.js'
+import { useSettings } from '../context/SettingsContext.jsx'
 import {
   getPhase, getWeekNumber,
   getTodayType, getWeekDates, getTypeForDay,
@@ -375,9 +376,10 @@ function getWeeksToRace(programEndDate) {
 }
 
 export default function Fitness({ onStartWorkout }) {
-  const { state } = useApp()
-  const { programStartDate, programEndDate, workoutLog, todayComplete } = state.fitness
-  const gymAccess = state.settings.gymAccess
+  const { fitnessState }  = useFitness()
+  const { settingsState } = useSettings()
+  const { programStartDate, programEndDate, workoutLog, todayComplete } = fitnessState
+  const gymAccess = settingsState.gymAccess
 
   const weekNum     = getWeekNumber(programStartDate)
   const weekDates   = getWeekDates()

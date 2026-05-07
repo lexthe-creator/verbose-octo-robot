@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
-import { useApp } from '../context/AppContext.jsx'
+import { useUser } from '../context/UserContext.jsx'
+import { useSettings } from '../context/SettingsContext.jsx'
+import { useFitness } from '../context/index.js'
 import { getPhase, getWeekNumber } from '../utils/fitness.js'
 import { GYM_ACCESS, PHASE_LABELS } from '../constants/fitness.js'
 import { THEMES } from '../constants/theme.js'
@@ -13,22 +15,24 @@ const EQUIPMENT_OPTIONS = [
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
 export default function Settings({ onBack }) {
-  const { state, dispatch } = useApp()
-  const [nameDraft, setNameDraft] = useState(state.profile.name)
+  const { userState, userDispatch }         = useUser()
+  const { settingsState, settingsDispatch } = useSettings()
+  const { fitnessState, fitnessDispatch }   = useFitness()
+  const [nameDraft, setNameDraft] = useState(userState.name)
   const [sheetKind, setSheetKind] = useState(null)  // 'plaid' | 'calendar' | null
 
   function handleNameBlur() {
     const clean = nameDraft.trim()
-    if (!clean) { setNameDraft(state.profile.name); return }
-    if (clean === state.profile.name) return
-    dispatch({ type: 'UPDATE_PROFILE', payload: { name: clean } })
+    if (!clean) { setNameDraft(userState.name); return }
+    if (clean === userState.name) return
+    userDispatch({ type: 'UPDATE_PROFILE', payload: { key: 'name', value: clean } })
   }
 
   function handleEquipment(value) {
-    dispatch({ type: 'UPDATE_SETTINGS', payload: { key: 'gymAccess', value } })
+    settingsDispatch({ type: 'UPDATE_SETTING', payload: { key: 'gymAccess', value } })
   }
 
-  const { programStartDate, programEndDate } = state.fitness
+  const { programStartDate, programEndDate } = fitnessState
   const phaseKey = getPhase(programStartDate, programEndDate)
   const weekNum  = getWeekNumber(programStartDate)
 
@@ -62,7 +66,7 @@ export default function Settings({ onBack }) {
           <label style={s.fieldLabel}>Equipment</label>
           <div style={s.pillRow}>
             {EQUIPMENT_OPTIONS.map(opt => {
-              const active = state.settings.gymAccess === opt.value
+              const active = settingsState.gymAccess === opt.value
               return (
                 <button
                   key={opt.value}
@@ -95,7 +99,7 @@ export default function Settings({ onBack }) {
             type="date"
             style={s.input}
             value={programStartDate || ''}
-            onChange={e => dispatch({
+            onChange={e => fitnessDispatch({
               type:    'UPDATE_FITNESS',
               payload: { key: 'programStartDate', value: e.target.value || null },
             })}
@@ -107,7 +111,7 @@ export default function Settings({ onBack }) {
             type="date"
             style={s.input}
             value={programEndDate || ''}
-            onChange={e => dispatch({
+            onChange={e => fitnessDispatch({
               type:    'UPDATE_FITNESS',
               payload: { key: 'programEndDate', value: e.target.value || null },
             })}
@@ -124,14 +128,14 @@ export default function Settings({ onBack }) {
         <ConnectionRow
           title="Plaid"
           subtitle="Bank & spending"
-          connected={state.settings.plaidConnected}
+          connected={settingsState.plaidConnected}
           onConnect={() => setSheetKind('plaid')}
         />
         <div style={s.divider} />
         <ConnectionRow
           title="Google Calendar"
           subtitle="Sync events"
-          connected={state.settings.calendarConnected}
+          connected={settingsState.calendarConnected}
           onConnect={() => setSheetKind('calendar')}
         />
       </section>
@@ -162,7 +166,7 @@ export default function Settings({ onBack }) {
           <label style={s.fieldLabel}>Theme</label>
           <div style={{ ...s.pillRow, gridTemplateColumns: 'repeat(2, 1fr)' }}>
             {[THEMES.DARK, THEMES.LIGHT].map(theme => {
-              const active = (state.settings.theme || THEMES.DARK) === theme
+              const active = (settingsState.theme || THEMES.DARK) === theme
               return (
                 <button
                   key={theme}
@@ -173,7 +177,7 @@ export default function Settings({ onBack }) {
                     color:      active ? 'var(--color-accent)'              : 'var(--color-faint)',
                     fontWeight: active ? 600                                 : 500,
                   }}
-                  onClick={() => dispatch({ type: 'UPDATE_SETTINGS', payload: { key: 'theme', value: theme } })}
+                  onClick={() => settingsDispatch({ type: 'UPDATE_SETTING', payload: { key: 'theme', value: theme } })}
                 >
                   {theme === 'dark' ? '◑ Dark' : '◐ Light'}
                 </button>

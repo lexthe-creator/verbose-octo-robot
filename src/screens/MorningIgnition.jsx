@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
-import { useApp } from '../context/AppContext.jsx'
+import { useSettings } from '../context/SettingsContext.jsx'
+import { useDay, useFitness } from '../context/index.js'
 import FuelEditSheet from '../components/FuelEditSheet.jsx'
 import { generateWorkout, getTodayType, getWeekNumber } from '../utils/fitness.js'
 import { formatMealTime } from '../utils/time.js'
@@ -446,11 +447,13 @@ function SortableTaskRow({ task, confirmed, onConfirm, onSkip }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function MorningIgnition({ onComplete }) {
-  const { state, dispatch } = useApp()
+  const { settingsState }         = useSettings()
+  const { dayState, dayDispatch } = useDay()
+  const { fitnessState }          = useFitness()
   const [step, setStep] = useState('energy')
 
   // Local brief state
-  const [localEnergy,  setLocalEnergy]  = useState(state.energyLevel)
+  const [localEnergy,  setLocalEnergy]  = useState(dayState.energyLevel)
   const [localTasks,   setLocalTasks]   = useState([])  // confirmed task ids
   const [localMeals,   setLocalMeals]   = useState(MEAL_SLOTS.map(s => s.id))
   const [localWorkout, setLocalWorkout] = useState(true)
@@ -461,7 +464,7 @@ export default function MorningIgnition({ onComplete }) {
 
   // Task management in brief
   const [briefTasks, setBriefTasks]       = useState(
-    () => state.tasks.map(t => ({ ...t, _new: false }))
+    () => dayState.tasks.map(t => ({ ...t, _new: false }))
   )
   const [exitingTaskId, setExitingTaskId] = useState(null)
   const [draftTasks,    setDraftTasks]    = useState([])  // pending inline inputs
@@ -469,7 +472,7 @@ export default function MorningIgnition({ onComplete }) {
   // Meal window editing
   const [mealWindows, setMealWindows] = useState(() => {
     const w = {}
-    Object.entries(state.meals).forEach(([slot, meal]) => {
+    Object.entries(dayState.meals).forEach(([slot, meal]) => {
       w[slot] = { startTime: meal.startTime, endTime: meal.endTime }
     })
     return w
@@ -562,25 +565,25 @@ export default function MorningIgnition({ onComplete }) {
   }
 
   function handleLockDay() {
-    dispatch({ type: 'SET_ENERGY', payload: localEnergy })
+    dayDispatch({ type: 'SET_ENERGY', payload: localEnergy })
 
     // Tasks — only if section not skipped
     if (!skippedSections.has('tasks')) {
       activeTasks
         .filter(t => !t._new && localTasks.includes(t.id))
-        .forEach(t => dispatch({ type: 'CONFIRM_TASK', payload: t.id }))
+        .forEach(t => dayDispatch({ type: 'CONFIRM_TASK', payload: t.id }))
 
       activeTasks
         .filter(t => t._new && localTasks.includes(t.id))
-        .forEach(t => dispatch({ type: 'ADD_TASK', payload: { text: t.text } }))
+        .forEach(t => dayDispatch({ type: 'ADD_TASK', payload: { text: t.text } }))
 
       const orderedIds = activeTasks.filter(t => !t._new).map(t => t.id)
-      dispatch({ type: 'REORDER_TASKS', payload: { orderedIds } })
+      dayDispatch({ type: 'REORDER_TASKS', payload: { orderedIds } })
     }
 
     // Meals — only if section not skipped
     if (!skippedSections.has('meals')) {
-      localMeals.forEach(slot => dispatch({
+      localMeals.forEach(slot => dayDispatch({
         type: 'CONFIRM_MEAL',
         payload: { slot, ...mealWindows[slot] },
       }))
@@ -589,9 +592,9 @@ export default function MorningIgnition({ onComplete }) {
     // Workout — generate today's workout and write to state on confirm
     if (!skippedSections.has('training') && localWorkout) {
       const todayType        = getTodayType()
-      const weekNum          = getWeekNumber(state.fitness.programStartDate)
-      const generatedWorkout = generateWorkout(todayType, state.settings.gymAccess, weekNum)
-      dispatch({
+      const weekNum          = getWeekNumber(fitnessState.programStartDate)
+      const generatedWorkout = generateWorkout(todayType, settingsState.gymAccess, weekNum)
+      dayDispatch({
         type:    'CONFIRM_WORKOUT',
         payload: {
           type:     generatedWorkout.type,
@@ -602,7 +605,7 @@ export default function MorningIgnition({ onComplete }) {
       })
     }
 
-    dispatch({ type: 'LOCK_DAY' })
+    dayDispatch({ type: 'LOCK_DAY' })
     setStep('locked')
   }
 
@@ -713,8 +716,8 @@ export default function MorningIgnition({ onComplete }) {
             <button style={s.skipLink} onClick={() => skipSection('training')}>Skip</button>
           </div>
           <SwipeRow
-            label={state.workout.type}
-            sublabel={`${state.workout.duration} · ${state.workout.pace} · ${state.workout.time}`}
+            label={dayState.workout.type}
+            sublabel={`${dayState.workout.duration} · ${dayState.workout.pace} · ${dayState.workout.time}`}
             confirmed={localWorkout}
             onConfirm={() => setLocalWorkout(true)}
           />
@@ -734,7 +737,7 @@ export default function MorningIgnition({ onComplete }) {
             </p>
           </div>
           <div style={s.mealGrid}>
-            {Object.entries(state.meals).map(([slot, meal]) => (
+            {Object.entries(dayState.meals).map(([slot, meal]) => (
               <MealSlot
                 key={slot}
                 label={meal.label}
@@ -767,9 +770,9 @@ export default function MorningIgnition({ onComplete }) {
         {editingMealSlot && (
           <FuelEditSheet
             meal={{
-              label:     state.meals[editingMealSlot].label,
-              startTime: mealWindows[editingMealSlot]?.startTime ?? state.meals[editingMealSlot].startTime,
-              endTime:   mealWindows[editingMealSlot]?.endTime   ?? state.meals[editingMealSlot].endTime,
+              label:     dayState.meals[editingMealSlot].label,
+              startTime: mealWindows[editingMealSlot]?.startTime ?? dayState.meals[editingMealSlot].startTime,
+              endTime:   mealWindows[editingMealSlot]?.endTime   ?? dayState.meals[editingMealSlot].endTime,
             }}
             onClose={() => setEditingMealSlot(null)}
             onSave={(start, end) => {
@@ -790,10 +793,10 @@ export default function MorningIgnition({ onComplete }) {
   const lockedItems = [
     ...confirmedTaskTexts,
     ...(!skippedSections.has('training') && localWorkout
-      ? [`${state.workout.type} — ${state.workout.duration}`]
+      ? [`${dayState.workout.type} — ${dayState.workout.duration}`]
       : []),
     ...(!skippedSections.has('meals')
-      ? localMeals.map(slot => state.meals[slot]?.label ?? slot)
+      ? localMeals.map(slot => dayState.meals[slot]?.label ?? slot)
       : []),
   ]
 

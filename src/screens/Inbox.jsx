@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { useApp } from '../context/AppContext.jsx'
+import { useInbox } from '../context/index.js'
 
 function formatTimestamp(iso) {
   const diff = Date.now() - new Date(iso).getTime()
@@ -17,7 +17,7 @@ function InboxItem({ item, exiting, flashing, onAction }) {
   if (flashing) {
     return (
       <div style={s.flashWrap}>
-        <span style={s.flashText}>Added to tasks ✓</span>
+        <span style={s.flashText}>Added to task queue ✓</span>
       </div>
     )
   }
@@ -37,15 +37,18 @@ function InboxItem({ item, exiting, flashing, onAction }) {
         <span style={s.timestamp}>{formatTimestamp(item.createdAt)}</span>
       </div>
       <div style={s.actions}>
-        <button style={s.actionBtn} onClick={() => onAction(item.id, 'task')}>
-          Task
+        <button style={s.actionBtn} onClick={() => onAction(item.id, item.text, 'task')}>
+          → Task
         </button>
-        <button style={s.actionBtn} onClick={() => onAction(item.id, 'calendar')}>
-          Calendar
+        <button style={s.actionBtn} onClick={() => onAction(item.id, item.text, 'note')}>
+          → Note
+        </button>
+        <button style={s.actionBtn} onClick={() => onAction(item.id, item.text, 'calendar')}>
+          → Calendar
         </button>
         <button
           style={{ ...s.actionBtn, color: 'var(--color-danger)' }}
-          onClick={() => onAction(item.id, 'delete')}
+          onClick={() => onAction(item.id, item.text, 'delete')}
         >
           Delete
         </button>
@@ -57,7 +60,7 @@ function InboxItem({ item, exiting, flashing, onAction }) {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function Inbox() {
-  const { state, dispatch } = useApp()
+  const { inboxState, inboxDispatch } = useInbox()
   const [inputText, setInputText] = useState('')
   const [exitingId, setExitingId] = useState(null)
   const [flashingId, setFlashingId] = useState(null)
@@ -66,7 +69,7 @@ export default function Inbox() {
   function handleSubmit() {
     const text = inputText.trim()
     if (!text) return
-    dispatch({ type: 'ADD_INBOX_ITEM', payload: text })
+    inboxDispatch({ type: 'ADD_INBOX_ITEM', payload: { text } })
     setInputText('')
     inputRef.current?.focus()
   }
@@ -75,33 +78,49 @@ export default function Inbox() {
     if (e.key === 'Enter') handleSubmit()
   }
 
-  function handleAction(itemId, action) {
+  function animateExit(itemId, afterMs, then) {
+    setExitingId(itemId)
+    setTimeout(() => {
+      then()
+      setExitingId(null)
+    }, afterMs)
+  }
+
+  function handleAction(itemId, itemText, action) {
     if (exitingId || flashingId) return
 
     if (action === 'task') {
-      const item = state.inboxItems.find(i => i.id === itemId)
-      if (!item) return
-      dispatch({ type: 'ADD_TASK', payload: { text: item.text } })
       setFlashingId(itemId)
       setTimeout(() => {
         setFlashingId(null)
-        setExitingId(itemId)
-        setTimeout(() => {
-          dispatch({ type: 'REMOVE_INBOX_ITEM', payload: itemId })
-          setExitingId(null)
-        }, 200)
+        animateExit(itemId, 200, () =>
+          inboxDispatch({ type: 'TRIAGE_TO_TASK', payload: { id: itemId, text: itemText } })
+        )
       }, 600)
       return
     }
 
-    setExitingId(itemId)
-    setTimeout(() => {
-      dispatch({ type: 'REMOVE_INBOX_ITEM', payload: itemId })
-      setExitingId(null)
-    }, 200)
+    if (action === 'note') {
+      animateExit(itemId, 200, () =>
+        inboxDispatch({ type: 'TRIAGE_TO_NOTE', payload: { id: itemId, text: itemText } })
+      )
+      return
+    }
+
+    if (action === 'calendar') {
+      animateExit(itemId, 200, () =>
+        inboxDispatch({ type: 'TRIAGE_TO_CALENDAR', payload: { id: itemId, text: itemText } })
+      )
+      return
+    }
+
+    // delete
+    animateExit(itemId, 200, () =>
+      inboxDispatch({ type: 'REMOVE_INBOX_ITEM', payload: { id: itemId } })
+    )
   }
 
-  const isEmpty = state.inboxItems.length === 0
+  const isEmpty = inboxState.inboxItems.length === 0
 
   return (
     <div style={s.screen}>
@@ -111,8 +130,8 @@ export default function Inbox() {
       <div style={s.header}>
         <div style={s.headerRow}>
           <h1 style={s.title}>Inbox</h1>
-          {state.inboxItems.length > 0 && (
-            <span style={s.badge}>{state.inboxItems.length}</span>
+          {inboxState.inboxItems.length > 0 && (
+            <span style={s.badge}>{inboxState.inboxItems.length}</span>
           )}
         </div>
         <p style={s.subtitle}>Capture anything. Sort later.</p>
@@ -151,7 +170,7 @@ export default function Inbox() {
         </div>
       ) : (
         <div style={s.list}>
-          {state.inboxItems.map(item => (
+          {inboxState.inboxItems.map(item => (
             <InboxItem
               key={item.id}
               item={item}

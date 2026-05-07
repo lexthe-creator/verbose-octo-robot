@@ -92,23 +92,30 @@ GitHub Pages via `.github/workflows/pages.yml` — triggers on push to `main`. V
 
 **Single-page PWA.** No router — `App.jsx` manages a `screen` string with `useState`. Screens are rendered conditionally. Two full-screen overlays (`EodReflection`, `WeeklyPlanning`) layer above the screen stack; `WorkoutPlayer` layers above those.
 
-**State** lives entirely in `src/context/AppContext.jsx` via `useReducer`. All components call `useApp()` to access `{ state, dispatch, updateTaskTime, updateMealWindow, ssDoneCount, ssTotalCount, ssListingsCount, ssNextTask, ssDayOf90 }`. State is persisted to `localStorage` under key `aiml_state` and rehydrated on load with a day-reset check (`dayLockedAt`). There is no server, no external API, no build-time env vars.
+**State** is split across 8 domain contexts, each with its own versioned localStorage key. There is no server, no external API, no build-time env vars.
 
 **Screen values:** `'ignition'` · `'home'` · `'fitness'` · `'focus'` · `'inbox'` · `'finance'` · `'projects'` · `'settings'`
 
 Nav is hidden for: `ignition`, `focus`, `projects`, `settings`. The bottom nav is fixed, 72px, rendered in `App.jsx`.
 
-**State shape highlights:**
-- `state.tasks[]` — the "3 things"; each `{ id, text, done, dueTime, scheduledTime, scheduledFor? }`
-- `state.projects[]` — generic project array; `projects[0]` is always She Stitches. Each project has `{ id, name, emoji, startDate, endDate, bufferDays, tasks[], lastActivityDate, status? }`
-- `state.meals` — keyed object (`breakfast`, `lunch`, `snack`, `dinner`); `lateAfter` mirrors `endTime`
-- `state.fitness` — `programStartDate/End` are ISO strings (null until set); phase is **derived** via `getPhase()`, never stored
-- `state.reflectionLog[]` and `state.weeklyPriorities[]` persist across day resets
-- Tasks with `scheduledFor: 'tomorrow'` carry forward on day reset (others reset to `initialState.tasks`)
+**Context map (localStorage key → hook → shape):**
+- `aiml_user` → `useUser()` → `{ name }`
+- `aiml_settings` → `useSettings()` → `{ gymAccess, theme, plaidConnected, calendarConnected }`
+- `aiml_day` → `useDay()` → `{ tasks[], meals, workout, workoutConfirmed, dayLockedAt, energyLevel }`
+- `aiml_fitness` → `useFitness()` → `{ programStartDate, programEndDate, todayComplete, workoutLog[], focusSessions }`
+- `aiml_inbox` → `useInbox()` → `{ inboxItems[] }`
+- `aiml_projects` → `useProjects()` → `{ projects[] }` — selectors: `getFocusProject`, `getProjectStats`
+- `aiml_finance` → `useFinance()` → `{ transactions[] }` — selectors: `getTodaySpend`, `getWeeklySpend`, `getWeekTotal`, `getFourWeekAvg`, `getOddTransaction`, `getTodayTransactions`
+- `aiml_planning` → `usePlanning()` → `{ reflectionLog[], weeklyPriorities[], groceryList[] }`
 
-**Day reset logic** (`loadState` + `RESET_DAY`): if `dayLockedAt` is from a prior calendar day, state resets to `initialState` but preserves `profile`, `settings`, `fitness` (minus `todayComplete`), `inboxItems`, `transactions`, `projects`, `reflectionLog`, `weeklyPriorities`, `groceryList`, and any `scheduledFor: 'tomorrow'` tasks.
+**Day context highlights:**
+- `dayState.tasks[]` — the "3 things"; each `{ id, text, done, dueTime, scheduledTime, scheduledFor? }`
+- `dayState.meals` — keyed object (`breakfast`, `lunch`, `snack`, `dinner`); `lateAfter` mirrors `endTime`
+- Tasks with `scheduledFor: 'tomorrow'` carry forward on day reset (others reset to initial tasks)
 
-**Legacy migration:** The old `'sheStitches'` localStorage key is migrated into `projects[0]` on first load via `loadLegacyProjects()`. Do not write to `'sheStitches'` key.
+**Day reset logic** (`loadDayState`): if `dayLockedAt` is from a prior calendar day, day state resets to initial values but `scheduledFor: 'tomorrow'` tasks carry forward. All other context state (projects, finance, planning, fitness, inbox) survives day resets independently.
+
+**Legacy migration:** The old `'sheStitches'` localStorage key is migrated into `projects[0]` on first load via `loadLegacyProjects()` in `ProjectsContext`. The old `'aiml_state'` key is read once for one-time migration into the new domain keys and never written to. Do not write to either legacy key.
 
 ## Design system
 
@@ -125,6 +132,10 @@ Fonts: DM Sans (body) and DM Serif Display (headings/numbers) loaded from Google
 ## Project pace (`src/utils/projectUtils.js`)
 
 `getProjectPace(project)` → `{ status: 'on_track' | 'buffer' | 'behind', projectedFinish, daysOver }`. Used in `Home.jsx` to drive the `SsGoalCard` border/badge colour.
+
+## Known issues (do not fix without a dedicated step)
+
+- **`WeeklyPlanning` `ssThisWeek`** — counts all-time done tasks on the focus project, not tasks completed this calendar week. Flagged in the refactor; fix requires scoping by `lastActivityDate` or a per-task completion timestamp that doesn't exist yet.
 
 ## SPEC.md
 
