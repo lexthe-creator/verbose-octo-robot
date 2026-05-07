@@ -268,7 +268,7 @@ function NoteRow({ note, onPin, onDelete }) {
         onMouseLeave={cancelLongPress}
       >
         <div style={s.noteLeft}>
-          {note.pinned && <span style={s.pinIndicator}>📌</span>}
+          {note.pinned && <span style={s.pinIndicator}>●</span>}
           <span style={s.triageRowText}>{note.text}</span>
         </div>
         <span style={s.noteTimestamp}>{formatTimestamp(note.createdAt)}</span>
@@ -896,9 +896,10 @@ const s = {
     flex:       1,
   },
   pinIndicator: {
-    fontSize:   '13px',
+    fontSize:   '9px',
+    color:      'var(--color-accent)',
     flexShrink: 0,
-    lineHeight: 1.4,
+    lineHeight: 1.8,
   },
   noteTimestamp: {
     fontSize:   '11px',
