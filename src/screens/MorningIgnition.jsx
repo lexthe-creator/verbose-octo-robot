@@ -1,9 +1,9 @@
 import { useState, useRef } from 'react'
 import { useSettings } from '../context/SettingsContext.jsx'
-import { useDay, useFitness } from '../context/index.js'
+import { useDay, useFitness, useInbox } from '../context/index.js'
 import FuelEditSheet from '../components/FuelEditSheet.jsx'
 import { generateWorkout, getTodayType, getWeekNumber } from '../utils/fitness.js'
-import { formatMealTime } from '../utils/time.js'
+import { formatMealTime, getTodayISO } from '../utils/time.js'
 import { MEAL_SLOTS } from '../constants/meals.js'
 import {
   DndContext, PointerSensor, TouchSensor,
@@ -447,9 +447,12 @@ function SortableTaskRow({ task, confirmed, onConfirm, onSkip }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function MorningIgnition({ onComplete }) {
-  const { settingsState }         = useSettings()
-  const { dayState, dayDispatch } = useDay()
-  const { fitnessState }          = useFitness()
+  const { settingsState }           = useSettings()
+  const { dayState, dayDispatch }   = useDay()
+  const { fitnessState }            = useFitness()
+  // 4th context hook — each domain is distinct: settings (gym), day (tasks/meals/workout),
+  // fitness (week number), inbox (task pool for "From your queue" section). No way to avoid.
+  const { inboxState, inboxDispatch } = useInbox()
   const [step, setStep] = useState('energy')
 
   // Local brief state
@@ -479,6 +482,10 @@ export default function MorningIgnition({ onComplete }) {
   })
   const [editingMealSlot, setEditingMealSlot] = useState(null)
 
+  // Queue tasks from inbox — unassigned items offered for today
+  const [confirmedQueueIds, setConfirmedQueueIds] = useState([])  // ids confirmed for today
+  const [skippedQueueIds,   setSkippedQueueIds]   = useState([])  // ids dismissed for today (kept in pool)
+
   // Drag-to-reorder
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -496,12 +503,27 @@ export default function MorningIgnition({ onComplete }) {
   }
 
   // Dynamic totals — progress tracks tasks only; meals + workout are optional
-  const activeTasks        = briefTasks.filter(t => t.id !== exitingTaskId)
-  const tasksSkipped       = skippedSections.has('tasks')
-  const taskTotal          = tasksSkipped ? 0 : activeTasks.length
-  const taskDone           = tasksSkipped ? 0 : localTasks.filter(id => activeTasks.some(t => t.id === id)).length
-  const progress           = taskTotal > 0 ? taskDone / taskTotal : (tasksSkipped ? 1 : 0)
-  const allConfirmed       = (tasksSkipped || taskDone >= taskTotal) && draftTasks.length === 0
+  const activeTasks      = briefTasks.filter(t => t.id !== exitingTaskId)
+  const tasksSkipped     = skippedSections.has('tasks')
+  const mainTaskTotal    = tasksSkipped ? 0 : activeTasks.length
+  const mainTaskDone     = tasksSkipped ? 0 : localTasks.filter(id => activeTasks.some(t => t.id === id)).length
+
+  // Queue tasks: unassigned and not dismissed for today
+  const MAX_TASKS         = 3
+  const visibleQueueTasks = inboxState.taskPool.filter(
+    t => t.assignedDate === null && !skippedQueueIds.includes(t.id)
+  )
+  const totalConfirmed    = mainTaskDone + confirmedQueueIds.length
+  const totalAvailable    = Math.min(mainTaskTotal + visibleQueueTasks.length, MAX_TASKS)
+  const isTasksFull       = totalConfirmed >= MAX_TASKS
+
+  // Progress bar: includes queue tasks in total confirmable count
+  const taskTotal  = totalAvailable
+  const taskDone   = Math.min(totalConfirmed, MAX_TASKS)
+  const progress   = taskTotal > 0 ? taskDone / taskTotal : (tasksSkipped ? 1 : 0)
+
+  // Lock button: main tasks must be handled; queue is optional
+  const allConfirmed = (tasksSkipped || mainTaskDone >= mainTaskTotal) && draftTasks.length === 0
 
   const today     = new Date()
   const dayLabel  = today.toLocaleDateString('en-US', { weekday: 'long' })
@@ -604,6 +626,15 @@ export default function MorningIgnition({ onComplete }) {
         },
       })
     }
+
+    // Queue tasks confirmed for today
+    const today = getTodayISO()
+    confirmedQueueIds.forEach(qid => {
+      const task = inboxState.taskPool.find(t => t.id === qid)
+      if (!task) return
+      dayDispatch({ type: 'ADD_TASK', payload: { text: task.text } })
+      inboxDispatch({ type: 'UPDATE_POOL_TASK', payload: { id: qid, key: 'assignedDate', value: today } })
+    })
 
     dayDispatch({ type: 'LOCK_DAY' })
     setStep('locked')
@@ -708,6 +739,43 @@ export default function MorningIgnition({ onComplete }) {
         </section>
         )}
 
+        {/* From your queue */}
+        {visibleQueueTasks.length > 0 && (
+        <section style={s.section}>
+          <p style={s.sectionLabel}>From your queue</p>
+          <div style={s.stack}>
+            {visibleQueueTasks.map(task => {
+              const isConfirmed = confirmedQueueIds.includes(task.id)
+              const isLocked    = !isConfirmed && isTasksFull
+              return (
+                <div key={task.id} style={{ display: 'flex', alignItems: 'stretch' }}>
+                  <div style={{ width: '20px', flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {isLocked ? (
+                      <div style={s.queueLockedRow}>
+                        <span style={s.queueLockedText}>{task.text}</span>
+                        <span style={s.queueLockedLabel}>Full — edit above</span>
+                      </div>
+                    ) : (
+                      <SwipeRow
+                        label={task.text}
+                        confirmed={isConfirmed}
+                        onConfirm={() => {
+                          if (isConfirmed || isTasksFull) return
+                          setConfirmedQueueIds(prev => [...prev, task.id])
+                        }}
+                        onSkip={!isConfirmed ? () =>
+                          setSkippedQueueIds(prev => [...prev, task.id]) : undefined}
+                      />
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+        )}
+
         {/* Training */}
         {!skippedSections.has('training') && (
         <section style={{ ...s.section, opacity: fadingSections.has('training') ? 0 : 1, transition: 'opacity 0.25s ease' }}>
@@ -790,8 +858,13 @@ export default function MorningIgnition({ onComplete }) {
     ? []
     : activeTasks.filter(t => localTasks.includes(t.id)).map(t => t.text)
 
+  const confirmedQueueTexts = inboxState.taskPool
+    .filter(t => confirmedQueueIds.includes(t.id))
+    .map(t => t.text)
+
   const lockedItems = [
     ...confirmedTaskTexts,
+    ...confirmedQueueTexts,
     ...(!skippedSections.has('training') && localWorkout
       ? [`${dayState.workout.type} — ${dayState.workout.duration}`]
       : []),
@@ -1037,6 +1110,27 @@ const s = {
     color:         'var(--color-success)',
     fontSize:      '13px',
     fontWeight:    500,
+  },
+
+  // Queue task locked state
+  queueLockedRow: {
+    display:      'flex',
+    alignItems:   'center',
+    justifyContent: 'space-between',
+    padding:      '14px 16px',
+    background:   'var(--color-card)',
+    borderRadius: 'var(--radius-sm)',
+    border:       'var(--border)',
+    opacity:      0.5,
+  },
+  queueLockedText: {
+    fontSize: '15px',
+    color:    'var(--color-text)',
+  },
+  queueLockedLabel: {
+    fontSize:   '11px',
+    color:      'var(--color-muted)',
+    fontStyle:  'italic',
   },
 
   // Shared CTA button
