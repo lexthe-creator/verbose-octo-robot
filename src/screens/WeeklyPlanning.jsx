@@ -170,6 +170,7 @@ export default function WeeklyPlanning({ onComplete }) {
   const tasksDoneCount = dayState.tasks.filter(t => t.done).length
 
   const ssProject   = projectsState.projects[0] ?? null
+  // BUG: counts all-time done tasks not this-week — fix in dedicated step after refactor complete
   const ssThisWeek  = ssProject?.tasks.filter(t => t.done).length ?? 0
 
   const nextWeekDates = getNextWeekDates()
