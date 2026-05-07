@@ -1,10 +1,9 @@
 import { createContext, useContext, useReducer, useEffect } from 'react'
 
 const INBOX_STORAGE_KEY = 'aiml_inbox'
-const SCHEMA_VERSION    = 1
+const SCHEMA_VERSION    = 2
 
 /* ─── Initial state ───────────────────────────────────────────────────────── */
-// taskPool, calendarItems, notes are V1 placeholders — triage UI built later.
 const initialInboxState = {
   inboxItems:    [],
   taskPool:      [],
@@ -13,7 +12,7 @@ const initialInboxState = {
 }
 
 /* ─── Migration ───────────────────────────────────────────────────────────── */
-function migrateInboxFromLegacy(legacyRaw) {
+function migrateFromLegacy(legacyRaw) {
   try {
     const parsed = JSON.parse(legacyRaw)
     return {
@@ -22,6 +21,26 @@ function migrateInboxFromLegacy(legacyRaw) {
     }
   } catch {
     return initialInboxState
+  }
+}
+
+// v1 → v2: backfill missing fields on existing items
+function migrateV1toV2(v1Data) {
+  return {
+    ...initialInboxState,
+    ...v1Data,
+    taskPool: (v1Data.taskPool ?? []).map(t => ({
+      priority: null,
+      ...t,
+    })),
+    calendarItems: (v1Data.calendarItems ?? []).map(c => ({
+      confirmed: false,
+      ...c,
+    })),
+    notes: (v1Data.notes ?? []).map(n => ({
+      pinned: false,
+      ...n,
+    })),
   }
 }
 
@@ -34,12 +53,15 @@ function loadInboxState() {
       if (stored.version === SCHEMA_VERSION) {
         return { ...initialInboxState, ...stored.data }
       }
+      if (stored.version === 1) {
+        return migrateV1toV2(stored.data)
+      }
       return initialInboxState
     }
 
     // One-time migration from legacy aiml_state — do not delete aiml_state
     const legacyRaw = localStorage.getItem('aiml_state')
-    if (legacyRaw) return migrateInboxFromLegacy(legacyRaw)
+    if (legacyRaw) return migrateFromLegacy(legacyRaw)
 
     return initialInboxState
   } catch {
@@ -79,6 +101,7 @@ export function inboxReducer(state, action) {
         text,
         createdAt:    new Date().toISOString(),
         assignedDate: null,
+        priority:     null,
       }
       return {
         ...state,
@@ -94,6 +117,7 @@ export function inboxReducer(state, action) {
         text,
         date:      date ?? null,
         time:      time ?? null,
+        confirmed: false,
         createdAt: new Date().toISOString(),
       }
       return {
@@ -109,11 +133,39 @@ export function inboxReducer(state, action) {
         id:        `note_${Date.now()}`,
         text,
         createdAt: new Date().toISOString(),
+        pinned:    false,
       }
       return {
         ...state,
         inboxItems: state.inboxItems.filter(i => i.id !== id),
         notes:      [...state.notes, note],
+      }
+    }
+
+    case 'UPDATE_POOL_TASK': {
+      const { id, key, value } = action.payload
+      return {
+        ...state,
+        taskPool: state.taskPool.map(t => t.id === id ? { ...t, [key]: value } : t),
+      }
+    }
+
+    case 'UPDATE_CALENDAR_ITEM': {
+      const { id, date, time } = action.payload
+      return {
+        ...state,
+        calendarItems: state.calendarItems.map(c =>
+          c.id === id ? { ...c, date, time, confirmed: true } : c
+        ),
+      }
+    }
+
+    case 'PIN_NOTE': {
+      return {
+        ...state,
+        notes: state.notes.map(n =>
+          n.id === action.payload.id ? { ...n, pinned: !n.pinned } : n
+        ),
       }
     }
 
