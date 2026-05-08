@@ -137,6 +137,11 @@ Fonts: DM Sans (body) and DM Serif Display (headings/numbers) loaded from Google
 
 - **`WeeklyPlanning` `ssThisWeek`** — counts all-time done tasks on the focus project, not tasks completed this calendar week. Flagged in the refactor; fix requires scoping by `lastActivityDate` or a per-task completion timestamp that doesn't exist yet.
 
+- **Pre-existing lint errors (not introduced in step 14b-i):**
+  - `WorkoutPlayer.jsx` lines 22, 28, 67, 138, 251 — `Date.now` called inside `useRef`/`useState`, `setState` called synchronously inside effects, `ref.current` accessed during render.
+  - `FitnessContext.jsx` — `react-refresh/only-export-components` warnings on `fitnessReducer` and `useFitness` exports.
+  - Fix in a dedicated cleanup step before App Store submission.
+
 ## SPEC.md
 
 `SPEC.md` is the living specification — update it at the end of every build step. It is the source of truth for intended behaviour. When in doubt, read SPEC before code.
