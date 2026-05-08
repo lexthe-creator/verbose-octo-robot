@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useUser } from '../context/UserContext.jsx'
 import { useSettings } from '../context/SettingsContext.jsx'
 import { useDay, useFitness, useProjects, getFocusProject, getProjectStats } from '../context/index.js'
@@ -659,6 +659,12 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
   const { settingsState }                              = useSettings()
   const { dayState, dayDispatch, updateTaskTime, updateMealWindow } = useDay()
   const { fitnessState }                               = useFitness()
+
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 60_000)
+    return () => clearInterval(id)
+  }, [])
 
   const now         = new Date()
   const currentMins = toMins(now)
