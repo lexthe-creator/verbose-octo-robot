@@ -656,22 +656,15 @@ See §4 for full documentation. Returns `{ status, projectedFinish, daysOver }`.
 
 ---
 
-### `generateWorkout(type, gymAccess, week)` — `src/utils/fitness.js`
+### `generateWorkout(type, gymAccess, week)` — `src/utils/fitness.js` *(deprecated)*
+
+> **@deprecated** — use `generateWorkout(config)` from `src/utils/workoutGenerator.js` instead. Remove after all call sites updated in step 14b-vi.
 
 Returns `{ type, title, subtitle, durationEst, segments[] }`.
 
 **Segment shape:** `{ kind, section, name, duration?, sets?, reps?, restSec?, detail? }`
 - `section`: `'warmup'` | `'main'` | `'cooldown'` — used by preview renderer
 - `kind`: `'timed'` | `'exercise'` | `'text'`
-
-**Shared warmup (all types):** Jumping jacks 2 min · Hip circles 1 min each · Leg swings 30s each
-
-**Shared cooldown (all types):** Hamstring stretch 60s each · Hip flexor 60s each · Child's pose 2 min
-
-**Run durations** scale per 4-week block (weeks 1–4, 5–8, 9–12, 13+):
-- Easy run main block: 20 / 25 / 30 / 35 min
-- Tempo main block (inner): 10 / 15 / 20 / 25 min + 5 min easy each side
-- Long run main block: 30 / 40 / 50 / 60 min
 
 **Phase logic:** `getPhase(programStartDate)` → 13-week repeating cycle: weeks 1–4 `'base'` / 5–8 `'build'` / 9–12 `'peak'` / 13 `'deload'`, then repeats. Phase is never stored in state. `programEndDate` is accepted for backward compatibility but not used for phase calculation.
 
@@ -680,6 +673,70 @@ Returns `{ type, title, subtitle, durationEst, segments[] }`.
 **Phase config:** `getPhaseConfig(phase, weekInPhase)` → `{ sets, reps, intensity, rpeTarget }`. `weekInPhase` (1–4) applies progressive overload: reps decrease by 1 per week; rpeTarget increases by 0.5 per week. Sets stay constant within a phase.
 
 **Day schedule** (JS `getDay()` indexed): Sun=rest, Mon=easy\_run, Tue=strength\_a, Wed=stretch, Thu=tempo\_run, Fri=strength\_b, Sat=long\_run.
+
+---
+
+### `generateWorkout(config)` — `src/utils/workoutGenerator.js`
+
+**Config shape:**
+```js
+{
+  dayType:          string,  // from programConfig.dayTypes
+  equipment:        string,  // 'bodyweight' | 'dumbbells' | 'gym' (default: 'bodyweight')
+  phase:            string,  // from getPhase() (default: 'base')
+  weekInPhase:      number,  // 1–4 (default: 1)
+  history:          object,  // raw fitnessState.workoutLog[] (default: [])
+  mobilityDuration: number,  // 20 | 30 | 40 (default: 30)
+}
+```
+
+**Returns:**
+```js
+{
+  id:               string,  // `${date}_${dayType}`
+  date:             string,  // getTodayISO()
+  dayType:          string,
+  title:            string,  // getDayTypeLabel(dayType)
+  phase:            string,
+  weekInPhase:      number,
+  estimatedMinutes: number,  // rounded up to nearest 5
+  segments:         WorkoutSegment[],
+}
+```
+
+**Segment shapes:**
+
+Timed segment (warmup, cooldown, run, mobility):
+```js
+{ section, type: 'timed', name, duration, instruction, effort?, audioId? }
+```
+
+Sets/reps segment (strength main):
+```js
+{ section: 'main', type: 'sets_reps', exerciseId, name, sets, reps, rpeTarget, intensity, cues[], loadSuggestion, restSeconds, muscleGroup }
+```
+
+**Routing by dayType:**
+- `run_easy | run_tempo | run_long` → `buildRunWorkout`
+- `upper | lower | full_body | push | pull` → `buildStrengthWorkout`
+- `mobility` → `buildMobilityWorkout`
+- `rest` or unknown → `{ segments: [], estimatedMinutes: 0 }`
+
+**Run durations** (seconds) per phase and week within phase (wk1–wk4):
+
+| Type | base | build | peak | deload |
+|---|---|---|---|---|
+| `run_easy` | 1200/1200/1500/1500 | 1500/1800/1800/2100 | 2100/2100/2400/2400 | 900 |
+| `run_tempo` | 600/600/900/900 | 900/1200/1200/1500 | 1500/1800/1800/2100 | 600 |
+| `run_long` | 1800/2100/2400/2700 | 2700/3000/3300/3600 | 3600/3900/4200/4500 | 1800 |
+
+`run_tempo` produces 5 segments: warmup_jog · tempo · recovery (120s fixed) · tempo · cooldown_walk.
+
+**`selectExercises(pool, count, workoutLog)`** — deterministic daily shuffle. Never repeats exercises done in the last 7 days; prefers not-done-in-14-days. Seed: `hashString(getTodayISO())` via LCG PRNG. Same workout generated all day; changes tomorrow.
+
+**`getLoadSuggestion(exercise, lastPerformance, phaseConfig)`** — returns `{ suggestion, basis }`. Null last performance → first-session hint. All reps hit last time → +2.5% rounded to nearest 2.5 lb. Any set short → stay at current weight. Bodyweight exercises (weight=0) always get first-session hint.
+
+**`restSeconds` by phase:** base → 90s · build → 120s · peak → 180s · deload → 90s.
 
 ---
 
@@ -852,5 +909,7 @@ File: `.github/workflows/pages.yml`
 | 11 | Finance transactions, fitness program dates, workout preview | ✅ Done | `src/context/AppContext.jsx` (transactions[], programStartDate/End, ADD_TRANSACTION, DELETE_TRANSACTION, UPDATE_FITNESS), `src/screens/Finance.jsx` (dynamic Plaid badge, live calculations, TransactionSheet, swipe-delete), `src/utils/fitness.js` (getWeekNumber, getPhase(startDate,endDate), shared WARMUP/COOLDOWN, section field on all segments), `src/screens/Fitness.jsx` (program-date header, weeks-to-race, expandable TodayCard preview), `src/screens/Settings.jsx` (Program section with date inputs) |
 | 12 | Projects system, EOD reflection, Sunday weekly planning | ✅ Done | `src/utils/projectUtils.js` (getProjectPace), `src/context/AppContext.jsx` (projects[], reflectionLog, weeklyPriorities, groceryList + all new actions, She Stitches migrated from ssState → projects[0], RESET_DAY carries tomorrow tasks), `src/screens/SheStitches.jsx` (reads projects[0], dispatches TOGGLE_PROJECT_TASK), `src/screens/Home.jsx` (pace status on goal card — border + badge by status), `src/screens/EodReflection.jsx` (3-step overlay: review/carry, feel, tomorrow tasks), `src/screens/WeeklyPlanning.jsx` (5-step overlay: week review, priorities, grocery, training preview, project check-ins), `src/App.jsx` (EodReflection + WeeklyPlanning overlay triggers with localStorage guards) |
 | 14b-i | Remove HYROX, fitness program schema v2, selectors, phase config | ✅ Done | `src/constants/fitness.js` (PHASES: base/build/peak/deload; PHASE_LABELS updated), `src/utils/fitness.js` (getPhase 13-week cycle, getPhaseConfig, getDayTypeLabel; hyroxStation removed; hyrox segment field removed), `src/utils/fitnessSelectors.js` (getExerciseHistory, getLastPerformance, getTodayWorkoutType, getWeekStrip), `src/context/FitnessContext.jsx` (schema v2 + v1→v2 migration; program/programConfig state; CONFIGURE_PROGRAM, UPDATE_PROGRAM_CONFIG, LOG_WORKOUT_SETS actions), `src/components/WorkoutPlayer.jsx` (HYROX station badge removed) |
+| 14b-ii | Exercise library data files | ✅ Done | `src/data/exercises.js` (EXERCISES: upper/lower/full_body/push/pull/mobility, 3 equipment tiers, 90+ exercises), `src/data/runSegments.js` (RUN_SEGMENTS: warmup/cooldown/main segments, pure data) |
+| 14b-iii | Workout generator — pure functions, progressive overload, run segments | ✅ Done | `src/utils/workoutGenerator.js` (getExercisePool, selectExercises, getLoadSuggestion, buildStrengthWorkout, buildRunWorkout, buildMobilityWorkout, generateWorkout — new config-based API), `src/utils/fitness.js` (@deprecated on old generateWorkout) |
 
 **Live URL:** https://lexthe-creator.github.io/verbose-octo-robot/

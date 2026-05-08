@@ -168,6 +168,9 @@ const STRENGTH_B = {
 
 // ─── generateWorkout ─────────────────────────────────────────────────────────
 
+// @deprecated — use generateWorkout from utils/workoutGenerator.js instead.
+// Remove after all call sites updated in step 14b-vi.
+//
 // Signature: generateWorkout(type, gymAccess, week)
 // Returns: { type, title, subtitle, durationEst, segments[] }
 //
