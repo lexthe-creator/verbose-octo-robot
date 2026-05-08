@@ -16,25 +16,53 @@ export function getWeekNumber(programStartDate) {
 
 // ─── Phase logic ─────────────────────────────────────────────────────────────
 
-// When programEndDate is set, derive phase from weeks remaining to race:
-//   ≤2 weeks → 'race'  |  ≤10 weeks → 'hyrox'  |  else fall through to week-based
-// Without programEndDate, uses week number from programStartDate.
-export function getPhase(programStartDate, programEndDate) {
-  if (programEndDate) {
-    const end = new Date(programEndDate)
-    end.setHours(0, 0, 0, 0)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const msLeft = end - today
-    if (msLeft <= 0) return PHASES.RACE
-    const weeksToEnd = Math.ceil(msLeft / (7 * 24 * 60 * 60 * 1000))
-    if (weeksToEnd <= 2)  return PHASES.RACE
-    if (weeksToEnd <= 10) return PHASES.HYROX
+// 13-week repeating cycle: 4 base + 4 build + 4 peak + 1 deload.
+// programEndDate is accepted for backward compatibility but not used for phase
+// — the week-based cycle is the source of truth.
+export function getPhase(programStartDate) {
+  const week     = getWeekNumber(programStartDate)
+  const position = ((week - 1) % 13) + 1
+  if (position <= 4)  return PHASES.BASE
+  if (position <= 8)  return PHASES.BUILD
+  if (position <= 12) return PHASES.PEAK
+  return PHASES.DELOAD
+}
+
+// Returns training config for the given phase and week within that phase (1–4).
+// reps decrease by 1 per week; rpeTarget increases by 0.5 per week.
+export function getPhaseConfig(phase, weekInPhase) {
+  const wk      = Math.max(1, Math.min(4, weekInPhase))
+  const BASE_CONFIGS = {
+    [PHASES.BASE]:   { sets: 3, reps: 12, intensity: 'light',    rpeTarget: 6 },
+    [PHASES.BUILD]:  { sets: 4, reps: 8,  intensity: 'moderate', rpeTarget: 7 },
+    [PHASES.PEAK]:   { sets: 5, reps: 5,  intensity: 'heavy',    rpeTarget: 8 },
+    [PHASES.DELOAD]: { sets: 2, reps: 10, intensity: 'light',    rpeTarget: 5 },
   }
-  const week = getWeekNumber(programStartDate)
-  if (week >= 25) return PHASES.RACE
-  if (week >= 17) return PHASES.HYROX
-  return PHASES.BASE
+  const cfg = BASE_CONFIGS[phase] ?? BASE_CONFIGS[PHASES.BASE]
+  return {
+    ...cfg,
+    reps:      cfg.reps - (wk - 1),
+    rpeTarget: cfg.rpeTarget + (wk - 1) * 0.5,
+  }
+}
+
+// ─── Day type labels ─────────────────────────────────────────────────────────
+
+const DAY_TYPE_LABEL_MAP = {
+  run_easy:  'Easy Run',
+  run_tempo: 'Tempo Run',
+  run_long:  'Long Run',
+  upper:     'Upper Body',
+  lower:     'Lower Body',
+  full_body: 'Full Body',
+  push:      'Push',
+  pull:      'Pull',
+  mobility:  'Mobility',
+  rest:      'Rest',
+}
+
+export function getDayTypeLabel(type) {
+  return DAY_TYPE_LABEL_MAP[type] ?? type
 }
 
 // ─── Weekly training split ──────────────────────────────────────────────────
@@ -138,21 +166,12 @@ const STRENGTH_B = {
   ],
 }
 
-// HYROX phase replaces the final strength exercise with a station drill
-function hyroxStation(week) {
-  if (week >= 23) return { name: 'Farmers carry simulation', sets: 3, reps: '40m',     hyrox: true }
-  if (week >= 21) return { name: 'Wall balls (DB thruster)', sets: 3, reps: '15',      hyrox: true }
-  if (week >= 19) return { name: 'Sandbag/DB lunges',        sets: 3, reps: '10 each', hyrox: true }
-  if (week >= 17) return { name: 'Burpee broad jumps',       sets: 3, reps: '8',       hyrox: true }
-  return null
-}
-
 // ─── generateWorkout ─────────────────────────────────────────────────────────
 
 // Signature: generateWorkout(type, gymAccess, week)
 // Returns: { type, title, subtitle, durationEst, segments[] }
 //
-// Segment shape: { kind, section, name, duration?, sets?, reps?, restSec?, detail?, hyrox? }
+// Segment shape: { kind, section, name, duration?, sets?, reps?, restSec?, detail? }
 //   section: 'warmup' | 'main' | 'cooldown'
 //   kind:    'timed' | 'exercise' | 'text'
 export function generateWorkout(type, gymAccess, week) {
@@ -190,9 +209,9 @@ export function generateWorkout(type, gymAccess, week) {
         durationEst: total,
         segments: [
           ...WARMUP,
-          { kind: 'timed', section: 'main', name: 'Easy',      duration: 5 * 60,     detail: 'Conversational pace' },
-          { kind: 'timed', section: 'main', name: 'Tempo',     duration: tempo * 60, detail: 'Comfortably hard — threshold effort' },
-          { kind: 'timed', section: 'main', name: 'Easy',      duration: 5 * 60,     detail: 'Recover' },
+          { kind: 'timed', section: 'main', name: 'Easy',  duration: 5 * 60,     detail: 'Conversational pace' },
+          { kind: 'timed', section: 'main', name: 'Tempo', duration: tempo * 60, detail: 'Comfortably hard — threshold effort' },
+          { kind: 'timed', section: 'main', name: 'Easy',  duration: 5 * 60,     detail: 'Recover' },
           ...COOLDOWN,
         ],
       }
@@ -217,11 +236,7 @@ export function generateWorkout(type, gymAccess, week) {
     case WORKOUT_TYPES.STRENGTH_B: {
       const source = type === WORKOUT_TYPES.STRENGTH_A ? STRENGTH_A : STRENGTH_B
       const list   = (source[gymAccess] || source[GYM_ACCESS.BODYWEIGHT]).slice()
-
-      const hy = hyroxStation(week)
-      if (hy) list[list.length - 1] = hy
-
-      const focus = type === WORKOUT_TYPES.STRENGTH_A ? 'Push + Core' : 'Pull + Legs'
+      const focus  = type === WORKOUT_TYPES.STRENGTH_A ? 'Push + Core' : 'Pull + Legs'
 
       return {
         type,
@@ -237,7 +252,6 @@ export function generateWorkout(type, gymAccess, week) {
             sets:    ex.sets,
             reps:    ex.reps,
             restSec: 60,
-            hyrox:   !!ex.hyrox,
           })),
           ...COOLDOWN,
         ],
@@ -253,7 +267,7 @@ export function generateWorkout(type, gymAccess, week) {
           { kind: 'timed',    section: 'main', name: 'Breathwork',         duration: 5 * 60, detail: 'Slow nasal breathing, relaxed body' },
           { kind: 'timed',    section: 'main', name: 'Hip flexor stretch', duration: 60,     detail: '60s each side' },
           { kind: 'timed',    section: 'main', name: 'Pigeon pose',        duration: 90,     detail: '90s each side' },
-          { kind: 'exercise', section: 'main', name: 'Thoracic rotation',  sets: 1, reps: '10 each', restSec: 0, hyrox: false },
+          { kind: 'exercise', section: 'main', name: 'Thoracic rotation',  sets: 1, reps: '10 each', restSec: 0 },
           { kind: 'timed',    section: 'main', name: "Child's pose",       duration: 120,    detail: 'Breathe and release' },
         ],
       }

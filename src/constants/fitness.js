@@ -15,9 +15,10 @@ export const GYM_ACCESS = {
 }
 
 export const PHASES = {
-  BASE:  'base',
-  HYROX: 'hyrox',
-  RACE:  'race',
+  BASE:   'base',
+  BUILD:  'build',
+  PEAK:   'peak',
+  DELOAD: 'deload',
 }
 
 export const WORKOUT_LABEL = {
@@ -31,7 +32,8 @@ export const WORKOUT_LABEL = {
 }
 
 export const PHASE_LABELS = {
-  [PHASES.BASE]:  'Base Building',
-  [PHASES.HYROX]: 'HYROX Prep',
-  [PHASES.RACE]:  'Race Block',
+  [PHASES.BASE]:   'Base',
+  [PHASES.BUILD]:  'Build',
+  [PHASES.PEAK]:   'Peak',
+  [PHASES.DELOAD]: 'Deload',
 }

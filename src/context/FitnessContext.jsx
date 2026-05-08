@@ -2,23 +2,29 @@ import { createContext, useContext, useReducer, useEffect } from 'react'
 import { getTodayISO } from '../utils/time.js'
 
 const FITNESS_STORAGE_KEY = 'aiml_fitness'
-const SCHEMA_VERSION      = 1
+const SCHEMA_VERSION      = 2
 
 /* ─── Initial state ───────────────────────────────────────────────────────── */
-// fitness.weekNumber is intentionally omitted — it was a legacy stored field
-// that was never updated by any action. All UI calls getWeekNumber(programStartDate).
-// focusSessions is a lifetime counter — never resets.
 const initialFitnessState = {
   programStartDate: null,
   programEndDate:   null,
   workoutLog:       [],
   todayComplete:    false,
   focusSessions:    0,
+  program: {
+    type:       null,  // 'strength' | 'endurance' | 'general' | 'fat_loss'
+    configured: false,
+  },
+  programConfig: {
+    trainingDays: [],     // ['mon','tue','thu','sat']
+    dayTypes:     {},     // { mon: 'upper', tue: 'run_easy' }
+    goal:         null,
+    audioEnabled: false,
+    weeklyDays:   0,
+  },
 }
 
 /* ─── Day reset ───────────────────────────────────────────────────────────── */
-// todayComplete is true only if a workout was logged on today's date.
-// Self-contained: no cross-context read needed.
 function resolveTodayComplete(saved) {
   if (!saved.todayComplete) return false
   const log = saved.workoutLog ?? []
@@ -27,13 +33,34 @@ function resolveTodayComplete(saved) {
 }
 
 /* ─── Migration ───────────────────────────────────────────────────────────── */
+function migrateV1ToV2(data) {
+  return {
+    ...data,
+    program: { type: null, configured: false },
+    programConfig: {
+      trainingDays: [],
+      dayTypes:     {},
+      goal:         null,
+      audioEnabled: false,
+      weeklyDays:   0,
+    },
+    workoutLog: (data.workoutLog ?? []).map(entry => ({
+      ...entry,
+      sets: entry.sets ?? [],
+    })),
+  }
+}
+
 function migrateFitnessFromLegacy(legacyRaw) {
   try {
-    const parsed      = JSON.parse(legacyRaw)
-    const fitness     = parsed.fitness ?? {}
+    const parsed       = JSON.parse(legacyRaw)
+    const fitness      = parsed.fitness ?? {}
     const focusSessions = parsed.focusSessions ?? 0
-    const workoutLog  = fitness.workoutLog ?? []
-    const candidate   = {
+    const workoutLog   = (fitness.workoutLog ?? []).map(entry => ({
+      ...entry,
+      sets: entry.sets ?? [],
+    }))
+    const candidate = {
       ...initialFitnessState,
       programStartDate: fitness.programStartDate ?? null,
       programEndDate:   fitness.programEndDate   ?? null,
@@ -58,6 +85,15 @@ function loadFitnessState() {
           ...initialFitnessState,
           ...data,
           todayComplete: resolveTodayComplete(data),
+        }
+      }
+      // v1 → v2: add program, programConfig, sets[] on log entries
+      if (stored.version === 1) {
+        const migrated = migrateV1ToV2(stored.data)
+        return {
+          ...initialFitnessState,
+          ...migrated,
+          todayComplete: resolveTodayComplete(migrated),
         }
       }
       return initialFitnessState
@@ -88,11 +124,46 @@ export function fitnessReducer(state, action) {
 
     case 'LOG_WORKOUT': {
       const { date, type, title, duration, feel, notes, exercises } = action.payload
-      const entry = { date, type, title, duration, feel, notes, exercises: exercises ?? [] }
+      const entry = { date, type, title, duration, feel, notes, exercises: exercises ?? [], sets: [] }
       return {
         ...state,
         workoutLog:    [...state.workoutLog, entry],
         todayComplete: true,
+      }
+    }
+
+    case 'LOG_WORKOUT_SETS': {
+      const { workoutId, sets } = action.payload
+      return {
+        ...state,
+        workoutLog: state.workoutLog.map(entry =>
+          entry.date === workoutId
+            ? { ...entry, sets: [...(entry.sets ?? []), ...sets] }
+            : entry
+        ),
+      }
+    }
+
+    case 'CONFIGURE_PROGRAM': {
+      const { type, trainingDays, dayTypes, goal, audioEnabled } = action.payload
+      return {
+        ...state,
+        program: { type, configured: true },
+        programConfig: {
+          trainingDays,
+          dayTypes,
+          goal,
+          audioEnabled,
+          weeklyDays: trainingDays.length,
+        },
+      }
+    }
+
+    case 'UPDATE_PROGRAM_CONFIG': {
+      const { key, value } = action.payload
+      return {
+        ...state,
+        programConfig: { ...state.programConfig, [key]: value },
       }
     }
 

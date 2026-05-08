@@ -130,7 +130,7 @@ src/
     DayContext.jsx         — tasks, meals, workout, energyLevel, dayLockedAt
     UserContext.jsx        — profile (name)
     SettingsContext.jsx    — gymAccess, plaidConnected, calendarConnected, theme
-    FitnessContext.jsx     — programStartDate/End, workoutLog, todayComplete, focusSessions
+    FitnessContext.jsx     — programStartDate/End, workoutLog, todayComplete, focusSessions, program, programConfig
     InboxContext.jsx       — inboxItems, taskPool, calendarItems, notes
   screens/
     MorningIgnition.jsx   — 3-step ignition flow
@@ -238,23 +238,40 @@ Persists: projects, reflectionLog, weeklyPriorities, groceryList, transactions. 
 
 ---
 
-### 4.2 FitnessContext (`aiml_fitness`, schema v1)
+### 4.2 FitnessContext (`aiml_fitness`, schema v2)
 
 ```js
 {
   programStartDate: null,  // ISO date string (YYYY-MM-DD) | null
-  programEndDate:   null,  // ISO date string — race day | null
+  programEndDate:   null,  // ISO date string — goal date | null
   workoutLog: [
-    { date: ISO8601, type: string, title: string, duration: number, feel: number, notes: string, exercises: [] }
+    {
+      date: ISO8601, type: string, title: string, duration: number,
+      feel: number, notes: string, exercises: [],
+      sets: [{ exercise: string, reps: number, weight: number, rpe: number, note: string }],
+    }
   ],
   todayComplete:  false,   // true only if workoutLog[last].date === today; resets automatically on new day
   focusSessions:  0,       // lifetime counter — never resets
+  program: {
+    type:       null,      // 'strength' | 'endurance' | 'general' | 'fat_loss'
+    configured: false,     // true after setup wizard completes
+  },
+  programConfig: {
+    trainingDays: [],      // ['mon','tue','thu','sat']
+    dayTypes:     {},      // { mon: 'upper', tue: 'run_easy', thu: 'lower' }
+    goal:         null,    // matches program.type
+    audioEnabled: false,
+    weeklyDays:   0,       // count of training days
+  },
 }
 ```
 
+Migration v1→v2: adds `program`, `programConfig`, and `sets: []` on existing `workoutLog` entries. Non-destructive.
+
 `todayComplete` is self-contained: on load, FitnessContext checks `workoutLog[last].date === getTodayISO()` — no cross-context dependency.
 
-Phase is **derived** — call `getPhase(programStartDate, programEndDate)`. Never stored.
+Phase is **derived** — call `getPhase(programStartDate)`. Never stored. 13-week repeating cycle: 4 base + 4 build + 4 peak + 1 deload.
 Week number is **derived** — call `getWeekNumber(programStartDate)`. Never stored.
 
 ---
@@ -351,7 +368,10 @@ Returns `{ status, projectedFinish, daysOver }`.
 
 | Action type | Payload | Effect |
 |---|---|---|
-| `LOG_WORKOUT` | `{ date, type, title, duration, feel, notes, exercises[] }` | Appends entry to `workoutLog`; sets `todayComplete: true` |
+| `LOG_WORKOUT` | `{ date, type, title, duration, feel, notes, exercises[] }` | Appends entry to `workoutLog` with `sets: []`; sets `todayComplete: true` |
+| `LOG_WORKOUT_SETS` | `{ workoutId, sets[] }` | Finds `workoutLog` entry by date, appends `sets` array to it |
+| `CONFIGURE_PROGRAM` | `{ type, trainingDays, dayTypes, goal, audioEnabled }` | Sets `program.type`, `program.configured: true`, writes full `programConfig` |
+| `UPDATE_PROGRAM_CONFIG` | `{ key, value }` | Updates `programConfig[key]` |
 | `UPDATE_FITNESS` | `{ key, value }` | Sets `fitnessState[key] = value` — used for `programStartDate`, `programEndDate` |
 | `INCREMENT_FOCUS_SESSIONS` | — | Increments `focusSessions` by 1 |
 
@@ -624,7 +644,7 @@ Full-screen `position: fixed` overlay (`z-index: 150`). Flows through `workout.s
 |---|---|---|
 | `timed` | `TimedSegment` | Count-up timer vs target duration; shows remaining until target hit, then elapsed |
 | `text` | `TextSegment` | Static card with name + instruction detail |
-| `exercise` | `ExerciseSegment` | Set rows (tap to mark done); 60s rest countdown (skippable) between sets; HYROX badge if `segment.hyrox` |
+| `exercise` | `ExerciseSegment` | Set rows (tap to mark done); 60s rest countdown (skippable) between sets |
 
 **Post-workout log:** (`PostWorkoutLog`) — elapsed timer, 5-emoji feel selector, notes textarea, "Save workout" → calls `onComplete({ date, type, title, duration, feel, notes, exercises[] })`. App.jsx dispatches `LOG_WORKOUT` and clears `activeWorkout`.
 
@@ -640,7 +660,7 @@ See §4 for full documentation. Returns `{ status, projectedFinish, daysOver }`.
 
 Returns `{ type, title, subtitle, durationEst, segments[] }`.
 
-**Segment shape:** `{ kind, section, name, duration?, sets?, reps?, restSec?, detail?, hyrox? }`
+**Segment shape:** `{ kind, section, name, duration?, sets?, reps?, restSec?, detail? }`
 - `section`: `'warmup'` | `'main'` | `'cooldown'` — used by preview renderer
 - `kind`: `'timed'` | `'exercise'` | `'text'`
 
@@ -653,15 +673,11 @@ Returns `{ type, title, subtitle, durationEst, segments[] }`.
 - Tempo main block (inner): 10 / 15 / 20 / 25 min + 5 min easy each side
 - Long run main block: 30 / 40 / 50 / 60 min
 
-**HYROX phase** (weeks 17–24): replaces final strength exercise with station drill:
-- Weeks 17–18: Burpee broad jumps (3×8)
-- Weeks 19–20: Sandbag/DB lunges (3×10 each)
-- Weeks 21–22: Wall balls / DB thruster (3×15)
-- Weeks 23–24: Farmers carry simulation (3×40m)
-
-**Phase logic:** `getPhase(programStartDate, programEndDate)` → `'race'` (≤2 wks to end) / `'hyrox'` (≤10 wks) / falls through to week-based: `'base'` (wk 1–16) / `'hyrox'` (17–24) / `'race'` (25+). Phase is never stored in state.
+**Phase logic:** `getPhase(programStartDate)` → 13-week repeating cycle: weeks 1–4 `'base'` / 5–8 `'build'` / 9–12 `'peak'` / 13 `'deload'`, then repeats. Phase is never stored in state. `programEndDate` is accepted for backward compatibility but not used for phase calculation.
 
 `getWeekNumber(programStartDate)` → weeks since start date (min 1); returns 1 when null.
+
+**Phase config:** `getPhaseConfig(phase, weekInPhase)` → `{ sets, reps, intensity, rpeTarget }`. `weekInPhase` (1–4) applies progressive overload: reps decrease by 1 per week; rpeTarget increases by 0.5 per week. Sets stay constant within a phase.
 
 **Day schedule** (JS `getDay()` indexed): Sun=rest, Mon=easy\_run, Tue=strength\_a, Wed=stretch, Thu=tempo\_run, Fri=strength\_b, Sat=long\_run.
 
@@ -835,5 +851,6 @@ File: `.github/workflows/pages.yml`
 | 9 | Fitness tab, workout generator, settings, polish | ✅ Done | `src/utils/fitness.js`, `src/screens/Fitness.jsx`, `src/screens/Settings.jsx`, `src/components/WorkoutPlayer.jsx`, `src/components/FuelEditSheet.jsx`, `src/screens/Home.jsx` (training card, gear icon, greeting), `src/screens/Inbox.jsx` (ADD_TASK + flash), `src/screens/MorningIgnition.jsx` (meal labels), `src/context/AppContext.jsx` (profile/settings/fitness slices), `src/App.jsx` (4-tab nav, global WorkoutPlayer overlay) |
 | 11 | Finance transactions, fitness program dates, workout preview | ✅ Done | `src/context/AppContext.jsx` (transactions[], programStartDate/End, ADD_TRANSACTION, DELETE_TRANSACTION, UPDATE_FITNESS), `src/screens/Finance.jsx` (dynamic Plaid badge, live calculations, TransactionSheet, swipe-delete), `src/utils/fitness.js` (getWeekNumber, getPhase(startDate,endDate), shared WARMUP/COOLDOWN, section field on all segments), `src/screens/Fitness.jsx` (program-date header, weeks-to-race, expandable TodayCard preview), `src/screens/Settings.jsx` (Program section with date inputs) |
 | 12 | Projects system, EOD reflection, Sunday weekly planning | ✅ Done | `src/utils/projectUtils.js` (getProjectPace), `src/context/AppContext.jsx` (projects[], reflectionLog, weeklyPriorities, groceryList + all new actions, She Stitches migrated from ssState → projects[0], RESET_DAY carries tomorrow tasks), `src/screens/SheStitches.jsx` (reads projects[0], dispatches TOGGLE_PROJECT_TASK), `src/screens/Home.jsx` (pace status on goal card — border + badge by status), `src/screens/EodReflection.jsx` (3-step overlay: review/carry, feel, tomorrow tasks), `src/screens/WeeklyPlanning.jsx` (5-step overlay: week review, priorities, grocery, training preview, project check-ins), `src/App.jsx` (EodReflection + WeeklyPlanning overlay triggers with localStorage guards) |
+| 14b-i | Remove HYROX, fitness program schema v2, selectors, phase config | ✅ Done | `src/constants/fitness.js` (PHASES: base/build/peak/deload; PHASE_LABELS updated), `src/utils/fitness.js` (getPhase 13-week cycle, getPhaseConfig, getDayTypeLabel; hyroxStation removed; hyrox segment field removed), `src/utils/fitnessSelectors.js` (getExerciseHistory, getLastPerformance, getTodayWorkoutType, getWeekStrip), `src/context/FitnessContext.jsx` (schema v2 + v1→v2 migration; program/programConfig state; CONFIGURE_PROGRAM, UPDATE_PROGRAM_CONFIG, LOG_WORKOUT_SETS actions), `src/components/WorkoutPlayer.jsx` (HYROX station badge removed) |
 
 **Live URL:** https://lexthe-creator.github.io/verbose-octo-robot/

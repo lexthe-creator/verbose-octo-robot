@@ -211,8 +211,6 @@ function ExerciseSegment({ segment }) {
     <div style={s.exWrap}>
       <p style={s.exName}>{segment.name}</p>
       <p style={s.exReps}>{segment.sets} × {segment.reps}</p>
-      {segment.hyrox && <span style={s.hyroxBadge}>HYROX station</span>}
-
       <div style={s.setList}>
         {setsDone.map((done, i) => (
           <button
@@ -374,11 +372,6 @@ const s = {
   },
   exName: { fontFamily: 'var(--font-display)', fontSize: '22px', color: 'var(--color-text)', textAlign: 'center' },
   exReps: { fontSize: '18px', color: 'var(--color-accent)', fontWeight: 600, textAlign: 'center', marginTop: '-4px' },
-  hyroxBadge: {
-    alignSelf: 'center', padding: '3px 10px', borderRadius: 'var(--radius-pill)',
-    background: 'var(--color-accent-bg)', color: 'var(--color-accent)', border: '0.5px solid var(--color-accent)',
-    fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em',
-  },
   setList: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' },
   setRow: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
