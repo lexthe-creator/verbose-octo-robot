@@ -191,11 +191,11 @@ const styles = {
     paddingBottom:  '6px',
   },
   tabIcon: {
-    fontSize:   '15px',
+    fontSize:   '18px',
     lineHeight: 1,
   },
   tabLabel: {
-    fontSize:      '8px',
+    fontSize:      '9px',
     fontWeight:    500,
     letterSpacing: '0.02em',
   },

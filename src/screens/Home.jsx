@@ -1,11 +1,11 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { useUser } from '../context/UserContext.jsx'
 import { useSettings } from '../context/SettingsContext.jsx'
 import { useDay, useFitness, useProjects, getFocusProject, getProjectStats } from '../context/index.js'
 import FuelEditSheet from '../components/FuelEditSheet.jsx'
 import { getTodayType, generateWorkout, getWeekNumber } from '../utils/fitness.js'
 import { getProjectPace } from '../utils/projectUtils.js'
-import { formatMealTime, parseHHMM, formatMins } from '../utils/time.js'
+import { formatMealTime, parseHHMM, formatMins, formatTimeUntil } from '../utils/time.js'
 import { SCREENS } from '../constants/navigation.js'
 import { WORKOUT_LABEL } from '../constants/fitness.js'
 import { PACE_STATUS } from '../constants/projects.js'
@@ -14,14 +14,6 @@ import { PACE_STATUS } from '../constants/projects.js'
 
 function toMins(date) {
   return date.getHours() * 60 + date.getMinutes()
-}
-
-function formatClockParts(date) {
-  let h = date.getHours()
-  const m = String(date.getMinutes()).padStart(2, '0')
-  const ampm = h >= 12 ? 'PM' : 'AM'
-  h = h % 12 || 12
-  return { time: `${h}`, colon: ':', mins: m, ampm }
 }
 
 function formatFullDate(date) {
@@ -39,7 +31,7 @@ const TIME_OPTIONS = Array.from({ length: 33 }, (_, i) => {
   return { value: hhmm, label: `${h12}:${String(m).padStart(2, '0')} ${ampm}` }
 })
 
-// ─── Hero clock ────────────────────────────────────────────────────────────────
+// ─── Hero header ───────────────────────────────────────────────────────────────
 
 function greeting(now, name) {
   const h = now.getHours()
@@ -48,31 +40,20 @@ function greeting(now, name) {
 }
 
 function HeroClock({ now, name, onOpenFocus, onOpenSettings }) {
-  const { time, colon, mins, ampm } = formatClockParts(now)
   return (
     <div style={hero.wrap}>
-      {/* Top row: greeting + gear */}
       <div style={hero.topRow}>
         <span style={hero.greeting}>{greeting(now, name)}</span>
         <button style={hero.gearBtn} onClick={onOpenSettings} aria-label="Settings">
           ⚙
         </button>
       </div>
-      {/* Clock row */}
-      <div style={hero.row}>
-        <div style={hero.clockWrap}>
-          <span style={hero.clock}>
-            {time}
-            <span style={hero.colon}>{colon}</span>
-            {mins}
-          </span>
-          <span style={hero.ampm}>{ampm}</span>
-        </div>
+      <div style={hero.dateRow}>
+        <p style={hero.date}>{formatFullDate(now)}</p>
         <button style={hero.focusPill} onClick={onOpenFocus}>
           ⊙ Focus
         </button>
       </div>
-      <p style={hero.date}>{formatFullDate(now)}</p>
     </div>
   )
 }
@@ -95,32 +76,21 @@ const hero = {
     cursor:          'pointer',
     flexShrink:      0,
   },
-  row:   { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' },
-  clockWrap: { display: 'flex', alignItems: 'baseline', gap: '4px' },
-  clock: {
-    fontFamily: 'var(--font-display)',
-    fontSize:   '44px',
-    lineHeight: 1,
-    color:      'var(--color-text)',
-    letterSpacing: '-1px',
-  },
-  colon: { color: 'var(--color-accent)' },
-  ampm:  { fontSize: '16px', color: 'var(--color-muted)', fontWeight: 500, marginBottom: '6px' },
+  dateRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  date:    { fontSize: '14px', color: 'var(--color-muted)', margin: 0 },
   focusPill: {
-    display:       'flex',
-    alignItems:    'center',
-    gap:           '4px',
-    padding:       '7px 14px',
-    borderRadius:  'var(--radius-pill)',
-    background:    'var(--color-accent-bg)',
-    border:        '0.5px solid var(--color-accent)',
-    color:         'var(--color-accent)',
-    fontSize:      '13px',
-    fontWeight:    600,
-    cursor:        'pointer',
-    marginBottom:  '4px',
+    display:      'flex',
+    alignItems:   'center',
+    gap:          '4px',
+    padding:      '7px 14px',
+    borderRadius: 'var(--radius-pill)',
+    background:   'var(--color-accent-bg)',
+    border:       '0.5px solid var(--color-accent)',
+    color:        'var(--color-accent)',
+    fontSize:     '13px',
+    fontWeight:   600,
+    cursor:       'pointer',
   },
-  date: { fontSize: '14px', color: 'var(--color-muted)', marginTop: '4px' },
 }
 
 // ─── Burn bar ──────────────────────────────────────────────────────────────────
@@ -221,7 +191,6 @@ function Timeline({ state, now }) {
   const nowMinsVal = toMins(now)
   const items = useMemo(
     () => buildTimeline(state, nowMinsVal),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [state, nowMinsVal]
   )
 
@@ -691,17 +660,11 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
   const { dayState, dayDispatch, updateTaskTime, updateMealWindow } = useDay()
   const { fitnessState }                               = useFitness()
 
-  const [now, setNow] = useState(() => new Date())
+  const now         = new Date()
+  const currentMins = toMins(now)
+
   const [expandedTask, setExpandedTask] = useState(null)
   const [editingSlot, setEditingSlot] = useState(null)
-
-  // Update clock every 10 seconds
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 10_000)
-    return () => clearInterval(id)
-  }, [])
-
-  const currentMins = toMins(now)
 
   const focusProject = useMemo(
     () => getFocusProject(projectsState.projects),
@@ -723,27 +686,28 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
     dayState.tasks.forEach(t => {
       if (t.scheduledTime && !t.done) {
         const m = parseHHMM(t.scheduledTime)
-        if (m > currentMins) candidates.push({ label: t.text.split(' ').slice(0, 2).join(' '), timeMins: m })
+        if (m > currentMins) candidates.push({ label: t.text.split(' ').slice(0, 2).join(' '), timeMins: m, timeHHMM: t.scheduledTime })
       }
     })
 
     Object.values(dayState.meals).forEach(meal => {
       if (!meal.eaten && parseHHMM(meal.endTime) > currentMins) {
         const m = parseHHMM(meal.startTime)
-        if (m > currentMins) candidates.push({ label: meal.label, timeMins: m })
+        if (m > currentMins) candidates.push({ label: meal.label, timeMins: m, timeHHMM: meal.startTime })
       }
     })
 
-    if (dayState.workoutConfirmed) {
+    if (dayState.workoutConfirmed && dayState.workout?.time) {
       const m = parseHHMM(dayState.workout.time)
-      if (m > currentMins) candidates.push({ label: dayState.workout.type, timeMins: m })
+      if (m > currentMins) candidates.push({ label: dayState.workout.type, timeMins: m, timeHHMM: dayState.workout.time })
     }
 
     if (candidates.length === 0) return null
     candidates.sort((a, b) => a.timeMins - b.timeMins)
     const next = candidates[0]
     const away = next.timeMins - currentMins
-    return `${next.label} in ${away} min`
+    const timeStr = formatTimeUntil(away, next.timeHHMM)
+    return away > 180 ? `${next.label} ${timeStr}` : timeStr
   }, [dayState, currentMins])
 
   const focusProjectName = focusProject?.name ?? 'Projects'
