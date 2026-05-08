@@ -137,6 +137,8 @@ Fonts: DM Sans (body) and DM Serif Display (headings/numbers) loaded from Google
 
 - **`WeeklyPlanning` `ssThisWeek`** — counts all-time done tasks on the focus project, not tasks completed this calendar week. Flagged in the refactor; fix requires scoping by `lastActivityDate` or a per-task completion timestamp that doesn't exist yet.
 
+- **`exercises.js` structural duplication** — `push_up` (and other shared exercises) appear in both `upper.bodyweight` and `push.bodyweight` with identical `id` and `cues`. The nested category schema makes this unavoidable without a schema change. Production fix: flat `EXERCISE_BY_ID` map + `EXERCISES_BY_CATEGORY` index. Defer to Step 15 schema versioning or a dedicated data cleanup step before App Store submission.
+
 - **Pre-existing lint errors (not introduced in step 14b-i):**
   - `WorkoutPlayer.jsx` lines 22, 28, 67, 138, 251 — `Date.now` called inside `useRef`/`useState`, `setState` called synchronously inside effects, `ref.current` accessed during render.
   - `FitnessContext.jsx` — `react-refresh/only-export-components` warnings on `fitnessReducer` and `useFitness` exports.
