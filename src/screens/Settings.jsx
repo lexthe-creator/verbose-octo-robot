@@ -195,6 +195,23 @@ export default function Settings({ onBack, onNavigate }) {
         </div>
       </section>
 
+      {/* Debug — remove before App Store submission */}
+      <section style={s.card}>
+        <p style={s.debugLabel}>DEBUG — remove before App Store submission</p>
+        <button
+          style={s.debugBtn}
+          onClick={() => { localStorage.removeItem('aiml_fitness'); window.location.reload() }}
+        >
+          Reset fitness program
+        </button>
+        <button
+          style={s.debugBtn}
+          onClick={() => { localStorage.removeItem('aiml_projects'); window.location.reload() }}
+        >
+          Reset project data
+        </button>
+      </section>
+
       {sheetKind && (
         <StubSheet kind={sheetKind} onClose={() => setSheetKind(null)} />
       )}
@@ -447,6 +464,27 @@ const s = {
     fontSize:   '12px',
     color:      'var(--color-accent)',
     fontWeight: 600,
+  },
+
+  // Debug section
+  debugLabel: {
+    fontSize:      '9px',
+    fontWeight:    600,
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase',
+    color:         'var(--color-danger)',
+  },
+  debugBtn: {
+    width:        '100%',
+    padding:      '10px',
+    borderRadius: 'var(--radius-sm)',
+    background:   'transparent',
+    border:       '0.5px solid var(--color-danger-border)',
+    color:        'var(--color-danger)',
+    fontSize:     '12px',
+    fontWeight:   500,
+    cursor:       'pointer',
+    marginBottom: '8px',
   },
 }
 
