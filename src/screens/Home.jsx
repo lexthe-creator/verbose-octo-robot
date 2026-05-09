@@ -1,14 +1,14 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useUser } from '../context/UserContext.jsx'
 import { useSettings } from '../context/SettingsContext.jsx'
-import { useDay, useFitness, useProjects, getFocusProject, getProjectStats } from '../context/index.js'
+import { useDay, useFitness, useProjects, getProjectStats } from '../context/index.js'
 import FuelEditSheet from '../components/FuelEditSheet.jsx'
 import { getTodayType, generateWorkout, getWeekNumber } from '../utils/fitness.js'
 import { getProjectPace } from '../utils/projectUtils.js'
 import { formatMealTime, parseHHMM, formatMins, formatTimeUntil } from '../utils/time.js'
 import { SCREENS } from '../constants/navigation.js'
 import { WORKOUT_LABEL } from '../constants/fitness.js'
-import { PACE_STATUS } from '../constants/projects.js'
+import { PACE_STATUS, PROJECT_STATUS } from '../constants/projects.js'
 
 // ─── Time utilities ────────────────────────────────────────────────────────────
 
@@ -673,7 +673,7 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
   const [editingSlot, setEditingSlot] = useState(null)
 
   const focusProject = useMemo(
-    () => getFocusProject(projectsState.projects),
+    () => projectsState.projects?.find(p => p.status === PROJECT_STATUS.FOCUS) ?? null,
     [projectsState.projects]
   )
   const { doneCount, totalCount, listingsCount, nextTask, dayOf90 } = useMemo(
@@ -716,7 +716,9 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
     return away > 180 ? `${next.label} ${timeStr}` : timeStr
   }, [dayState, currentMins])
 
-  const focusProjectName = focusProject?.name ?? 'Projects'
+  const projectSectionLabel = focusProject?.name
+    ? focusProject.name.toUpperCase()
+    : 'PROJECTS'
   const focusNextTask    = nextTask ?? 'Set a focus project in Projects'
 
   function handleToggleExpand(taskId) {
@@ -786,7 +788,7 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
 
       {/* 5 — Focus project goal card */}
       <section style={s.section}>
-        <p style={s.sectionLabel}>{focusProjectName}</p>
+        <p style={s.sectionLabel}>{projectSectionLabel}</p>
         <FocusProjectCard
           projectName={focusProject?.name ?? 'Projects'}
           projectEmoji={focusProject?.emoji ?? '📋'}
