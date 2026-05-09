@@ -4,6 +4,7 @@ import { useSettings } from '../context/SettingsContext.jsx'
 import { useFitness } from '../context/index.js'
 import { getPhase, getWeekNumber } from '../utils/fitness.js'
 import { GYM_ACCESS, PHASE_LABELS } from '../constants/fitness.js'
+import { SCREENS } from '../constants/navigation.js'
 import { THEMES } from '../constants/theme.js'
 
 const EQUIPMENT_OPTIONS = [
@@ -14,7 +15,7 @@ const EQUIPMENT_OPTIONS = [
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
-export default function Settings({ onBack }) {
+export default function Settings({ onBack, onNavigate }) {
   const { userState, userDispatch }         = useUser()
   const { settingsState, settingsDispatch } = useSettings()
   const { fitnessState, fitnessDispatch }   = useFitness()
@@ -88,6 +89,13 @@ export default function Settings({ onBack }) {
             Controls what exercises get generated in your workouts
           </p>
         </div>
+        <div style={s.divider} />
+        <button
+          style={s.editProgramBtn}
+          onClick={() => onNavigate?.(SCREENS.FITNESS_SETUP)}
+        >
+          Edit training program →
+        </button>
       </section>
 
       {/* Program */}
@@ -185,6 +193,23 @@ export default function Settings({ onBack }) {
             })}
           </div>
         </div>
+      </section>
+
+      {/* Debug — remove before App Store submission */}
+      <section style={s.card}>
+        <p style={s.debugLabel}>DEBUG — remove before App Store submission</p>
+        <button
+          style={s.debugBtn}
+          onClick={() => { localStorage.removeItem('aiml_fitness'); window.location.reload() }}
+        >
+          Reset fitness program
+        </button>
+        <button
+          style={s.debugBtn}
+          onClick={() => { localStorage.removeItem('aiml_projects'); window.location.reload() }}
+        >
+          Reset project data
+        </button>
       </section>
 
       {sheetKind && (
@@ -339,9 +364,19 @@ const s = {
     width:        '100%',
   },
   helper: {
-    fontSize: '10px',
-    color:    'var(--color-faint)',
+    fontSize:   '10px',
+    color:      'var(--color-faint)',
     lineHeight: 1.4,
+  },
+  editProgramBtn: {
+    alignSelf:  'flex-start',
+    background: 'none',
+    border:     'none',
+    color:      'var(--color-accent)',
+    fontSize:   '14px',
+    fontWeight: 600,
+    cursor:     'pointer',
+    padding:    '6px 0',
   },
 
   // Equipment pill toggle
@@ -429,6 +464,27 @@ const s = {
     fontSize:   '12px',
     color:      'var(--color-accent)',
     fontWeight: 600,
+  },
+
+  // Debug section
+  debugLabel: {
+    fontSize:      '9px',
+    fontWeight:    600,
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase',
+    color:         'var(--color-danger)',
+  },
+  debugBtn: {
+    width:        '100%',
+    padding:      '10px',
+    borderRadius: 'var(--radius-sm)',
+    background:   'transparent',
+    border:       '0.5px solid var(--color-danger-border)',
+    color:        'var(--color-danger)',
+    fontSize:     '12px',
+    fontWeight:   500,
+    cursor:       'pointer',
+    marginBottom: '8px',
   },
 }
 

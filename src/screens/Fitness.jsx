@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { useFitness } from '../context/index.js'
+import { useFitness }  from '../context/index.js'
 import { useSettings } from '../context/SettingsContext.jsx'
+import FitnessSetup    from './FitnessSetup.jsx'
 import {
   getPhase, getWeekNumber,
-  getTodayType, getWeekDates, getTypeForDay,
+  getWeekDates, getTypeForDay,
   generateWorkout,
 } from '../utils/fitness.js'
 import { WORKOUT_TYPES, PHASE_LABELS } from '../constants/fitness.js'
@@ -378,6 +379,23 @@ function getWeeksToRace(programEndDate) {
 export default function Fitness({ onStartWorkout }) {
   const { fitnessState }  = useFitness()
   const { settingsState } = useSettings()
+
+  // Hooks must be called unconditionally before any early return.
+  // null = viewing today, 0–6 = browsing a specific day.
+  const [selectedIndex, setSelectedIndex] = useState(null)
+
+  // Guard: show setup wizard as full-screen overlay if program not yet configured.
+  // Primary path: App.jsx intercepts FITNESS navigation when !configured.
+  // This is the fallback for any edge case where Fitness renders unconfigured.
+  if (!fitnessState.program.configured) {
+    return (
+      <FitnessSetup
+        onComplete={() => {/* configured flag now true; Fitness re-renders normally */}}
+        isEditing={false}
+      />
+    )
+  }
+
   const { programStartDate, programEndDate, workoutLog, todayComplete } = fitnessState
   const gymAccess = settingsState.gymAccess
 
@@ -386,9 +404,6 @@ export default function Fitness({ onStartWorkout }) {
   const phaseKey    = getPhase(programStartDate, programEndDate)
   const weeksToRace = getWeeksToRace(programEndDate)
   const todayIdx    = todayWeekIndex()
-
-  // null = viewing today, 0-6 = browsing a specific day
-  const [selectedIndex, setSelectedIndex] = useState(null)
 
   const viewingIndex   = selectedIndex ?? todayIdx
   const viewingDate    = weekDates[viewingIndex]
