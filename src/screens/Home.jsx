@@ -838,7 +838,7 @@ const s = {
     display:       'flex',
     flexDirection: 'column',
     gap:           '0',
-    paddingTop:    'var(--safe-top)',
+    paddingTop:    'max(env(safe-area-inset-top), 52px)',
     paddingBottom: 'calc(var(--safe-bottom) + var(--nav-height) + 24px)',
     minHeight:     '100dvh',
     position:      'relative',
