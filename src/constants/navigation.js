@@ -1,14 +1,15 @@
 export const SCREENS = {
-  HOME:     'home',
-  FITNESS:  'fitness',
-  INBOX:    'inbox',
-  PROJECTS: 'projects',
-  FINANCE:  'finance',
-  SETTINGS: 'settings',
-  IGNITION: 'ignition',
-  FOCUS:    'focus',
-  EOD:      'eod',
-  WEEKLY:   'weekly',
+  HOME:          'home',
+  FITNESS:       'fitness',
+  FITNESS_SETUP: 'fitness-setup',
+  INBOX:         'inbox',
+  PROJECTS:      'projects',
+  FINANCE:       'finance',
+  SETTINGS:      'settings',
+  IGNITION:      'ignition',
+  FOCUS:         'focus',
+  EOD:           'eod',
+  WEEKLY:        'weekly',
 }
 
 export const NAV_TABS = [

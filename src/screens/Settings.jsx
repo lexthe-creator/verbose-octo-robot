@@ -4,6 +4,7 @@ import { useSettings } from '../context/SettingsContext.jsx'
 import { useFitness } from '../context/index.js'
 import { getPhase, getWeekNumber } from '../utils/fitness.js'
 import { GYM_ACCESS, PHASE_LABELS } from '../constants/fitness.js'
+import { SCREENS } from '../constants/navigation.js'
 import { THEMES } from '../constants/theme.js'
 
 const EQUIPMENT_OPTIONS = [
@@ -14,7 +15,7 @@ const EQUIPMENT_OPTIONS = [
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
-export default function Settings({ onBack }) {
+export default function Settings({ onBack, onNavigate }) {
   const { userState, userDispatch }         = useUser()
   const { settingsState, settingsDispatch } = useSettings()
   const { fitnessState, fitnessDispatch }   = useFitness()
@@ -88,6 +89,13 @@ export default function Settings({ onBack }) {
             Controls what exercises get generated in your workouts
           </p>
         </div>
+        <div style={s.divider} />
+        <button
+          style={s.editProgramBtn}
+          onClick={() => onNavigate?.(SCREENS.FITNESS_SETUP)}
+        >
+          Edit training program →
+        </button>
       </section>
 
       {/* Program */}
@@ -339,9 +347,19 @@ const s = {
     width:        '100%',
   },
   helper: {
-    fontSize: '10px',
-    color:    'var(--color-faint)',
+    fontSize:   '10px',
+    color:      'var(--color-faint)',
     lineHeight: 1.4,
+  },
+  editProgramBtn: {
+    alignSelf:  'flex-start',
+    background: 'none',
+    border:     'none',
+    color:      'var(--color-accent)',
+    fontSize:   '14px',
+    fontWeight: 600,
+    cursor:     'pointer',
+    padding:    '6px 0',
   },
 
   // Equipment pill toggle

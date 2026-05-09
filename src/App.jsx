@@ -13,13 +13,14 @@ import Finance         from './screens/Finance.jsx'
 import Projects        from './screens/Projects.jsx'
 import Settings        from './screens/Settings.jsx'
 import Fitness         from './screens/Fitness.jsx'
+import FitnessSetup    from './screens/FitnessSetup.jsx'
 import WorkoutPlayer   from './components/WorkoutPlayer.jsx'
 import EodReflection   from './screens/EodReflection.jsx'
 import WeeklyPlanning  from './screens/WeeklyPlanning.jsx'
 
 export default function App() {
-  const { dayState }          = useDay()
-  const { fitnessDispatch }   = useFitness()
+  const { dayState }                      = useDay()
+  const { fitnessState, fitnessDispatch } = useFitness()
 
   const initialScreen = (() => {
     if (!dayState.dayLockedAt) return SCREENS.IGNITION
@@ -29,7 +30,9 @@ export default function App() {
 
   const { screen, navigate: navigateTo, goBack } = useNavigate(initialScreen)
 
-  const [activeWorkout, setActiveWorkout] = useState(null)
+  const [activeWorkout, setActiveWorkout]     = useState(null)
+  // true when FitnessSetup is opened from Settings (vs first-launch unconfigured flow)
+  const [isEditingProgram, setIsEditingProgram] = useState(false)
 
   const [showReflection, setShowReflection] = useState(() => {
     if (new URLSearchParams(window.location.search).get('eod') === '1') return true
@@ -48,6 +51,18 @@ export default function App() {
   function navigate(target) {
     if (target === SCREENS.EOD)    { setShowReflection(true); return }
     if (target === SCREENS.WEEKLY) { setShowWeeklyPlan(true); return }
+    // First-launch: redirect to setup wizard (nav hidden by route config)
+    if (target === SCREENS.FITNESS && !fitnessState.program.configured) {
+      setIsEditingProgram(false)
+      navigateTo(SCREENS.FITNESS_SETUP)
+      return
+    }
+    // Settings → "Edit training program": open wizard in editing mode
+    if (target === SCREENS.FITNESS_SETUP) {
+      setIsEditingProgram(true)
+      navigateTo(SCREENS.FITNESS_SETUP)
+      return
+    }
     navigateTo(target)
   }
 
@@ -78,8 +93,15 @@ export default function App() {
         {screen === SCREENS.FITNESS && (
           <Fitness onStartWorkout={handleStartWorkout} />
         )}
+        {screen === SCREENS.FITNESS_SETUP && (
+          <FitnessSetup
+            onComplete={() => navigate(SCREENS.FITNESS)}
+            onBack={goBack}
+            isEditing={isEditingProgram}
+          />
+        )}
         {screen === SCREENS.SETTINGS && (
-          <Settings onBack={goBack} />
+          <Settings onBack={goBack} onNavigate={navigate} />
         )}
         {screen === SCREENS.PROJECTS && (
           <Projects onBack={goBack} />
