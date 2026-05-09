@@ -126,8 +126,8 @@ function Step1({ selectedProgram, onSelect }) {
   return (
     <div style={sc.stepWrap}>
       <div style={sc.heading}>
-        <p style={sc.sub}>This shapes your entire program.</p>
         <h1 style={sc.h1}>What's your goal?</h1>
+        <p style={sc.sub}>This shapes your entire program.</p>
       </div>
       <div style={sc.cardList}>
         {PROGRAM_OPTIONS.map(prog => {
@@ -174,8 +174,8 @@ function Step2({ weeklyDays, onSelect, recommendedSplit }) {
   return (
     <div style={sc.stepWrap}>
       <div style={sc.heading}>
-        <p style={sc.sub}>Be realistic — consistency beats perfection.</p>
         <h1 style={sc.h1}>How many days per week?</h1>
+        <p style={sc.sub}>Be realistic — consistency beats perfection.</p>
       </div>
       <div style={sc.pillRow}>
         {WEEKLY_DAY_COUNTS.map(n => {
@@ -212,8 +212,8 @@ function Step3({ selectedDays, weeklyDays, onToggle }) {
   return (
     <div style={sc.stepWrap}>
       <div style={sc.heading}>
-        <p style={sc.sub}>Pick exactly {weeklyDays} day{weeklyDays !== 1 ? 's' : ''}.</p>
         <h1 style={sc.h1}>Which days will you train?</h1>
+        <p style={sc.sub}>Pick exactly {weeklyDays} day{weeklyDays !== 1 ? 's' : ''}.</p>
       </div>
       <div style={sc.dayPillRow}>
         {DAYS_OF_WEEK.map(day => {
@@ -249,8 +249,8 @@ function Step4({ sortedSelectedDays, dayTypes, setDayTypes, selectedProgram }) {
   return (
     <div style={sc.stepWrap}>
       <div style={sc.heading}>
-        <p style={sc.sub}>You can change this anytime.</p>
         <h1 style={sc.h1}>What type is each day?</h1>
+        <p style={sc.sub}>You can change this anytime.</p>
       </div>
       <div style={sc.dayTypeList}>
         {sortedSelectedDays.map(day => (
@@ -290,8 +290,8 @@ function Step5({ equipment, onSelect }) {
   return (
     <div style={sc.stepWrap}>
       <div style={sc.heading}>
-        <p style={sc.sub}>Controls what exercises get generated.</p>
         <h1 style={sc.h1}>What equipment do you have?</h1>
+        <p style={sc.sub}>Controls what exercises get generated.</p>
       </div>
       <div style={sc.cardList}>
         {EQUIPMENT_OPTIONS.map(opt => {
@@ -322,8 +322,8 @@ function Step6({ startDate, goalDate, showGoalDate, onStartDateChange, onGoalDat
   return (
     <div style={sc.stepWrap}>
       <div style={sc.heading}>
-        <p style={sc.sub}>We'll track your progress from day one.</p>
         <h1 style={sc.h1}>When do you start?</h1>
+        <p style={sc.sub}>We'll track your progress from day one.</p>
       </div>
 
       <div style={sc.dateField}>
@@ -588,7 +588,7 @@ export default function FitnessSetup({ onComplete, onBack, isEditing = false }) 
               key={i}
               style={{
                 ...s.dot,
-                background: i < step ? 'var(--color-accent)' : 'var(--color-faint)',
+                background: i < step ? 'var(--color-accent)' : 'var(--color-border)',
               }}
             />
           ))}
@@ -702,7 +702,7 @@ const s = {
   backPlaceholder: { width: '40px' },
   dotsRow: {
     display:    'flex',
-    gap:        '7px',
+    gap:        '4px',
     alignItems: 'center',
   },
   dot: {
@@ -717,9 +717,16 @@ const s = {
     overflowX: 'hidden',
   },
   footer: {
+    position:      'fixed',
+    bottom:        0,
+    left:          '50%',
+    transform:     'translateX(-50%)',
+    width:         '100%',
+    maxWidth:      'var(--max-width)',
+    background:    'var(--color-bg)',
     padding:       '12px 20px',
-    paddingBottom: 'calc(var(--safe-bottom) + 12px)',
-    flexShrink:    0,
+    paddingBottom: 'calc(var(--safe-bottom) + 16px)',
+    zIndex:        10,
   },
   cta: {
     width:        '100%',
@@ -739,10 +746,10 @@ const s = {
 
 const sc = {
   stepWrap: {
-    padding:       '8px 20px 32px',
+    padding:       '4px 20px 120px',
     display:       'flex',
     flexDirection: 'column',
-    gap:           '20px',
+    gap:           '16px',
   },
 
   // Heading block (sub + h1 grouped tight)
@@ -757,7 +764,7 @@ const sc = {
   },
   h1: {
     fontFamily: 'var(--font-display)',
-    fontSize:   '28px',
+    fontSize:   '24px',
     color:      'var(--color-text)',
     lineHeight: 1.15,
   },
@@ -766,13 +773,13 @@ const sc = {
   cardList: {
     display:       'flex',
     flexDirection: 'column',
-    gap:           '10px',
+    gap:           '8px',
   },
   programCard: {
     display:       'flex',
     flexDirection: 'column',
     gap:           '4px',
-    padding:       '14px',
+    padding:       '12px',
     borderRadius:  'var(--radius-card)',
     textAlign:     'left',
     cursor:        'pointer',
@@ -795,7 +802,7 @@ const sc = {
     marginTop:  '6px',
   },
   tag: {
-    padding:      '3px 8px',
+    padding:      '2px 8px',
     borderRadius: 'var(--radius-pill)',
     fontSize:     '10px',
     fontWeight:   600,
