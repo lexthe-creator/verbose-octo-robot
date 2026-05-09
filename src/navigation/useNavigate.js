@@ -1,28 +1,24 @@
-import { useState, useCallback } from 'react'
-import { SCREENS } from '../constants/navigation'
-import { getRoute } from './router'
+import { useState, useRef, useCallback } from 'react'
+import { getRoute, isOverlay } from './router'
 
-export function useNavigate(initialScreen = SCREENS.HOME) {
-  const [screen,  setScreen]  = useState(initialScreen)
-  const [history, setHistory] = useState([initialScreen])
+export function useNavigate(initialScreen) {
+  const [screen, setScreen] = useState(initialScreen)
+  const historyRef = useRef([])
 
   const navigate = useCallback((target) => {
     if (!getRoute(target)) {
       console.warn(`[Router] Unknown screen: ${target}`)
       return
     }
+    if (isOverlay(target)) return
+    historyRef.current.push(screen)
     setScreen(target)
-    setHistory(prev => [...prev, target])
-  }, [])
+  }, [screen])
 
   const goBack = useCallback(() => {
-    setHistory(prev => {
-      if (prev.length <= 1) return prev
-      const next = prev.slice(0, -1)
-      setScreen(next[next.length - 1])
-      return next
-    })
+    if (historyRef.current.length === 0) return
+    setScreen(historyRef.current.pop())
   }, [])
 
-  return { screen, navigate, goBack, history }
+  return { screen, navigate, goBack }
 }

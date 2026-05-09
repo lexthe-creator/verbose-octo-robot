@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useDay, useFitness } from './context/index.js'
 import { SCREENS, NAV_TABS } from './constants/navigation.js'
-import { shouldShowNav } from './navigation/router.js'
+import { shouldShowNav, getRoute } from './navigation/router.js'
 import { useNavigate } from './navigation/useNavigate.js'
 import { getTodayISO, isThisWeek } from './utils/time.js'
 
@@ -18,15 +18,17 @@ import WorkoutPlayer   from './components/WorkoutPlayer.jsx'
 import EodReflection   from './screens/EodReflection.jsx'
 import WeeklyPlanning  from './screens/WeeklyPlanning.jsx'
 
+function getInitialScreen(dayLockedAt) {
+  if (!dayLockedAt) return SCREENS.IGNITION
+  const lockedDate = new Date(dayLockedAt).toDateString()
+  return lockedDate === new Date().toDateString() ? SCREENS.HOME : SCREENS.IGNITION
+}
+
 export default function App() {
   const { dayState }                      = useDay()
   const { fitnessState, fitnessDispatch } = useFitness()
 
-  const initialScreen = (() => {
-    if (!dayState.dayLockedAt) return SCREENS.IGNITION
-    const lockedDate = new Date(dayState.dayLockedAt).toDateString()
-    return lockedDate === new Date().toDateString() ? SCREENS.HOME : SCREENS.IGNITION
-  })()
+  const initialScreen = getInitialScreen(dayState.dayLockedAt)
 
   const { screen, navigate: navigateTo, goBack } = useNavigate(initialScreen)
 
@@ -75,11 +77,11 @@ export default function App() {
     setActiveWorkout(null)
   }
 
-  const hideNav = !shouldShowNav(screen)
+  const showNav = shouldShowNav(screen)
 
   return (
     <div style={styles.root}>
-      <div style={{ ...styles.screenWrap, paddingBottom: hideNav ? 0 : 'var(--nav-height)' }}>
+      <div style={{ ...styles.screenWrap, paddingBottom: showNav ? 'var(--nav-height)' : 0 }}>
         {screen === SCREENS.IGNITION && (
           <MorningIgnition onComplete={() => navigate(SCREENS.HOME)} />
         )}
@@ -113,7 +115,7 @@ export default function App() {
         {screen === SCREENS.FINANCE  && <Finance />}
       </div>
 
-      {!hideNav && (
+      {showNav && (
         <nav style={styles.nav}>
           {NAV_TABS.map(tab => {
             const active = screen === tab.screen
@@ -137,25 +139,25 @@ export default function App() {
         </nav>
       )}
 
-      {/* EOD Reflection — shows after 7pm if not logged today; priority over weekly plan */}
-      {showReflection && screen !== SCREENS.IGNITION && screen !== SCREENS.FOCUS && (
-        <EodReflection
-          onComplete={() => {
-            localStorage.setItem('lastReflectionDate', getTodayISO())
-            setShowReflection(false)
-          }}
-        />
-      )}
-
-      {/* Sunday Weekly Planning — shows Sunday ≥5pm if not planned this week */}
-      {showWeeklyPlan && !showReflection && screen !== SCREENS.IGNITION && (
-        <WeeklyPlanning
-          onComplete={() => {
-            localStorage.setItem('lastWeeklyPlanDate', getTodayISO())
-            setShowWeeklyPlan(false)
-          }}
-        />
-      )}
+      {[
+        {
+          screen:   SCREENS.EOD,
+          active:   showReflection && screen !== SCREENS.IGNITION && screen !== SCREENS.FOCUS,
+          onComplete() { localStorage.setItem('lastReflectionDate',  getTodayISO()); setShowReflection(false) },
+        },
+        {
+          screen:   SCREENS.WEEKLY,
+          active:   showWeeklyPlan && !showReflection && screen !== SCREENS.IGNITION,
+          onComplete() { localStorage.setItem('lastWeeklyPlanDate', getTodayISO()); setShowWeeklyPlan(false) },
+        },
+      ]
+        .filter(o => o.active)
+        .sort((a, b) => (getRoute(a.screen)?.overlayPriority ?? 0) - (getRoute(b.screen)?.overlayPriority ?? 0))
+        .map(o => o.screen === SCREENS.EOD
+          ? <EodReflection  key={SCREENS.EOD}    onComplete={o.onComplete} />
+          : <WeeklyPlanning key={SCREENS.WEEKLY} onComplete={o.onComplete} />
+        )
+      }
 
       {activeWorkout && (
         <WorkoutPlayer

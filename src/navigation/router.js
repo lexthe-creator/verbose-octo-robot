@@ -1,19 +1,19 @@
 import { SCREENS } from '../constants/navigation'
 
-export const ROUTES = [
-  { screen: SCREENS.HOME,     showNav: true,  overlay: false },
-  { screen: SCREENS.FITNESS,  showNav: true,  overlay: false },
-  { screen: SCREENS.INBOX,    showNav: true,  overlay: false },
-  { screen: SCREENS.PROJECTS, showNav: true,  overlay: false },
-  { screen: SCREENS.FINANCE,  showNav: true,  overlay: false },
-  { screen: SCREENS.FITNESS_SETUP, showNav: false, overlay: false },
-  { screen: SCREENS.SETTINGS,      showNav: false, overlay: false },
-  { screen: SCREENS.IGNITION, showNav: false, overlay: false },
-  { screen: SCREENS.FOCUS,    showNav: false, overlay: false },
-  { screen: SCREENS.EOD,      showNav: false, overlay: true,  overlayPriority: 200 },
-  { screen: SCREENS.WEEKLY,   showNav: false, overlay: true,  overlayPriority: 190 },
-]
+const ROUTES = new Map([
+  [SCREENS.HOME,          { showNav: true,  isOverlay: false }],
+  [SCREENS.FITNESS,       { showNav: true,  isOverlay: false }],
+  [SCREENS.INBOX,         { showNav: true,  isOverlay: false }],
+  [SCREENS.PROJECTS,      { showNav: true,  isOverlay: false }],
+  [SCREENS.FINANCE,       { showNav: true,  isOverlay: false }],
+  [SCREENS.FITNESS_SETUP, { showNav: false, isOverlay: false }],
+  [SCREENS.SETTINGS,      { showNav: false, isOverlay: false }],
+  [SCREENS.IGNITION,      { showNav: false, isOverlay: false }],
+  [SCREENS.FOCUS,         { showNav: false, isOverlay: false }],
+  [SCREENS.EOD,           { showNav: false, isOverlay: true, overlayPriority: 1 }],
+  [SCREENS.WEEKLY,        { showNav: false, isOverlay: true, overlayPriority: 2 }],
+])
 
-export const getRoute      = (screen) => ROUTES.find(r => r.screen === screen)
-export const shouldShowNav = (screen) => getRoute(screen)?.showNav ?? false
-export const isOverlay     = (screen) => getRoute(screen)?.overlay ?? false
+export function getRoute(screen)      { return ROUTES.get(screen) }
+export function shouldShowNav(screen) { return ROUTES.get(screen)?.showNav    ?? false }
+export function isOverlay(screen)     { return ROUTES.get(screen)?.isOverlay  ?? false }
