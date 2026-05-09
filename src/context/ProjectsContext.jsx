@@ -121,16 +121,27 @@ function loadProjectsState() {
     const raw = localStorage.getItem(PROJECTS_STORAGE_KEY)
     if (raw) {
       const stored = JSON.parse(raw)
-      if (stored.version === SCHEMA_VERSION) return { ...initialProjectsState, ...stored.data }
+      if (stored.version === SCHEMA_VERSION) {
+        const projects         = stored.data.projects ?? []
+        const migratedProjects = projects.map((p, i) => ({
+          ...p,
+          status: p.status ?? (i === 0 ? PROJECT_STATUS.FOCUS : PROJECT_STATUS.ACTIVE),
+        }))
+        return { ...initialProjectsState, ...stored.data, projects: migratedProjects }
+      }
       return initialProjectsState
     }
     // One-time migration from legacy aiml_state
     const legacyRaw = localStorage.getItem('aiml_state')
     if (legacyRaw) {
       try {
-        const parsed   = JSON.parse(legacyRaw)
-        const projects = parsed.projects ?? loadLegacyProjects()
-        return { ...initialProjectsState, projects }
+        const parsed           = JSON.parse(legacyRaw)
+        const projects         = parsed.projects ?? loadLegacyProjects()
+        const migratedProjects = projects.map((p, i) => ({
+          ...p,
+          status: p.status ?? (i === 0 ? PROJECT_STATUS.FOCUS : PROJECT_STATUS.ACTIVE),
+        }))
+        return { ...initialProjectsState, projects: migratedProjects }
       } catch {
         return { ...initialProjectsState, projects: loadLegacyProjects() }
       }
