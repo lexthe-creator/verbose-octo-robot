@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useDay, useFitness, useProjects, usePlanning } from '../context/index.js'
-import { getTypeForDay, getWeekNumber } from '../utils/fitness.js'
+import { getTypeForDay } from '../utils/fitness.js'
 import { getProjectPace } from '../utils/projectUtils.js'
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────

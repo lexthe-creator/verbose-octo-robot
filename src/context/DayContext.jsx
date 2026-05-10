@@ -43,7 +43,7 @@ const initialDayState = {
 function applyDayReset(saved) {
   const carried = (saved.tasks || [])
     .filter(t => t.scheduledFor === 'tomorrow')
-    .map(({ scheduledFor, carryOver, done, ...rest }) => ({ ...rest, done: false }))
+    .map(({ scheduledFor: _sf, done: _done, ...rest }) => ({ ...rest, done: false }))
 
   return {
     ...initialDayState,

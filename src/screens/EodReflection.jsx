@@ -94,8 +94,7 @@ export default function EodReflection({ onComplete }) {
   const [addDraft,     setAddDraft]     = useState('')
   const addInputRef = useRef(null)
 
-  const today    = new Date().toISOString().slice(0, 10)
-  const undone   = dayState.tasks.filter(t => !t.done)
+  const today = new Date().toISOString().slice(0, 10)
 
   function toggleCarry(id) {
     setCarrySet(prev => {
