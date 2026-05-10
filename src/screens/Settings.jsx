@@ -200,13 +200,23 @@ export default function Settings({ onBack, onNavigate }) {
         <p style={s.debugLabel}>DEBUG — remove before App Store submission</p>
         <button
           style={s.debugBtn}
-          onClick={() => { localStorage.removeItem('aiml_fitness'); window.location.reload() }}
+          onClick={() => {
+            localStorage.removeItem('aiml_fitness')
+            localStorage.removeItem('lastReflectionDate')
+            localStorage.removeItem('lastWeeklyPlanDate')
+            window.location.reload()
+          }}
         >
           Reset fitness program
         </button>
         <button
           style={s.debugBtn}
-          onClick={() => { localStorage.removeItem('aiml_projects'); window.location.reload() }}
+          onClick={() => {
+            localStorage.removeItem('aiml_projects')
+            localStorage.removeItem('lastReflectionDate')
+            localStorage.removeItem('lastWeeklyPlanDate')
+            window.location.reload()
+          }}
         >
           Reset project data
         </button>
