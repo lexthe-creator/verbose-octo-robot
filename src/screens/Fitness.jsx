@@ -2,24 +2,20 @@ import { useState } from 'react'
 import { useFitness }  from '../context/index.js'
 import { useSettings } from '../context/SettingsContext.jsx'
 import FitnessSetup    from './FitnessSetup.jsx'
-import {
-  getPhase, getWeekNumber,
-  getWeekDates, getTypeForDay,
-  generateWorkout,
-} from '../utils/fitness.js'
-import { WORKOUT_TYPES, PHASE_LABELS } from '../constants/fitness.js'
+import { getPhase, getWeekNumber, getWeekDates } from '../utils/fitness.js'
+import { PHASE_LABELS } from '../constants/fitness.js'
+import { generateWorkout } from '../utils/workoutGenerator.js'
 
-const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
-const DAY_NAMES  = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+const DAY_LABELS    = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+const DAY_NAMES     = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+// Canonical Mon–Sun key order matching getWeekDates() output index
+const WEEK_DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 
 const TYPE_ABBR = {
-  [WORKOUT_TYPES.EASY_RUN]:   'R',
-  [WORKOUT_TYPES.TEMPO_RUN]:  'R',
-  [WORKOUT_TYPES.LONG_RUN]:   'R',
-  [WORKOUT_TYPES.STRENGTH_A]: 'US',
-  [WORKOUT_TYPES.STRENGTH_B]: 'LS',
-  [WORKOUT_TYPES.STRETCH]:    'ST',
-  [WORKOUT_TYPES.REST]:       '—',
+  run_easy: 'R', run_tempo: 'R', run_long: 'R',
+  upper: 'US', lower: 'LS', full_body: 'FB',
+  push: 'P', pull: 'PL', mobility: 'MO',
+  rest: '—',
 }
 
 const FEEL_LABELS = ['', 'drained', 'flat', 'good', 'great', 'charged']
@@ -60,13 +56,15 @@ function PreviewSection({ title, segs }) {
 function TodayCard({ workout, todayComplete, isToday, onStart }) {
   const [expanded, setExpanded] = useState(false)
 
-  const canStart    = isToday && workout.type !== 'rest' && !todayComplete
-  const hasPreview  = workout.type !== 'rest' && workout.segments.length > 0
-  const abbr        = TYPE_ABBR[workout.type] || '?'
+  const isRest      = !workout.dayType || workout.dayType === 'rest'
+  const canStart    = isToday && !isRest && !todayComplete
+  const hasPreview  = !isRest && (workout.segments?.length ?? 0) > 0
+  const abbr        = TYPE_ABBR[workout.dayType] || '?'
+  const subtitle    = isRest ? 'No session today' : `~${workout.estimatedMinutes} min`
 
-  const warmupSegs = workout.segments.filter(s => s.section === 'warmup')
-  const mainSegs   = workout.segments.filter(s => s.section === 'main' || !s.section)
-  const coolSegs   = workout.segments.filter(s => s.section === 'cooldown')
+  const warmupSegs = (workout.segments ?? []).filter(s => s.section === 'warmup')
+  const mainSegs   = (workout.segments ?? []).filter(s => s.section === 'main' || !s.section)
+  const coolSegs   = (workout.segments ?? []).filter(s => s.section === 'cooldown')
 
   return (
     <div style={tc.wrap}>
@@ -78,7 +76,7 @@ function TodayCard({ workout, todayComplete, isToday, onStart }) {
         <span style={tc.abbr}>{abbr}</span>
         <div style={tc.info}>
           <p style={tc.name}>{workout.title}</p>
-          <p style={tc.sub}>{workout.subtitle}</p>
+          <p style={tc.sub}>{subtitle}</p>
         </div>
         {isToday && todayComplete && (
           <span style={tc.doneBadge}>Done</span>
@@ -103,7 +101,7 @@ function TodayCard({ workout, todayComplete, isToday, onStart }) {
           {coolSegs.length   > 0 && <PreviewSection title="COOL DOWN" segs={coolSegs}   />}
 
           <div style={tc.prevFooter}>
-            <span style={tc.prevTotal}>~{workout.durationEst} min</span>
+            <span style={tc.prevTotal}>~{workout.estimatedMinutes} min</span>
             {canStart && (
               <button style={tc.startInPreview} onClick={onStart}>
                 Start Workout
@@ -117,7 +115,7 @@ function TodayCard({ workout, todayComplete, isToday, onStart }) {
       </div>
 
       {/* Collapsed-state start / completed button */}
-      {isToday && workout.type !== 'rest' && !expanded && (
+      {isToday && !isRest && !expanded && (
         <button
           style={{
             ...tc.startBtn,
@@ -264,15 +262,15 @@ const tc = {
 
 // ─── Weekly strip ─────────────────────────────────────────────────────────────
 
-function WeekStrip({ weekDates, selectedIndex, onSelect }) {
+function WeekStrip({ weekDates, programDayTypes, selectedIndex, onSelect }) {
   const todayIndex = todayWeekIndex()
 
   return (
     <div style={ws.scroll}>
-      {weekDates.map((date, i) => {
+      {weekDates.map((_date, i) => {
         const isToday    = i === todayIndex
         const isSelected = i === selectedIndex
-        const type       = getTypeForDay(date.getDay())
+        const type       = programDayTypes?.[WEEK_DAY_KEYS[i]] ?? 'rest'
         const abbr       = TYPE_ABBR[type] || '—'
 
         let bg, borderColor, labelColor, abbrColor
@@ -406,9 +404,17 @@ export default function Fitness({ onStartWorkout }) {
   const todayIdx    = todayWeekIndex()
 
   const viewingIndex   = selectedIndex ?? todayIdx
-  const viewingDate    = weekDates[viewingIndex]
-  const viewingType    = getTypeForDay(viewingDate.getDay())
-  const viewedWorkout  = generateWorkout(viewingType, gymAccess, weekNum)
+  const viewingDayKey  = WEEK_DAY_KEYS[viewingIndex]
+  const viewingType    = fitnessState.programConfig.dayTypes[viewingDayKey] ?? 'rest'
+  // weekInPhase: position within the 4-week repeating block (1–4)
+  const weekInPhase    = ((weekNum - 1) % 13 % 4) + 1
+  const viewedWorkout  = generateWorkout({
+    dayType:    viewingType,
+    equipment:  gymAccess,
+    phase:      phaseKey,
+    weekInPhase,
+    history:    workoutLog,
+  })
   const isViewingToday = selectedIndex === null || selectedIndex === todayIdx
 
   const recentLog = [...workoutLog].reverse().slice(0, 5)
@@ -436,6 +442,7 @@ export default function Fitness({ onStartWorkout }) {
         <p style={s.sectionLabel}>This week</p>
         <WeekStrip
           weekDates={weekDates}
+          programDayTypes={fitnessState.programConfig.dayTypes}
           selectedIndex={selectedIndex}
           onSelect={setSelectedIndex}
         />

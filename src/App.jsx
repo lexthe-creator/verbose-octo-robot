@@ -73,7 +73,7 @@ export default function App() {
   }
 
   function handleWorkoutComplete(log) {
-    fitnessDispatch({ type: 'LOG_WORKOUT', payload: log })
+    if (log !== null) fitnessDispatch({ type: 'LOG_WORKOUT', payload: log })
     setActiveWorkout(null)
   }
 
@@ -164,6 +164,7 @@ export default function App() {
           workout={activeWorkout}
           onComplete={handleWorkoutComplete}
           onClose={() => setActiveWorkout(null)}
+          audioEnabled={fitnessState.programConfig.audioEnabled}
         />
       )}
     </div>
