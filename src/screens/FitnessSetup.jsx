@@ -143,8 +143,7 @@ function Step1({ selectedProgram, onSelect }) {
               onClick={() => onSelect(prog.id)}
             >
               <p style={sc.programTitle}>{prog.title}</p>
-              <p style={sc.programDesc}>{prog.lines[0]}</p>
-              <p style={sc.programDesc}>{prog.lines[1]}</p>
+              <p style={sc.programDesc}>{prog.lines[0]} {prog.lines[1]}</p>
               <div style={sc.tagRow}>
                 {prog.tags.map(tag => (
                   <span
@@ -682,6 +681,8 @@ const s = {
     maxWidth:      'var(--max-width)',
     left:          '50%',
     transform:     'translateX(-50%)',
+    height:        '100%',
+    overflow:      'hidden',
   },
   topBar: {
     display:        'flex',
@@ -749,14 +750,14 @@ const sc = {
     padding:       '4px 20px 120px',
     display:       'flex',
     flexDirection: 'column',
-    gap:           '16px',
+    gap:           '12px',
   },
 
   // Heading block (sub + h1 grouped tight)
   heading: {
     display:       'flex',
     flexDirection: 'column',
-    gap:           '6px',
+    gap:           '4px',
   },
   sub: {
     fontSize: '13px',
@@ -773,38 +774,38 @@ const sc = {
   cardList: {
     display:       'flex',
     flexDirection: 'column',
-    gap:           '8px',
+    gap:           '6px',
   },
   programCard: {
     display:       'flex',
     flexDirection: 'column',
-    gap:           '4px',
-    padding:       '12px',
+    gap:           '2px',
+    padding:       '10px 12px',
     borderRadius:  'var(--radius-card)',
     textAlign:     'left',
     cursor:        'pointer',
     transition:    'border-color 0.15s, background 0.15s',
   },
   programTitle: {
-    fontSize:   '15px',
+    fontSize:   '13px',
     fontWeight: 600,
     color:      'var(--color-text)',
   },
   programDesc: {
-    fontSize:   '12px',
+    fontSize:   '11px',
     color:      'var(--color-muted)',
-    lineHeight: 1.4,
+    lineHeight: 1.3,
   },
   tagRow: {
     display:    'flex',
-    gap:        '6px',
+    gap:        '4px',
     flexWrap:   'wrap',
-    marginTop:  '6px',
+    marginTop:  '4px',
   },
   tag: {
-    padding:      '2px 8px',
+    padding:      '2px 6px',
     borderRadius: 'var(--radius-pill)',
-    fontSize:     '10px',
+    fontSize:     '9px',
     fontWeight:   600,
   },
 
