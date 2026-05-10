@@ -18,7 +18,12 @@ const TYPE_ABBR = {
   rest: '—',
 }
 
-const FEEL_LABELS = ['', 'drained', 'flat', 'good', 'great', 'charged']
+// Maps 1–10 feel score to display label. Sparse object handles both legacy (1–5)
+// and current (1–10) entries stored in workoutLog.
+const FEEL_LABELS = {
+  1: 'tough', 2: 'hard', 3: 'hard', 4: 'fair', 5: 'ok',
+  6: 'decent', 7: 'good', 8: 'great', 9: 'excellent', 10: 'best',
+}
 
 function todayWeekIndex() {
   return (new Date().getDay() + 6) % 7

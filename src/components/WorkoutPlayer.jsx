@@ -12,13 +12,7 @@ const SECTION_LABELS = {
   cooldown: 'COOL DOWN',
 }
 
-const FEEL_OPTIONS = [
-  { value: 1, label: 'Tough' },
-  { value: 2, label: 'Hard'  },
-  { value: 3, label: 'Good'  },
-  { value: 4, label: 'Great' },
-  { value: 5, label: 'Best'  },
-]
+const FEEL_SCALE = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 // ─── Audio helper ──────────────────────────────────────────────────────────────
 
@@ -506,7 +500,7 @@ function SetsRepsSegment({
 // ─── Post-workout log ──────────────────────────────────────────────────────────
 
 function PostWorkoutLog({ durationMin, onSave, onSkip }) {
-  const [feel,  setFeel]  = useState(3)
+  const [feel,  setFeel]  = useState(5)
   const [notes, setNotes] = useState('')
 
   return (
@@ -516,30 +510,36 @@ function PostWorkoutLog({ durationMin, onSave, onSkip }) {
 
       <div style={pw.field}>
         <p style={pw.fieldLabel}>How did that feel?</p>
+        {/* 1–10 horizontal number scale anchored Tough / Best */}
         <div style={pw.feelRow}>
-          {FEEL_OPTIONS.map(opt => (
+          {FEEL_SCALE.map(n => (
             <button
-              key={opt.value}
+              key={n}
               style={{
                 ...pw.feelBtn,
-                background:  feel === opt.value ? 'var(--color-accent)'    : 'var(--color-card)',
-                borderColor: feel === opt.value ? 'var(--color-accent)'    : 'var(--color-border)',
-                color:       feel === opt.value ? '#fff'                   : 'var(--color-muted)',
+                background:  feel === n ? 'var(--color-accent)' : 'var(--color-card)',
+                borderColor: feel === n ? 'var(--color-accent)' : 'var(--color-border)',
+                color:       feel === n ? '#fff'                : 'var(--color-muted)',
               }}
-              onClick={() => setFeel(opt.value)}
+              onClick={() => setFeel(n)}
             >
-              {opt.label}
+              {n}
             </button>
           ))}
+        </div>
+        <div style={pw.feelAnchors}>
+          <span style={pw.feelAnchorLabel}>Tough</span>
+          <span style={pw.feelAnchorLabel}>Best</span>
         </div>
       </div>
 
       <div style={pw.field}>
+        <p style={pw.fieldLabel}>Journal entry</p>
         <textarea
           style={pw.notes}
           value={notes}
           rows={3}
-          placeholder="Any notes? (optional)"
+          placeholder="How did you feel? What worked? What was hard?"
           onChange={e => setNotes(e.target.value)}
         />
       </div>
@@ -992,17 +992,28 @@ const pw = {
   },
   feelRow: {
     display: 'flex',
-    gap:     '6px',
+    gap:     '4px',
   },
   feelBtn: {
     flex:         1,
-    padding:      '10px 4px',
+    padding:      '10px 2px',
     borderRadius: 'var(--radius-sm)',
     border:       '0.5px solid',
-    fontSize:     '13px',
+    fontSize:     '12px',
     fontWeight:   600,
     cursor:       'pointer',
     transition:   'background 0.15s, border-color 0.15s, color 0.15s',
+    minWidth:     0,
+  },
+  feelAnchors: {
+    display:        'flex',
+    justifyContent: 'space-between',
+    marginTop:      '-4px',
+  },
+  feelAnchorLabel: {
+    fontSize:  '10px',
+    color:     'var(--color-muted)',
+    fontWeight: 500,
   },
   notes: {
     background:   'var(--color-card)',
