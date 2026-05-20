@@ -377,6 +377,11 @@ function getTimelinePreview(items, nowMinutes) {
   }
 }
 
+function getBurnBarLabel(timelinePreview) {
+  if (!timelinePreview.next) return 'Clear for now'
+  return `Next ${formatMins(timelinePreview.next.timeMins)} · ${timelinePreview.next.label}`
+}
+
 function TimelinePreview({ preview }) {
   const nextLabel = preview.next
     ? `${formatMins(preview.next.timeMins)} · ${preview.next.label}`
@@ -810,7 +815,7 @@ const ss = {
 
 // ─── Today's Training card ─────────────────────────────────────────────────────
 
-function TodayTrainingCard({ todayComplete, gymAccess, weekNumber, onStart }) {
+function TodayTrainingCard({ todayComplete, gymAccess, weekNumber, onStart, compact = false }) {
   const todayType = getTodayType()
   const workout   = generateWorkout(todayType, gymAccess, weekNumber)
   const canStart  = workout.type !== 'rest' && !todayComplete
@@ -820,8 +825,8 @@ function TodayTrainingCard({ todayComplete, gymAccess, weekNumber, onStart }) {
       <div style={tt.top}>
         <span style={tt.typeTag}>{WORKOUT_LABEL[workout.type] ?? 'Workout'}</span>
         <div style={tt.info}>
-          <p style={tt.name}>{workout.title}</p>
-          <p style={tt.sub}>{workout.subtitle}</p>
+          <p style={tt.name}>{compact ? 'Workout details' : workout.title}</p>
+          <p style={tt.sub}>{compact ? 'Warmup · Main · Cooldown' : workout.subtitle}</p>
         </div>
         {todayComplete && <span style={tt.doneBadge}>✓ Done</span>}
       </div>
@@ -829,9 +834,14 @@ function TodayTrainingCard({ todayComplete, gymAccess, weekNumber, onStart }) {
         <button
           style={{
             ...tt.startBtn,
-            background: todayComplete ? 'var(--color-success-bg)' : 'var(--color-accent)',
-            color:      todayComplete ? 'var(--color-success)'    : '#fff',
-            border:     todayComplete ? '0.5px solid var(--color-success)' : 'none',
+            ...(compact ? tt.startBtnSecondary : {}),
+            background: todayComplete
+              ? 'var(--color-success-bg)'
+              : compact
+                ? 'var(--color-chart-bar)'
+                : 'var(--color-accent)',
+            color:      todayComplete ? 'var(--color-success)' : compact ? 'var(--color-muted)' : '#fff',
+            border:     todayComplete ? '0.5px solid var(--color-success)' : compact ? 'var(--border)' : 'none',
             cursor:     canStart ? 'pointer' : 'default',
           }}
           onClick={canStart ? onStart : undefined}
@@ -964,6 +974,10 @@ const tt = {
     fontSize:     '14px',
     fontWeight:   600,
   },
+  startBtnSecondary: {
+    padding:  '10px',
+    fontSize: '13px',
+  },
 }
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
@@ -1030,6 +1044,10 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
   const timelinePreview = useMemo(
     () => getTimelinePreview(timelineItems, currentMins),
     [timelineItems, currentMins]
+  )
+  const burnBarLabel = useMemo(
+    () => getBurnBarLabel(timelinePreview),
+    [timelinePreview]
   )
 
   const showFocusProjects = enabledModules.focus || enabledModules.goals || !!focusProject
@@ -1128,7 +1146,7 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
         onOpenSettings={() => onNavigate(SCREENS.SETTINGS)}
       />
 
-      <BurnBar now={now} nextLabel={nextAction.detail} />
+      <BurnBar now={now} nextLabel={burnBarLabel} />
 
       <div style={s.cards}>
         <CollapsibleCard
@@ -1146,7 +1164,7 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
           <CollapsibleCard
             id={SECTION_KEYS.TRAINING}
             title="Training"
-            subtitle={fitnessState.todayComplete ? 'Completed today' : todayWorkout.title}
+            subtitle={fitnessState.todayComplete ? 'Completed today' : nextAction.type === 'workout' ? 'Warmup · Main · Cooldown' : todayWorkout.title}
             expanded={expandedSection === SECTION_KEYS.TRAINING}
             onToggle={handleToggleSection}
           >
@@ -1155,6 +1173,7 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
               gymAccess={settingsState.gymAccess}
               weekNumber={weekNumber}
               onStart={handleStartTodayWorkout}
+              compact={nextAction.type === 'workout'}
             />
           </CollapsibleCard>
         )}
@@ -1211,10 +1230,10 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
             expanded={expandedSection === SECTION_KEYS.FOCUS}
             onToggle={handleToggleSection}
           >
-            {enabledModules.focus && (
-              <button style={s.focusLaunchBtn} onClick={onOpenFocus}>
-                Start focus timer
-              </button>
+            {enabledModules.focus && !focusProject && (
+              <p style={s.focusContext}>
+                Focus timer is ready from the hero or secondary action.
+              </p>
             )}
             {(enabledModules.goals || focusProject) && (
               <>
@@ -1289,15 +1308,14 @@ const s = {
     gridTemplateColumns: 'repeat(2, 1fr)',
     gap:                 'var(--space-2)',
   },
-  focusLaunchBtn: {
-    width:        '100%',
-    minHeight:    '42px',
+  focusContext: {
+    margin:       0,
+    padding:      '10px 12px',
     borderRadius: 'var(--radius-sm)',
-    border:       'none',
-    background:   'var(--color-accent)',
-    color:        '#fff',
-    fontSize:     '14px',
-    fontWeight:   700,
-    cursor:       'pointer',
+    border:       'var(--border)',
+    background:   'var(--color-chart-bar)',
+    color:        'var(--color-muted)',
+    fontSize:     '13px',
+    lineHeight:   1.4,
   },
 }
