@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useUser } from '../context/UserContext.jsx'
 import { useSettings } from '../context/SettingsContext.jsx'
 import { useDay, useFitness, useProjects, getProjectStats } from '../context/index.js'
@@ -49,109 +49,6 @@ function getEnabledModules(modules = {}) {
   }
 }
 
-function buildAction({
-  type,
-  title,
-  detail,
-  ctaLabel,
-  section,
-  accent = 'var(--color-accent)',
-  ...extra
-}) {
-  return { type, title, detail, ctaLabel, section, accent, ...extra }
-}
-
-function getHomeNextAction({ dayState, fitnessState, modules, now, todayWorkout }) {
-  const enabled = getEnabledModules(modules)
-  const currentMins = toMins(now)
-
-  const scheduledTasks = [...(dayState.tasks || [])]
-    .filter(task => task.scheduledTime && !task.done)
-    .map(task => ({ ...task, timeMins: parseHHMM(task.scheduledTime) }))
-    .filter(task => task.timeMins >= 0)
-    .sort((a, b) => a.timeMins - b.timeMins)
-
-  const overdueTask = scheduledTasks
-    .filter(task => task.timeMins < currentMins)
-    .sort((a, b) => a.timeMins - b.timeMins)[0]
-  if (overdueTask) {
-    return buildAction({
-      type:     'task',
-      taskId:   overdueTask.id,
-      title:    overdueTask.text,
-      detail:   `Scheduled for ${formatMins(overdueTask.timeMins)}`,
-      ctaLabel: 'Mark done',
-      section:  SECTION_KEYS.TASKS,
-      accent:   'var(--color-danger)',
-    })
-  }
-
-  // Existing persisted state does not support active/in-progress workout resumes.
-
-  const nextTask = scheduledTasks.find(task => task.timeMins >= currentMins)
-  if (nextTask) {
-    return buildAction({
-      type:     'task',
-      taskId:   nextTask.id,
-      title:    nextTask.text,
-      detail:   `Next at ${formatMins(nextTask.timeMins)}`,
-      ctaLabel: 'Mark done',
-      section:  SECTION_KEYS.TASKS,
-    })
-  }
-
-  if (enabled.nutrition) {
-    const nextMeal = Object.entries(dayState.meals || {})
-      .map(([slot, meal]) => ({
-        slot,
-        meal,
-        startMins: parseHHMM(meal.startTime),
-        endMins:   parseHHMM(meal.endTime),
-      }))
-      .filter(({ meal, endMins }) => !meal.eaten && endMins >= currentMins)
-      .sort((a, b) => a.startMins - b.startMins)[0]
-
-    if (nextMeal) {
-      return buildAction({
-        type:     'meal',
-        slot:     nextMeal.slot,
-        title:    nextMeal.meal.label,
-        detail:   `${formatMealTime(nextMeal.meal.startTime)} - ${formatMealTime(nextMeal.meal.endTime)}`,
-        ctaLabel: 'Mark eaten',
-        section:  SECTION_KEYS.MEALS,
-      })
-    }
-  }
-
-  if (enabled.fitness && todayWorkout?.type !== 'rest' && !fitnessState.todayComplete) {
-    return buildAction({
-      type:     'workout',
-      title:    todayWorkout.title,
-      detail:   todayWorkout.subtitle,
-      ctaLabel: 'Start workout',
-      section:  SECTION_KEYS.TRAINING,
-    })
-  }
-
-  if (enabled.focus) {
-    return buildAction({
-      type:     'focus',
-      title:    'Start a focus session',
-      detail:   'Pick one thing and protect the next block.',
-      ctaLabel: 'Start focus',
-      section:  SECTION_KEYS.FOCUS,
-    })
-  }
-
-  return buildAction({
-    type:     'inbox',
-    title:    'Capture what is on your mind',
-    detail:   'Get it out of working memory. Sort it later.',
-    ctaLabel: 'Open inbox',
-    section:  null,
-  })
-}
-
 // ─── Hero header ───────────────────────────────────────────────────────────────
 
 function greeting(now, name) {
@@ -160,7 +57,18 @@ function greeting(now, name) {
   return `Good ${part}, ${name}`
 }
 
-function HomeHero({ now, name, nextAction, secondaryAction, onPrimary, onSecondary, onOpenSettings }) {
+function QuickActionsHero({
+  now,
+  name,
+  showFocus,
+  showMeals,
+  showWorkout,
+  onFocus,
+  onJournal,
+  onMeals,
+  onWorkout,
+  onOpenSettings,
+}) {
   return (
     <div style={hero.wrap}>
       <div style={hero.topRow}>
@@ -172,17 +80,30 @@ function HomeHero({ now, name, nextAction, secondaryAction, onPrimary, onSeconda
       <div style={hero.dateRow}>
         <p style={hero.date}>{formatFullDate(now)}</p>
       </div>
-      <div style={{ ...hero.actionCard, borderColor: nextAction.accent }}>
-        <span style={{ ...hero.actionKicker, color: nextAction.accent }}>Next action</span>
-        <h1 style={hero.actionTitle}>{nextAction.title}</h1>
-        <p style={hero.actionDetail}>{nextAction.detail}</p>
-        <div style={hero.actionRow}>
-          <button style={{ ...hero.primaryBtn, background: nextAction.accent }} onClick={onPrimary}>
-            {nextAction.ctaLabel}
+      <div style={hero.actionCard}>
+        <h1 style={hero.actionTitle}>What do you need right now?</h1>
+        <p style={hero.actionDetail}>Pick the support that fits this moment.</p>
+        <div style={hero.quickGrid}>
+          {showFocus && (
+            <button style={hero.quickBtn} onClick={onFocus}>
+              <span style={hero.quickIcon}>⊙</span>
+              <span>Focus</span>
+            </button>
+          )}
+          <button style={hero.quickBtn} onClick={onJournal}>
+            <span style={hero.quickIcon}>◇</span>
+            <span>Journal</span>
           </button>
-          {secondaryAction && (
-            <button style={hero.secondaryBtn} onClick={onSecondary}>
-              {secondaryAction.label}
+          {showMeals && (
+            <button style={hero.quickBtn} onClick={onMeals}>
+              <span style={hero.quickIcon}>◷</span>
+              <span>Meals</span>
+            </button>
+          )}
+          {showWorkout && (
+            <button style={hero.quickBtn} onClick={onWorkout}>
+              <span style={hero.quickIcon}>◉</span>
+              <span>Workout</span>
             </button>
           )}
         </div>
@@ -214,24 +135,18 @@ const hero = {
   actionCard: {
     marginTop:      '16px',
     background:     'var(--color-card)',
-    border:         '0.5px solid var(--color-accent)',
+    border:         'var(--border)',
     borderRadius:   'var(--radius-card)',
     padding:        '16px',
     display:        'flex',
     flexDirection:  'column',
-    gap:            '8px',
-  },
-  actionKicker: {
-    fontSize:       '10px',
-    fontWeight:     700,
-    letterSpacing:  '0.08em',
-    textTransform:  'uppercase',
+    gap:            '12px',
   },
   actionTitle: {
     margin:         0,
     fontFamily:    'var(--font-display)',
-    fontSize:      '30px',
-    lineHeight:    1.05,
+    fontSize:      '28px',
+    lineHeight:    1.08,
     fontWeight:    400,
     color:         'var(--color-text)',
   },
@@ -241,32 +156,29 @@ const hero = {
     lineHeight: 1.45,
     color:      'var(--color-muted)',
   },
-  actionRow: {
+  quickGrid: {
     display:             'grid',
-    gridTemplateColumns: 'minmax(0, 1fr) auto',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
     gap:                 '8px',
-    marginTop:           '6px',
   },
-  primaryBtn: {
+  quickBtn: {
     minHeight:     '44px',
-    border:        'none',
-    borderRadius:  'var(--radius-sm)',
-    color:         '#fff',
-    fontSize:      '14px',
-    fontWeight:    700,
-    cursor:        'pointer',
-  },
-  secondaryBtn: {
-    minHeight:     '44px',
-    padding:       '0 14px',
     borderRadius:  'var(--radius-sm)',
     border:        'var(--border)',
     background:    'var(--color-chart-bar)',
-    color:         'var(--color-muted)',
+    color:         'var(--color-text)',
+    display:       'flex',
+    alignItems:    'center',
+    justifyContent:'center',
+    gap:           '7px',
     fontSize:      '13px',
-    fontWeight:    600,
+    fontWeight:    700,
     cursor:        'pointer',
-    whiteSpace:    'nowrap',
+  },
+  quickIcon: {
+    color:      'var(--color-accent)',
+    fontSize:   '14px',
+    lineHeight: 1,
   },
 }
 
@@ -999,8 +911,7 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
 
   const [expandedTask, setExpandedTask] = useState(null)
   const [editingSlot, setEditingSlot] = useState(null)
-  const [expandedSection, setExpandedSection] = useState(null)
-  const didSetDefaultSection = useRef(false)
+  const [expandedSection, setExpandedSection] = useState(SECTION_KEYS.TIMELINE)
 
   const focusProject = useMemo(
     () => projectsState.projects?.find(p => p.status === PROJECT_STATUS.FOCUS) ?? null,
@@ -1026,17 +937,6 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
     [settingsState.gymAccess, weekNumber]
   )
 
-  const nextAction = useMemo(
-    () => getHomeNextAction({
-      dayState,
-      fitnessState,
-      modules: settingsState.modules,
-      now,
-      todayWorkout,
-    }),
-    [dayState, fitnessState, settingsState.modules, now, todayWorkout]
-  )
-
   const timelineItems = useMemo(
     () => buildTimeline(dayState, currentMins, { includePlannedWorkout: true }),
     [dayState, currentMins]
@@ -1051,22 +951,6 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
   )
 
   const showFocusProjects = enabledModules.focus || enabledModules.goals || !!focusProject
-  const availableSections = useMemo(() => [
-    SECTION_KEYS.TIMELINE,
-    ...(enabledModules.fitness ? [SECTION_KEYS.TRAINING] : []),
-    SECTION_KEYS.TASKS,
-    ...(enabledModules.nutrition ? [SECTION_KEYS.MEALS] : []),
-    ...(showFocusProjects ? [SECTION_KEYS.FOCUS] : []),
-  ], [enabledModules.fitness, enabledModules.nutrition, showFocusProjects])
-
-  useEffect(() => {
-    if (didSetDefaultSection.current) return
-    didSetDefaultSection.current = true
-    const preferred = nextAction.section && availableSections.includes(nextAction.section)
-      ? nextAction.section
-      : availableSections[0] ?? null
-    setExpandedSection(preferred)
-  }, [availableSections, nextAction.section])
 
   const projectSectionLabel = focusProject?.name
     ? focusProject.name.toUpperCase()
@@ -1098,51 +982,28 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
     onStartWorkout && onStartWorkout(todayWorkout)
   }
 
-  function handlePrimaryAction() {
-    if (nextAction.type === 'task') {
-      dayDispatch({ type: 'TOGGLE_TASK', payload: nextAction.taskId })
-      return
-    }
-    if (nextAction.type === 'meal') {
-      handleMarkEaten(nextAction.slot)
-      return
-    }
-    if (nextAction.type === 'workout') {
-      handleStartTodayWorkout()
-      return
-    }
-    if (nextAction.type === 'focus') {
-      onOpenFocus()
-      return
-    }
-    onNavigate(SCREENS.INBOX)
-  }
-
-  function handleSecondaryAction() {
-    if (nextAction.type === 'focus') onNavigate(SCREENS.INBOX)
-    else if (enabledModules.focus) onOpenFocus()
-    else onNavigate(SCREENS.INBOX)
-  }
-
   function handleToggleSection(id) {
     setExpandedSection(prev => prev === id ? null : id)
   }
 
-  const secondaryAction = nextAction.type === 'focus'
-    ? { label: 'Inbox' }
-    : enabledModules.focus
-      ? { label: 'Focus' }
-      : { label: 'Inbox' }
+  function handleOpenMeals() {
+    setExpandedSection(SECTION_KEYS.MEALS)
+  }
+
+  const canStartWorkout = enabledModules.fitness && todayWorkout.type !== 'rest' && !fitnessState.todayComplete
 
   return (
     <div style={s.screen}>
-      <HomeHero
+      <QuickActionsHero
         now={now}
         name={userState.name}
-        nextAction={nextAction}
-        secondaryAction={secondaryAction}
-        onPrimary={handlePrimaryAction}
-        onSecondary={handleSecondaryAction}
+        showFocus={enabledModules.focus}
+        showMeals={enabledModules.nutrition}
+        showWorkout={canStartWorkout}
+        onFocus={onOpenFocus}
+        onJournal={() => onNavigate(SCREENS.EOD)}
+        onMeals={handleOpenMeals}
+        onWorkout={handleStartTodayWorkout}
         onOpenSettings={() => onNavigate(SCREENS.SETTINGS)}
       />
 
@@ -1164,7 +1025,7 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
           <CollapsibleCard
             id={SECTION_KEYS.TRAINING}
             title="Training"
-            subtitle={fitnessState.todayComplete ? 'Completed today' : nextAction.type === 'workout' ? 'Warmup · Main · Cooldown' : todayWorkout.title}
+            subtitle={fitnessState.todayComplete ? 'Completed today' : 'Warmup · Main · Cooldown'}
             expanded={expandedSection === SECTION_KEYS.TRAINING}
             onToggle={handleToggleSection}
           >
@@ -1173,7 +1034,7 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
               gymAccess={settingsState.gymAccess}
               weekNumber={weekNumber}
               onStart={handleStartTodayWorkout}
-              compact={nextAction.type === 'workout'}
+              compact={canStartWorkout}
             />
           </CollapsibleCard>
         )}
