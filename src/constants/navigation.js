@@ -14,8 +14,12 @@ export const SCREENS = {
 
 export const NAV_TABS = [
   { screen: SCREENS.HOME,     label: 'Home',     icon: '⌂' },
-  { screen: SCREENS.FITNESS,  label: 'Fitness',  icon: '◉' },
+  { screen: SCREENS.FITNESS,  label: 'Fitness',  icon: '◉', module: 'fitness' },
   { screen: SCREENS.INBOX,    label: 'Inbox',    icon: '◎' },
-  { screen: SCREENS.PROJECTS, label: 'Projects', icon: '▣' },
-  { screen: SCREENS.FINANCE,  label: 'Finance',  icon: '◈' },
+  { screen: SCREENS.PROJECTS, label: 'Projects', icon: '▣', module: 'goals' },
+  { screen: SCREENS.FINANCE,  label: 'Finance',  icon: '◈', module: 'finance' },
 ]
+
+export function getEnabledNavTabs(modules = {}) {
+  return NAV_TABS.filter(tab => !tab.module || modules[tab.module] !== false)
+}

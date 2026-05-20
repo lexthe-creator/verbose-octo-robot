@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useDay, useFitness } from './context/index.js'
-import { SCREENS, NAV_TABS } from './constants/navigation.js'
+import { useDay, useFitness, useSettings } from './context/index.js'
+import { SCREENS, getEnabledNavTabs } from './constants/navigation.js'
 import { shouldShowNav, getRoute } from './navigation/router.js'
 import { useNavigate } from './navigation/useNavigate.js'
 import { getTodayISO, isThisWeek } from './utils/time.js'
@@ -27,6 +27,7 @@ function getInitialScreen(dayLockedAt) {
 export default function App() {
   const { dayState }                      = useDay()
   const { fitnessState, fitnessDispatch } = useFitness()
+  const { settingsState }                 = useSettings()
 
   const initialScreen = getInitialScreen(dayState.dayLockedAt)
 
@@ -78,6 +79,7 @@ export default function App() {
   }
 
   const showNav = shouldShowNav(screen)
+  const navTabs = getEnabledNavTabs(settingsState.modules)
 
   return (
     <div style={styles.root}>
@@ -117,7 +119,7 @@ export default function App() {
 
       {showNav && (
         <nav style={styles.nav}>
-          {NAV_TABS.map(tab => {
+          {navTabs.map(tab => {
             const active = screen === tab.screen
             return (
               <button

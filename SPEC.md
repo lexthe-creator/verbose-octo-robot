@@ -231,7 +231,7 @@ Actions:
 - `UPDATE_SETTING { key, value }`
 - `UPDATE_MODULE { module, enabled }`
 
-**Current module gating behavior:** `settings.modules` is persisted and migration-safe, but no current screen reads it for rendering. `App.jsx` renders all bottom-nav tabs from `NAV_TABS` and does not gate Fitness, Inbox, Projects, or Finance by module flags. `Home.jsx` imports `settingsState` for `gymAccess` only; it does not currently hide or reorder Home sections by `settings.modules`. Any future module gating must preserve these defaults and explicitly define the migration from preference-only flags to behavior-driving flags.
+**Current module gating behavior:** `settings.modules` is persisted and migration-safe. `App.jsx` filters bottom-nav tabs through `getEnabledNavTabs(settings.modules)`: Home and Inbox are always shown; Fitness, Projects, and Finance are gated by `fitness`, `goals`, and `finance`. `Home.jsx` uses the same module flags for support sections: Training follows `fitness`, Meals follows `nutrition`, Focus / Projects follows `focus`, `goals`, or an available focus project, and Tasks remains always available.
 
 ### 4.3 DayContext (`aiml_day`, schema v1)
 
@@ -511,15 +511,14 @@ Project stats are exposed by `getProjectStats(project)`, not by `useApp()`.
 
 Layout zones top to bottom:
 
-1. **Hero header** — greeting line ("Good morning/afternoon/evening, {name}") from `UserContext`, gear icon top-right → `onNavigate('settings')`, date row, and right-aligned "⊙ Focus" pill → `onOpenFocus`. The currently implemented HeroClock does not render the large clock display described in older specs.
-2. **Burn bar** — 2px track, fills based on % of waking day elapsed (6am–11pm). Left: "X% of day gone". Right: `nextLabel` — computed inline with `useMemo`, not a named `nextAction` helper. It considers future incomplete scheduled tasks, future uneaten meal windows, and confirmed workout time. If the next item is more than 3 hours away, it prefixes the time string with a short label.
-3. **Today's Training** — card showing today's generated workout. `Start →` is the primary CTA for the section and calls `onStartWorkout(workout)`; green "✓ Completed" state when `fitnessState.todayComplete`. Rest days render without a start button.
-4. **Today at a glance** — dark card, vertical timeline. Items: Morning ignition, confirmed workout, scheduled tasks, meal windows, and a chronological "you are here" marker.
-5. **3 Things** — task rows from `DayContext`. Tapping the check circle toggles done. Tapping row text expands/collapses the inline time picker. Done rows are strikethrough + green + reduced opacity. Overdue badge appears when `dueTime` is earlier than now and the task is not done.
-6. **Focus project** — section label is the uppercase name of the project with `status === 'focus'`, or `PROJECTS` when none exists. Goal card shows progress, listings, and the next undone task from `getProjectStats(focusProject)`. If no focus project exists, next task shows "Set a focus project in Projects". Tap → `onNavigate('projects')`.
-7. **Fuel gauge** — 4 meal slots (Breakfast / Lunch / Snack / Dinner). Tap slot body → `MARK_MEAL_EATEN` (toggle). Tap ◷ icon → `FuelEditSheet` bottom sheet for time editing.
-
-Current Home does **not** implement a single global next-action card, a global primary CTA beyond section-local CTAs, a secondary-action maximum rule, collapsible supporting cards outside task rows, or module-gated Home sections. `settings.modules` is available in state but unused by Home rendering.
+1. **Hero header + next action** — greeting line ("Good morning/afternoon/evening, {name}") from `UserContext`, gear icon top-right → `onNavigate('settings')`, date row, then a single "Next action" hero card. The hero renders one primary action, one primary CTA, and at most one secondary button. Secondary action is Focus when focus is enabled and the primary is not Focus; otherwise Inbox.
+2. **Derived next action helper** — `getHomeNextAction()` computes the hero action from existing state in this order: overdue scheduled task, active/in-progress workout if a future persisted state supports it, next scheduled task, next uneaten meal window, today's workout if not complete, focus session, inbox capture prompt. Current persisted state has no active/in-progress workout resume field, so that priority branch is intentionally skipped.
+3. **Burn bar** — 2px track, fills based on % of waking day elapsed (6am-11pm). Left: "X% of day gone". Right: the current next-action detail string.
+4. **Collapsible support cards** — Home support content is grouped into collapsible cards and only one card is expanded by default, preferring the card related to the current next action. Cards can be toggled open/closed by their headers.
+5. **Training card** — gated by `settings.modules.fitness !== false`. Shows today's generated workout. `Start ->` calls `onStartWorkout(workout)`; green "✓ Completed" state when `fitnessState.todayComplete`. Rest days render without a start button.
+6. **Tasks card** — always available. Contains the "Today at a glance" timeline and task rows from `DayContext`. Tapping the check circle toggles done. Tapping row text expands/collapses the inline time picker. Done rows are strikethrough + green + reduced opacity. Overdue badge appears when `dueTime` is earlier than now and the task is not done.
+7. **Meals card** — gated by `settings.modules.nutrition === true`. Shows 4 meal slots (Breakfast / Lunch / Snack / Dinner). Tap slot body → `MARK_MEAL_EATEN` (toggle). Tap ◷ icon → `FuelEditSheet` bottom sheet for time editing.
+8. **Focus / Projects card** — shown when focus is enabled, goals are enabled, or an existing focus project is available. Focus launch calls `onOpenFocus`. Goal card selects the project with `status === 'focus'`, shows progress/listings/next task from `getProjectStats(focusProject)`, and taps through to `onNavigate('projects')`.
 
 ---
 
@@ -823,7 +822,7 @@ Used in Home screen fuel gauge slots.
 
 **Bottom nav** (`src/App.jsx`):
 - 72px height, `#1A1A14` bg, `0.5px` top border
-- 5 tabs from `NAV_TABS`: Home `⌂` / Fitness `◉` / Inbox `◎` / Projects `▣` / Finance `◈`
+- Tabs come from `getEnabledNavTabs(settings.modules)`: Home `⌂` and Inbox `◎` are always available; Fitness `◉` is gated by `modules.fitness`; Projects `▣` is gated by `modules.goals`; Finance `◈` is gated by `modules.finance`.
 - Active: label + icon color → `#C17B56`, small 4px pip dot below icon
 - Fixed to bottom of the 393px column, `z-index: 100`
 - Hidden by `navigation/router.js` for `fitness-setup`, `settings`, `ignition`, `focus`, `eod`, and `weekly`. The current route map shows nav on `home`, `fitness`, `inbox`, `projects`, and `finance`.
@@ -837,7 +836,7 @@ Used in Home screen fuel gauge slots.
 |---|---|---|
 | `ignition` | `home` | `onComplete()` inside MorningIgnition Step 3 |
 | `home` | `focus` | `onOpenFocus()` prop |
-| `home` | `settings` | Gear icon in HeroClock → `onNavigate('settings')` |
+| `home` | `settings` | Gear icon in HomeHero → `onNavigate('settings')` |
 | `home` | `projects` | `onNavigate('projects')` via focus-project goal card tap |
 | `settings` | `home` | `onBack()` prop |
 | `focus` | `home` | `onClose()` prop |
@@ -902,7 +901,7 @@ File: `.github/workflows/pages.yml`
 - LocalStorage persistence with eight domain keys and daily reset scoped to DayContext
 - PWA manifest + GitHub Pages deploy
 
-**Module defaults in V1:** `settings.modules.fitness`, `settings.modules.finance`, and `settings.modules.focus` default to enabled. `nutrition`, `goals`, `reflection`, `habits`, and `sleep` default to disabled. These flags are currently persisted preferences only; V1 does not gate App nav or Home sections from them.
+**Module defaults in V1:** `settings.modules.fitness`, `settings.modules.finance`, and `settings.modules.focus` default to enabled. `nutrition`, `goals`, `reflection`, `habits`, and `sleep` default to disabled. App nav now gates Fitness, Projects, and Finance from these flags while keeping Home and Inbox always available. Home gates Training, Meals, and Focus / Projects support cards from these flags, while keeping Tasks available.
 
 ### Deferred (V2+)
 
@@ -913,7 +912,6 @@ File: `.github/workflows/pages.yml`
 - **Task editing** — add/edit/delete tasks from the app
 - **Meal customization** — edit meal labels and time windows
 - **Notifications / reminders** — push or local alerts for commitments
-- **Module-driven UI gating** — hide/show App nav and Home sections from `settings.modules`
 - **Onboarding flow** — first-time setup for tasks, meals, workout defaults, and module preferences
 - **Multiple energy history** — chart of energy levels over time
 - **Swipe left to delete** on task rows

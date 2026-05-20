@@ -1,11 +1,11 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useUser } from '../context/UserContext.jsx'
 import { useSettings } from '../context/SettingsContext.jsx'
 import { useDay, useFitness, useProjects, getProjectStats } from '../context/index.js'
 import FuelEditSheet from '../components/FuelEditSheet.jsx'
 import { getTodayType, generateWorkout, getWeekNumber } from '../utils/fitness.js'
 import { getProjectPace } from '../utils/projectUtils.js'
-import { formatMealTime, parseHHMM, formatMins, formatTimeUntil } from '../utils/time.js'
+import { formatMealTime, parseHHMM, formatMins } from '../utils/time.js'
 import { SCREENS } from '../constants/navigation.js'
 import { WORKOUT_LABEL } from '../constants/fitness.js'
 import { PACE_STATUS, PROJECT_STATUS } from '../constants/projects.js'
@@ -31,6 +31,126 @@ const TIME_OPTIONS = Array.from({ length: 33 }, (_, i) => {
   return { value: hhmm, label: `${h12}:${String(m).padStart(2, '0')} ${ampm}` }
 })
 
+const SECTION_KEYS = {
+  TRAINING: 'training',
+  TASKS:    'tasks',
+  MEALS:    'meals',
+  FOCUS:    'focus',
+}
+
+function getEnabledModules(modules = {}) {
+  return {
+    fitness:   modules.fitness !== false,
+    nutrition: modules.nutrition === true,
+    goals:     modules.goals === true,
+    focus:     modules.focus !== false,
+    finance:   modules.finance !== false,
+  }
+}
+
+function buildAction({
+  type,
+  title,
+  detail,
+  ctaLabel,
+  section,
+  accent = 'var(--color-accent)',
+  ...extra
+}) {
+  return { type, title, detail, ctaLabel, section, accent, ...extra }
+}
+
+function getHomeNextAction({ dayState, fitnessState, modules, now, todayWorkout }) {
+  const enabled = getEnabledModules(modules)
+  const currentMins = toMins(now)
+
+  const scheduledTasks = [...(dayState.tasks || [])]
+    .filter(task => task.scheduledTime && !task.done)
+    .map(task => ({ ...task, timeMins: parseHHMM(task.scheduledTime) }))
+    .filter(task => task.timeMins >= 0)
+    .sort((a, b) => a.timeMins - b.timeMins)
+
+  const overdueTask = scheduledTasks
+    .filter(task => task.timeMins < currentMins)
+    .sort((a, b) => a.timeMins - b.timeMins)[0]
+  if (overdueTask) {
+    return buildAction({
+      type:     'task',
+      taskId:   overdueTask.id,
+      title:    overdueTask.text,
+      detail:   `Scheduled for ${formatMins(overdueTask.timeMins)}`,
+      ctaLabel: 'Mark done',
+      section:  SECTION_KEYS.TASKS,
+      accent:   'var(--color-danger)',
+    })
+  }
+
+  // Existing persisted state does not support active/in-progress workout resumes.
+
+  const nextTask = scheduledTasks.find(task => task.timeMins >= currentMins)
+  if (nextTask) {
+    return buildAction({
+      type:     'task',
+      taskId:   nextTask.id,
+      title:    nextTask.text,
+      detail:   `Next at ${formatMins(nextTask.timeMins)}`,
+      ctaLabel: 'Mark done',
+      section:  SECTION_KEYS.TASKS,
+    })
+  }
+
+  if (enabled.nutrition) {
+    const nextMeal = Object.entries(dayState.meals || {})
+      .map(([slot, meal]) => ({
+        slot,
+        meal,
+        startMins: parseHHMM(meal.startTime),
+        endMins:   parseHHMM(meal.endTime),
+      }))
+      .filter(({ meal, endMins }) => !meal.eaten && endMins >= currentMins)
+      .sort((a, b) => a.startMins - b.startMins)[0]
+
+    if (nextMeal) {
+      return buildAction({
+        type:     'meal',
+        slot:     nextMeal.slot,
+        title:    nextMeal.meal.label,
+        detail:   `${formatMealTime(nextMeal.meal.startTime)} - ${formatMealTime(nextMeal.meal.endTime)}`,
+        ctaLabel: 'Mark eaten',
+        section:  SECTION_KEYS.MEALS,
+      })
+    }
+  }
+
+  if (enabled.fitness && todayWorkout?.type !== 'rest' && !fitnessState.todayComplete) {
+    return buildAction({
+      type:     'workout',
+      title:    todayWorkout.title,
+      detail:   todayWorkout.subtitle,
+      ctaLabel: 'Start workout',
+      section:  SECTION_KEYS.TRAINING,
+    })
+  }
+
+  if (enabled.focus) {
+    return buildAction({
+      type:     'focus',
+      title:    'Start a focus session',
+      detail:   'Pick one thing and protect the next block.',
+      ctaLabel: 'Start focus',
+      section:  SECTION_KEYS.FOCUS,
+    })
+  }
+
+  return buildAction({
+    type:     'inbox',
+    title:    'Capture what is on your mind',
+    detail:   'Get it out of working memory. Sort it later.',
+    ctaLabel: 'Open inbox',
+    section:  null,
+  })
+}
+
 // ─── Hero header ───────────────────────────────────────────────────────────────
 
 function greeting(now, name) {
@@ -39,7 +159,7 @@ function greeting(now, name) {
   return `Good ${part}, ${name}`
 }
 
-function HeroClock({ now, name, onOpenFocus, onOpenSettings }) {
+function HomeHero({ now, name, nextAction, secondaryAction, onPrimary, onSecondary, onOpenSettings }) {
   return (
     <div style={hero.wrap}>
       <div style={hero.topRow}>
@@ -50,9 +170,21 @@ function HeroClock({ now, name, onOpenFocus, onOpenSettings }) {
       </div>
       <div style={hero.dateRow}>
         <p style={hero.date}>{formatFullDate(now)}</p>
-        <button style={hero.focusPill} onClick={onOpenFocus}>
-          ⊙ Focus
-        </button>
+      </div>
+      <div style={{ ...hero.actionCard, borderColor: nextAction.accent }}>
+        <span style={{ ...hero.actionKicker, color: nextAction.accent }}>Next action</span>
+        <h1 style={hero.actionTitle}>{nextAction.title}</h1>
+        <p style={hero.actionDetail}>{nextAction.detail}</p>
+        <div style={hero.actionRow}>
+          <button style={{ ...hero.primaryBtn, background: nextAction.accent }} onClick={onPrimary}>
+            {nextAction.ctaLabel}
+          </button>
+          {secondaryAction && (
+            <button style={hero.secondaryBtn} onClick={onSecondary}>
+              {secondaryAction.label}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -78,18 +210,62 @@ const hero = {
   },
   dateRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   date:    { fontSize: '14px', color: 'var(--color-muted)', margin: 0 },
-  focusPill: {
-    display:      'flex',
-    alignItems:   'center',
-    gap:          '4px',
-    padding:      '7px 14px',
-    borderRadius: 'var(--radius-pill)',
-    background:   'var(--color-accent-bg)',
-    border:       '0.5px solid var(--color-accent)',
-    color:        'var(--color-accent)',
-    fontSize:     '13px',
-    fontWeight:   600,
-    cursor:       'pointer',
+  actionCard: {
+    marginTop:      '16px',
+    background:     'var(--color-card)',
+    border:         '0.5px solid var(--color-accent)',
+    borderRadius:   'var(--radius-card)',
+    padding:        '16px',
+    display:        'flex',
+    flexDirection:  'column',
+    gap:            '8px',
+  },
+  actionKicker: {
+    fontSize:       '10px',
+    fontWeight:     700,
+    letterSpacing:  '0.08em',
+    textTransform:  'uppercase',
+  },
+  actionTitle: {
+    margin:         0,
+    fontFamily:    'var(--font-display)',
+    fontSize:      '30px',
+    lineHeight:    1.05,
+    fontWeight:    400,
+    color:         'var(--color-text)',
+  },
+  actionDetail: {
+    margin:     0,
+    fontSize:   '13px',
+    lineHeight: 1.45,
+    color:      'var(--color-muted)',
+  },
+  actionRow: {
+    display:             'grid',
+    gridTemplateColumns: 'minmax(0, 1fr) auto',
+    gap:                 '8px',
+    marginTop:           '6px',
+  },
+  primaryBtn: {
+    minHeight:     '44px',
+    border:        'none',
+    borderRadius:  'var(--radius-sm)',
+    color:         '#fff',
+    fontSize:      '14px',
+    fontWeight:    700,
+    cursor:        'pointer',
+  },
+  secondaryBtn: {
+    minHeight:     '44px',
+    padding:       '0 14px',
+    borderRadius:  'var(--radius-sm)',
+    border:        'var(--border)',
+    background:    'var(--color-chart-bar)',
+    color:         'var(--color-muted)',
+    fontSize:      '13px',
+    fontWeight:    600,
+    cursor:        'pointer',
+    whiteSpace:    'nowrap',
   },
 }
 
@@ -238,7 +414,7 @@ function Timeline({ state, now }) {
 }
 
 const tl = {
-  card:    { margin: '16px 20px 0', background: 'var(--color-card)', border: 'var(--border)', borderRadius: 'var(--radius-card)', padding: '16px' },
+  card:    { background: 'transparent', border: 'none', borderRadius: 0, padding: 0 },
   heading: { fontSize: '11px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-muted)', marginBottom: '12px' },
   list:    { display: 'flex', flexDirection: 'column' },
   row:     { display: 'flex', alignItems: 'flex-start', gap: '10px', minHeight: '28px' },
@@ -602,12 +778,84 @@ function TodayTrainingCard({ todayComplete, gymAccess, weekNumber, onStart }) {
   )
 }
 
+function CollapsibleCard({ id, title, subtitle, expanded, onToggle, children }) {
+  return (
+    <section style={cc.wrap}>
+      <button
+        style={cc.header}
+        onClick={() => onToggle(id)}
+        aria-expanded={expanded}
+      >
+        <div style={cc.headerText}>
+          <span style={cc.title}>{title}</span>
+          {subtitle && <span style={cc.subtitle}>{subtitle}</span>}
+        </div>
+        <span style={{ ...cc.chevron, transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>›</span>
+      </button>
+      {expanded && <div style={cc.body}>{children}</div>}
+    </section>
+  )
+}
+
+const cc = {
+  wrap: {
+    margin:       '12px 20px 0',
+    background:   'var(--color-card)',
+    border:       'var(--border)',
+    borderRadius: 'var(--radius-card)',
+    overflow:     'hidden',
+  },
+  header: {
+    width:          '100%',
+    minHeight:      '58px',
+    padding:        '12px 14px',
+    background:     'none',
+    border:         'none',
+    display:        'flex',
+    alignItems:     'center',
+    justifyContent: 'space-between',
+    gap:            '12px',
+    cursor:         'pointer',
+    textAlign:      'left',
+  },
+  headerText: { display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 },
+  title: {
+    fontSize:      '11px',
+    fontWeight:    700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    color:         'var(--color-text)',
+  },
+  subtitle: {
+    fontSize:     '12px',
+    color:        'var(--color-muted)',
+    overflow:     'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace:   'nowrap',
+    maxWidth:     '260px',
+  },
+  chevron: {
+    fontSize:   '22px',
+    lineHeight: 1,
+    color:      'var(--color-faint)',
+    transition: 'transform 0.2s var(--ease-out)',
+    flexShrink: 0,
+  },
+  body: {
+    borderTop:     'var(--border)',
+    padding:       '12px',
+    display:       'flex',
+    flexDirection: 'column',
+    gap:           '12px',
+  },
+}
+
 const tt = {
   wrap: {
-    background:    'var(--color-card)',
-    border:        'var(--border)',
-    borderRadius:  'var(--radius-card)',
-    padding:       '12px',
+    background:    'transparent',
+    border:        'none',
+    borderRadius:  0,
+    padding:       0,
     display:       'flex',
     flexDirection: 'column',
     gap:           '12px',
@@ -660,17 +908,18 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
   const { dayState, dayDispatch, updateTaskTime, updateMealWindow } = useDay()
   const { fitnessState }                               = useFitness()
 
-  const [, setTick] = useState(0)
+  const [now, setNow] = useState(() => new Date())
   useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 60_000)
+    const id = setInterval(() => setNow(new Date()), 60_000)
     return () => clearInterval(id)
   }, [])
 
-  const now         = new Date()
   const currentMins = toMins(now)
 
   const [expandedTask, setExpandedTask] = useState(null)
   const [editingSlot, setEditingSlot] = useState(null)
+  const [expandedSection, setExpandedSection] = useState(null)
+  const didSetDefaultSection = useRef(false)
 
   const focusProject = useMemo(
     () => projectsState.projects?.find(p => p.status === PROJECT_STATUS.FOCUS) ?? null,
@@ -685,41 +934,52 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
     return getProjectPace(focusProject).status
   }, [focusProject])
 
-  // Next commitment label for burn bar
-  const nextLabel = useMemo(() => {
-    const candidates = []
+  const enabledModules = useMemo(
+    () => getEnabledModules(settingsState.modules),
+    [settingsState.modules]
+  )
 
-    dayState.tasks.forEach(t => {
-      if (t.scheduledTime && !t.done) {
-        const m = parseHHMM(t.scheduledTime)
-        if (m > currentMins) candidates.push({ label: t.text.split(' ').slice(0, 2).join(' '), timeMins: m, timeHHMM: t.scheduledTime })
-      }
-    })
+  const weekNumber = getWeekNumber(fitnessState.programStartDate)
+  const todayWorkout = useMemo(
+    () => generateWorkout(getTodayType(), settingsState.gymAccess, weekNumber),
+    [settingsState.gymAccess, weekNumber]
+  )
 
-    Object.values(dayState.meals).forEach(meal => {
-      if (!meal.eaten && parseHHMM(meal.endTime) > currentMins) {
-        const m = parseHHMM(meal.startTime)
-        if (m > currentMins) candidates.push({ label: meal.label, timeMins: m, timeHHMM: meal.startTime })
-      }
-    })
+  const nextAction = useMemo(
+    () => getHomeNextAction({
+      dayState,
+      fitnessState,
+      modules: settingsState.modules,
+      now,
+      todayWorkout,
+    }),
+    [dayState, fitnessState, settingsState.modules, now, todayWorkout]
+  )
 
-    if (dayState.workoutConfirmed && dayState.workout?.time) {
-      const m = parseHHMM(dayState.workout.time)
-      if (m > currentMins) candidates.push({ label: dayState.workout.type, timeMins: m, timeHHMM: dayState.workout.time })
-    }
+  const showFocusProjects = enabledModules.focus || enabledModules.goals || !!focusProject
+  const availableSections = useMemo(() => [
+    ...(enabledModules.fitness ? [SECTION_KEYS.TRAINING] : []),
+    SECTION_KEYS.TASKS,
+    ...(enabledModules.nutrition ? [SECTION_KEYS.MEALS] : []),
+    ...(showFocusProjects ? [SECTION_KEYS.FOCUS] : []),
+  ], [enabledModules.fitness, enabledModules.nutrition, showFocusProjects])
 
-    if (candidates.length === 0) return null
-    candidates.sort((a, b) => a.timeMins - b.timeMins)
-    const next = candidates[0]
-    const away = next.timeMins - currentMins
-    const timeStr = formatTimeUntil(away, next.timeHHMM)
-    return away > 180 ? `${next.label} ${timeStr}` : timeStr
-  }, [dayState, currentMins])
+  useEffect(() => {
+    if (didSetDefaultSection.current) return
+    didSetDefaultSection.current = true
+    const preferred = nextAction.section && availableSections.includes(nextAction.section)
+      ? nextAction.section
+      : availableSections[0] ?? null
+    setExpandedSection(preferred)
+  }, [availableSections, nextAction.section])
 
   const projectSectionLabel = focusProject?.name
     ? focusProject.name.toUpperCase()
     : 'PROJECTS'
   const focusNextTask    = nextTask ?? 'Set a focus project in Projects'
+  const incompleteTasks  = dayState.tasks.filter(task => !task.done).length
+  const eatenMeals       = Object.values(dayState.meals).filter(meal => meal.eaten).length
+  const totalMeals       = Object.values(dayState.meals).length
 
   function handleToggleExpand(taskId) {
     setExpandedTask(prev => prev === taskId ? null : taskId)
@@ -738,86 +998,156 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
     dayDispatch({ type: 'MARK_MEAL_EATEN', payload: slot })
   }
 
+  function handleStartTodayWorkout() {
+    if (todayWorkout.type === 'rest' || fitnessState.todayComplete) return
+    onStartWorkout && onStartWorkout(todayWorkout)
+  }
+
+  function handlePrimaryAction() {
+    if (nextAction.type === 'task') {
+      dayDispatch({ type: 'TOGGLE_TASK', payload: nextAction.taskId })
+      return
+    }
+    if (nextAction.type === 'meal') {
+      handleMarkEaten(nextAction.slot)
+      return
+    }
+    if (nextAction.type === 'workout') {
+      handleStartTodayWorkout()
+      return
+    }
+    if (nextAction.type === 'focus') {
+      onOpenFocus()
+      return
+    }
+    onNavigate(SCREENS.INBOX)
+  }
+
+  function handleSecondaryAction() {
+    if (nextAction.type === 'focus') onNavigate(SCREENS.INBOX)
+    else if (enabledModules.focus) onOpenFocus()
+    else onNavigate(SCREENS.INBOX)
+  }
+
+  function handleToggleSection(id) {
+    setExpandedSection(prev => prev === id ? null : id)
+  }
+
+  const secondaryAction = nextAction.type === 'focus'
+    ? { label: 'Inbox' }
+    : enabledModules.focus
+      ? { label: 'Focus' }
+      : { label: 'Inbox' }
+
   return (
     <div style={s.screen}>
-      {/* 1 — Hero clock */}
-      <HeroClock
+      <HomeHero
         now={now}
         name={userState.name}
-        onOpenFocus={onOpenFocus}
+        nextAction={nextAction}
+        secondaryAction={secondaryAction}
+        onPrimary={handlePrimaryAction}
+        onSecondary={handleSecondaryAction}
         onOpenSettings={() => onNavigate(SCREENS.SETTINGS)}
       />
 
-      {/* 2 — Burn bar */}
-      <BurnBar now={now} nextLabel={nextLabel} />
+      <BurnBar now={now} nextLabel={nextAction.detail} />
 
-      {/* 3 — Today's Training */}
-      <section style={s.section}>
-        <p style={s.sectionLabel}>Today's Training</p>
-        <TodayTrainingCard
-          todayComplete={fitnessState.todayComplete}
-          gymAccess={settingsState.gymAccess}
-          weekNumber={getWeekNumber(fitnessState.programStartDate)}
-          onStart={() => {
-            const type    = getTodayType()
-            const workout = generateWorkout(type, settingsState.gymAccess, getWeekNumber(fitnessState.programStartDate))
-            onStartWorkout && onStartWorkout(workout)
-          }}
-        />
-      </section>
-
-      {/* 4 — Timeline */}
-      <Timeline state={dayState} now={now} />
-
-      {/* 5 — 3 Things */}
-      <section style={s.section}>
-        <p style={s.sectionLabel}>3 Things</p>
-        <div style={s.stack}>
-          {dayState.tasks.map(task => (
-            <TaskRow
-              key={task.id}
-              task={task}
-              expanded={expandedTask === task.id}
-              onToggleExpand={() => handleToggleExpand(task.id)}
-              onToggleDone={() => handleToggleDone(task.id)}
-              onTimeSelect={time => handleTimeSelect(task.id, time)}
+      <div style={s.cards}>
+        {enabledModules.fitness && (
+          <CollapsibleCard
+            id={SECTION_KEYS.TRAINING}
+            title="Training"
+            subtitle={fitnessState.todayComplete ? 'Completed today' : todayWorkout.title}
+            expanded={expandedSection === SECTION_KEYS.TRAINING}
+            onToggle={handleToggleSection}
+          >
+            <TodayTrainingCard
+              todayComplete={fitnessState.todayComplete}
+              gymAccess={settingsState.gymAccess}
+              weekNumber={weekNumber}
+              onStart={handleStartTodayWorkout}
             />
-          ))}
-        </div>
-      </section>
+          </CollapsibleCard>
+        )}
 
-      {/* 5 — Focus project goal card */}
-      <section style={s.section}>
-        <p style={s.sectionLabel}>{projectSectionLabel}</p>
-        <FocusProjectCard
-          projectName={focusProject?.name ?? 'Projects'}
-          projectEmoji={focusProject?.emoji ?? '📋'}
-          doneCount={doneCount}
-          totalCount={totalCount}
-          listingsCount={listingsCount}
-          nextTask={focusNextTask}
-          dayOf90={dayOf90}
-          paceStatus={paceStatus}
-          onTap={() => onNavigate(SCREENS.PROJECTS)}
-        />
-      </section>
+        <CollapsibleCard
+          id={SECTION_KEYS.TASKS}
+          title="Tasks"
+          subtitle={`${incompleteTasks} open`}
+          expanded={expandedSection === SECTION_KEYS.TASKS}
+          onToggle={handleToggleSection}
+        >
+          <Timeline state={dayState} now={now} />
+          <div style={s.stack}>
+            {dayState.tasks.map(task => (
+              <TaskRow
+                key={task.id}
+                task={task}
+                expanded={expandedTask === task.id}
+                onToggleExpand={() => handleToggleExpand(task.id)}
+                onToggleDone={() => handleToggleDone(task.id)}
+                onTimeSelect={time => handleTimeSelect(task.id, time)}
+              />
+            ))}
+          </div>
+        </CollapsibleCard>
 
-      {/* 6 — Fuel gauge */}
-      <section style={s.section}>
-        <p style={s.sectionLabel}>Fuel</p>
-        <div style={s.mealGrid}>
-          {Object.entries(dayState.meals).map(([slot, meal]) => (
-            <FuelSlot
-              key={slot}
-              slotKey={slot}
-              meal={meal}
-              nowMins={currentMins}
-              onMarkEaten={handleMarkEaten}
-              onOpenEditor={setEditingSlot}
-            />
-          ))}
-        </div>
-      </section>
+        {enabledModules.nutrition && (
+          <CollapsibleCard
+            id={SECTION_KEYS.MEALS}
+            title="Meals"
+            subtitle={`${eatenMeals} of ${totalMeals} eaten`}
+            expanded={expandedSection === SECTION_KEYS.MEALS}
+            onToggle={handleToggleSection}
+          >
+            <div style={s.mealGrid}>
+              {Object.entries(dayState.meals).map(([slot, meal]) => (
+                <FuelSlot
+                  key={slot}
+                  slotKey={slot}
+                  meal={meal}
+                  nowMins={currentMins}
+                  onMarkEaten={handleMarkEaten}
+                  onOpenEditor={setEditingSlot}
+                />
+              ))}
+            </div>
+          </CollapsibleCard>
+        )}
+
+        {showFocusProjects && (
+          <CollapsibleCard
+            id={SECTION_KEYS.FOCUS}
+            title="Focus / Projects"
+            subtitle={focusProject?.name ?? 'Focus session'}
+            expanded={expandedSection === SECTION_KEYS.FOCUS}
+            onToggle={handleToggleSection}
+          >
+            {enabledModules.focus && (
+              <button style={s.focusLaunchBtn} onClick={onOpenFocus}>
+                Start focus timer
+              </button>
+            )}
+            {(enabledModules.goals || focusProject) && (
+              <>
+                <p style={s.sectionLabel}>{projectSectionLabel}</p>
+                <FocusProjectCard
+                  projectName={focusProject?.name ?? 'Projects'}
+                  projectEmoji={focusProject?.emoji ?? '📋'}
+                  doneCount={doneCount}
+                  totalCount={totalCount}
+                  listingsCount={listingsCount}
+                  nextTask={focusNextTask}
+                  dayOf90={dayOf90}
+                  paceStatus={paceStatus}
+                  onTap={() => onNavigate(SCREENS.PROJECTS)}
+                />
+              </>
+            )}
+          </CollapsibleCard>
+        )}
+      </div>
 
       {editingSlot && (
         <FuelEditSheet
@@ -864,9 +1194,23 @@ const s = {
     flexDirection: 'column',
     gap:           'var(--space-2)',
   },
+  cards: {
+    paddingTop: '4px',
+  },
   mealGrid: {
     display:             'grid',
     gridTemplateColumns: 'repeat(2, 1fr)',
     gap:                 'var(--space-2)',
+  },
+  focusLaunchBtn: {
+    width:        '100%',
+    minHeight:    '42px',
+    borderRadius: 'var(--radius-sm)',
+    border:       'none',
+    background:   'var(--color-accent)',
+    color:        '#fff',
+    fontSize:     '14px',
+    fontWeight:   700,
+    cursor:       'pointer',
   },
 }
