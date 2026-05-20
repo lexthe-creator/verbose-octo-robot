@@ -33,6 +33,7 @@ const TIME_OPTIONS = Array.from({ length: 33 }, (_, i) => {
 
 const SECTION_KEYS = {
   TRAINING: 'training',
+  TIMELINE: 'timeline',
   TASKS:    'tasks',
   MEALS:    'meals',
   FOCUS:    'focus',
@@ -303,8 +304,9 @@ const burn = {
 
 // ─── Timeline ─────────────────────────────────────────────────────────────────
 
-function buildTimeline(state, nowMinutes) {
+function buildTimeline(state, nowMinutes, options = {}) {
   const items = []
+  const { includePlannedWorkout = true } = options
 
   // Morning ignition — always at 6am
   items.push({
@@ -316,14 +318,15 @@ function buildTimeline(state, nowMinutes) {
   })
 
   // Workout
-  if (state.workoutConfirmed) {
+  if (state.workout?.time && (state.workoutConfirmed || state.workout.confirmed || includePlannedWorkout)) {
     const wm = parseHHMM(state.workout.time)
     items.push({
       key:      'workout',
       timeMins: wm,
       label:    `${state.workout.type} · ${state.workout.duration}`,
       type:     'workout',
-      done:     nowMinutes > wm,
+      done:     state.workout.confirmed || (state.workoutConfirmed && nowMinutes > wm),
+      planned:  !state.workoutConfirmed && !state.workout.confirmed,
     })
   }
 
@@ -363,13 +366,34 @@ function buildTimeline(state, nowMinutes) {
   return items
 }
 
-function Timeline({ state, now }) {
-  const nowMinsVal = toMins(now)
-  const items = useMemo(
-    () => buildTimeline(state, nowMinsVal),
-    [state, nowMinsVal]
-  )
+function getTimelinePreview(items, nowMinutes) {
+  const visible = items.filter(item => item.type !== 'now')
+  const remaining = visible.filter(item => !item.done && item.timeMins >= nowMinutes)
+  const next = remaining[0] ?? visible.filter(item => !item.done)[0] ?? null
+  return {
+    next,
+    remainingCount: remaining.length,
+    nowIndex: items.findIndex(item => item.type === 'now'),
+  }
+}
 
+function TimelinePreview({ preview }) {
+  const nextLabel = preview.next
+    ? `${formatMins(preview.next.timeMins)} · ${preview.next.label}`
+    : 'All visible items are complete'
+
+  return (
+    <div style={tl.preview}>
+      <span style={tl.previewNow}>●</span>
+      <div style={tl.previewText}>
+        <span style={tl.previewMain}>{nextLabel}</span>
+        <span style={tl.previewSub}>{preview.remainingCount} remaining scheduled item{preview.remainingCount === 1 ? '' : 's'} today</span>
+      </div>
+    </div>
+  )
+}
+
+function Timeline({ items }) {
   function dotColor(item) {
     if (item.type === 'now')     return 'var(--color-accent)'
     if (item.done)               return 'var(--color-success)'
@@ -401,9 +425,10 @@ function Timeline({ state, now }) {
               color:          item.type === 'now' ? 'var(--color-accent)' : item.done ? 'var(--color-success)' : item.late ? 'var(--color-danger)' : 'var(--color-text)',
               fontWeight:     item.type === 'now' ? 600 : 400,
               textDecoration: item.done && item.type !== 'now' ? 'line-through' : 'none',
-              opacity:        item.done ? 0.6 : 1,
+              opacity:        item.done ? 0.6 : item.planned ? 0.82 : 1,
             }}>
               {item.label}
+              {item.planned && <span style={tl.plannedPip}>planned</span>}
               {item.type === 'now' && <span style={tl.nowPip}>●</span>}
             </span>
           </div>
@@ -424,6 +449,47 @@ const tl = {
   line:    { width: '1px', flex: 1, minHeight: '20px', background: 'var(--color-faint)', margin: '2px 0' },
   label:   { fontSize: '13px', paddingTop: '1px', flex: 1, lineHeight: 1.4 },
   nowPip:  { color: 'var(--color-accent)', fontSize: '8px', marginLeft: '4px', verticalAlign: 'middle' },
+  plannedPip: {
+    marginLeft:    '6px',
+    padding:       '1px 6px',
+    borderRadius:  'var(--radius-pill)',
+    background:    'var(--color-chart-bar)',
+    color:         'var(--color-muted)',
+    fontSize:      '10px',
+    fontWeight:    600,
+    verticalAlign: 'middle',
+  },
+  preview: {
+    borderTop:    'var(--border)',
+    padding:      '0 14px 12px',
+    display:      'flex',
+    alignItems:   'flex-start',
+    gap:          '9px',
+  },
+  previewNow: {
+    color:      'var(--color-accent)',
+    fontSize:   '9px',
+    lineHeight: 1,
+    marginTop:  '5px',
+  },
+  previewText: {
+    minWidth:      0,
+    display:       'flex',
+    flexDirection: 'column',
+    gap:           '2px',
+  },
+  previewMain: {
+    fontSize:     '13px',
+    color:        'var(--color-text)',
+    whiteSpace:   'nowrap',
+    overflow:     'hidden',
+    textOverflow: 'ellipsis',
+    maxWidth:     '292px',
+  },
+  previewSub: {
+    fontSize: '11px',
+    color:    'var(--color-muted)',
+  },
 }
 
 // ─── Task row ─────────────────────────────────────────────────────────────────
@@ -778,7 +844,7 @@ function TodayTrainingCard({ todayComplete, gymAccess, weekNumber, onStart }) {
   )
 }
 
-function CollapsibleCard({ id, title, subtitle, expanded, onToggle, children }) {
+function CollapsibleCard({ id, title, subtitle, preview, expanded, onToggle, children }) {
   return (
     <section style={cc.wrap}>
       <button
@@ -792,6 +858,7 @@ function CollapsibleCard({ id, title, subtitle, expanded, onToggle, children }) 
         </div>
         <span style={{ ...cc.chevron, transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>›</span>
       </button>
+      {!expanded && preview}
       {expanded && <div style={cc.body}>{children}</div>}
     </section>
   )
@@ -956,8 +1023,18 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
     [dayState, fitnessState, settingsState.modules, now, todayWorkout]
   )
 
+  const timelineItems = useMemo(
+    () => buildTimeline(dayState, currentMins, { includePlannedWorkout: true }),
+    [dayState, currentMins]
+  )
+  const timelinePreview = useMemo(
+    () => getTimelinePreview(timelineItems, currentMins),
+    [timelineItems, currentMins]
+  )
+
   const showFocusProjects = enabledModules.focus || enabledModules.goals || !!focusProject
   const availableSections = useMemo(() => [
+    SECTION_KEYS.TIMELINE,
     ...(enabledModules.fitness ? [SECTION_KEYS.TRAINING] : []),
     SECTION_KEYS.TASKS,
     ...(enabledModules.nutrition ? [SECTION_KEYS.MEALS] : []),
@@ -1054,6 +1131,17 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
       <BurnBar now={now} nextLabel={nextAction.detail} />
 
       <div style={s.cards}>
+        <CollapsibleCard
+          id={SECTION_KEYS.TIMELINE}
+          title="Today Timeline"
+          subtitle={timelinePreview.next ? `Next: ${formatMins(timelinePreview.next.timeMins)}` : 'Clear for now'}
+          preview={<TimelinePreview preview={timelinePreview} />}
+          expanded={expandedSection === SECTION_KEYS.TIMELINE}
+          onToggle={handleToggleSection}
+        >
+          <Timeline items={timelineItems} />
+        </CollapsibleCard>
+
         {enabledModules.fitness && (
           <CollapsibleCard
             id={SECTION_KEYS.TRAINING}
@@ -1078,7 +1166,6 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
           expanded={expandedSection === SECTION_KEYS.TASKS}
           onToggle={handleToggleSection}
         >
-          <Timeline state={dayState} now={now} />
           <div style={s.stack}>
             {dayState.tasks.map(task => (
               <TaskRow

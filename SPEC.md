@@ -231,7 +231,7 @@ Actions:
 - `UPDATE_SETTING { key, value }`
 - `UPDATE_MODULE { module, enabled }`
 
-**Current module gating behavior:** `settings.modules` is persisted and migration-safe. `App.jsx` filters bottom-nav tabs through `getEnabledNavTabs(settings.modules)`: Home and Inbox are always shown; Fitness, Projects, and Finance are gated by `fitness`, `goals`, and `finance`. `Home.jsx` uses the same module flags for support sections: Training follows `fitness`, Meals follows `nutrition`, Focus / Projects follows `focus`, `goals`, or an available focus project, and Tasks remains always available.
+**Current module gating behavior:** `settings.modules` is persisted and migration-safe. `App.jsx` filters bottom-nav tabs through `getEnabledNavTabs(settings.modules)`: Home and Inbox are always shown; Fitness, Projects, and Finance are gated by `fitness`, `goals`, and `finance`. `Home.jsx` uses the same module flags for support sections: Training follows `fitness`, Meals follows `nutrition`, Focus / Projects follows `focus`, `goals`, or an available focus project. Tasks and Today Timeline remain core Home cards and are always available.
 
 ### 4.3 DayContext (`aiml_day`, schema v1)
 
@@ -515,10 +515,11 @@ Layout zones top to bottom:
 2. **Derived next action helper** — `getHomeNextAction()` computes the hero action from existing state in this order: overdue scheduled task, active/in-progress workout if a future persisted state supports it, next scheduled task, next uneaten meal window, today's workout if not complete, focus session, inbox capture prompt. Current persisted state has no active/in-progress workout resume field, so that priority branch is intentionally skipped.
 3. **Burn bar** — 2px track, fills based on % of waking day elapsed (6am-11pm). Left: "X% of day gone". Right: the current next-action detail string.
 4. **Collapsible support cards** — Home support content is grouped into collapsible cards and only one card is expanded by default, preferring the card related to the current next action. Cards can be toggled open/closed by their headers.
-5. **Training card** — gated by `settings.modules.fitness !== false`. Shows today's generated workout. `Start ->` calls `onStartWorkout(workout)`; green "✓ Completed" state when `fitnessState.todayComplete`. Rest days render without a start button.
-6. **Tasks card** — always available. Contains the "Today at a glance" timeline and task rows from `DayContext`. Tapping the check circle toggles done. Tapping row text expands/collapses the inline time picker. Done rows are strikethrough + green + reduced opacity. Overdue badge appears when `dueTime` is earlier than now and the task is not done.
-7. **Meals card** — gated by `settings.modules.nutrition === true`. Shows 4 meal slots (Breakfast / Lunch / Snack / Dinner). Tap slot body → `MARK_MEAL_EATEN` (toggle). Tap ◷ icon → `FuelEditSheet` bottom sheet for time editing.
-8. **Focus / Projects card** — shown when focus is enabled, goals are enabled, or an existing focus project is available. Focus launch calls `onOpenFocus`. Goal card selects the project with `status === 'focus'`, shows progress/listings/next task from `getProjectStats(focusProject)`, and taps through to `onNavigate('projects')`.
+5. **Today Timeline card** — core Home card, not a separate nav/module. Collapsed state shows the next upcoming item, remaining scheduled-item count, and a small current-position dot. Expanded state renders the full derived chronological timeline: Morning ignition, scheduled tasks, meal windows, planned or confirmed workout, and the current "you are here" marker.
+6. **Training card** — gated by `settings.modules.fitness !== false`. Shows today's generated workout. `Start ->` calls `onStartWorkout(workout)`; green "✓ Completed" state when `fitnessState.todayComplete`. Rest days render without a start button.
+7. **Tasks card** — always available. Contains task rows from `DayContext`. Tapping the check circle toggles done. Tapping row text expands/collapses the inline time picker. Done rows are strikethrough + green + reduced opacity. Overdue badge appears when `dueTime` is earlier than now and the task is not done.
+8. **Meals card** — gated by `settings.modules.nutrition === true`. Shows 4 meal slots (Breakfast / Lunch / Snack / Dinner). Tap slot body → `MARK_MEAL_EATEN` (toggle). Tap ◷ icon → `FuelEditSheet` bottom sheet for time editing.
+9. **Focus / Projects card** — shown when focus is enabled, goals are enabled, or an existing focus project is available. Focus launch calls `onOpenFocus`. Goal card selects the project with `status === 'focus'`, shows progress/listings/next task from `getProjectStats(focusProject)`, and taps through to `onNavigate('projects')`.
 
 ---
 
