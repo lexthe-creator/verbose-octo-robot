@@ -90,23 +90,25 @@ GitHub Pages via `.github/workflows/pages.yml` — triggers on push to `main`. V
 
 ## Architecture
 
-**Single-page PWA.** No router — `App.jsx` manages a `screen` string with `useState`. Screens are rendered conditionally. Two full-screen overlays (`EodReflection`, `WeeklyPlanning`) layer above the screen stack; `WorkoutPlayer` layers above those.
+**Single-page PWA.** No router library — `useNavigate()` manages a `screen` string with `useState`. Screens are rendered conditionally. Two full-screen overlays (`EodReflection`, `WeeklyPlanning`) render above the screen stack at z-index 200; `WorkoutPlayer` renders at z-index 150.
 
 **State** is split across 8 domain contexts, each with its own versioned localStorage key. There is no server, no external API, no build-time env vars.
 
 **Screen values:** `'ignition'` · `'home'` · `'fitness'` · `'focus'` · `'inbox'` · `'finance'` · `'projects'` · `'settings'`
 
-Nav is hidden for: `ignition`, `focus`, `projects`, `settings`. The bottom nav is fixed, 72px, rendered in `App.jsx`.
+Nav is hidden for: `ignition`, `focus`, `fitness-setup`, and `settings`. The current route map shows nav on `home`, `fitness`, `inbox`, `projects`, and `finance`. The bottom nav is fixed, 72px, rendered in `App.jsx`.
 
 **Context map (localStorage key → hook → shape):**
-- `aiml_user` → `useUser()` → `{ name }`
-- `aiml_settings` → `useSettings()` → `{ gymAccess, theme, plaidConnected, calendarConnected }`
+- `aiml_user` v1 → `useUser()` → `{ name, wakeTime, sleepTime }`
+- `aiml_settings` v1 → `useSettings()` → `{ gymAccess, theme, plaidConnected, calendarConnected, modules }`
 - `aiml_day` → `useDay()` → `{ tasks[], meals, workout, workoutConfirmed, dayLockedAt, energyLevel }`
-- `aiml_fitness` → `useFitness()` → `{ programStartDate, programEndDate, todayComplete, workoutLog[], focusSessions }`
-- `aiml_inbox` → `useInbox()` → `{ inboxItems[] }`
-- `aiml_projects` → `useProjects()` → `{ projects[] }` — selectors: `getFocusProject`, `getProjectStats`
-- `aiml_finance` → `useFinance()` → `{ transactions[] }` — selectors: `getTodaySpend`, `getWeeklySpend`, `getWeekTotal`, `getFourWeekAvg`, `getOddTransaction`, `getTodayTransactions`
-- `aiml_planning` → `usePlanning()` → `{ reflectionLog[], weeklyPriorities[], groceryList[] }`
+- `aiml_fitness` v2 → `useFitness()` → `{ programStartDate, programEndDate, todayComplete, workoutLog[], focusSessions, program, programConfig }`
+- `aiml_inbox` v2 → `useInbox()` → `{ inboxItems[], taskPool[], calendarItems[], notes[] }`
+- `aiml_projects` v1 → `useProjects()` → `{ projects[] }` — selectors: `getFocusProject`, `getProjectStats`
+- `aiml_finance` v1 → `useFinance()` → `{ transactions[] }` — selectors: `getTodaySpend`, `getWeeklySpend`, `getWeekTotal`, `getFourWeekAvg`, `getOddTransaction`, `getTodayTransactions`
+- `aiml_planning` v1 → `usePlanning()` → `{ reflectionLog[], weeklyPriorities[], groceryList[] }`
+
+**Module flags:** `settings.modules` defaults to `{ fitness: true, nutrition: false, goals: false, reflection: false, finance: true, focus: true, habits: false, sleep: false }`. These flags are persisted but are not currently used by `App.jsx` or `Home.jsx` for rendering gates.
 
 **Day context highlights:**
 - `dayState.tasks[]` — the "3 things"; each `{ id, text, done, dueTime, scheduledTime, scheduledFor? }`
@@ -115,7 +117,7 @@ Nav is hidden for: `ignition`, `focus`, `projects`, `settings`. The bottom nav i
 
 **Day reset logic** (`loadDayState`): if `dayLockedAt` is from a prior calendar day, day state resets to initial values but `scheduledFor: 'tomorrow'` tasks carry forward. All other context state (projects, finance, planning, fitness, inbox) survives day resets independently.
 
-**Legacy migration:** The old `'sheStitches'` localStorage key is migrated into `projects[0]` on first load via `loadLegacyProjects()` in `ProjectsContext`. The old `'aiml_state'` key is read once for one-time migration into the new domain keys and never written to. Do not write to either legacy key.
+**Legacy migration:** The old `'sheStitches'` localStorage key can seed the generic projects array on first load via `loadLegacyProjects()` in `ProjectsContext`; it is removed only after a successful migration. The old `'aiml_state'` key is read once for one-time migration into the new domain keys and never written to. Do not write to either legacy key. Product code should select a focus project by `status === 'focus'`, not by hard-coding `projects[0]`.
 
 ## Design system
 
@@ -131,7 +133,7 @@ Fonts: DM Sans (body) and DM Serif Display (headings/numbers) loaded from Google
 
 ## Project pace (`src/utils/projectUtils.js`)
 
-`getProjectPace(project)` → `{ status: 'on_track' | 'buffer' | 'behind', projectedFinish, daysOver }`. Used in `Home.jsx` to drive the `SsGoalCard` border/badge colour.
+`getProjectPace(project)` → `{ status: 'on_track' | 'buffer' | 'behind', projectedFinish, daysOver }`. Used in `Home.jsx` to drive the focus-project goal card border/badge colour.
 
 ## Known issues (do not fix without a dedicated step)
 

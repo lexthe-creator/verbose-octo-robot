@@ -9,7 +9,7 @@
 1. [Project Overview](#1-project-overview)
 2. [Design System](#2-design-system)
 3. [App Structure](#3-app-structure)
-4. [AppContext State Shape](#4-appcontext-state-shape)
+4. [Context State Shapes](#4-context-state-shapes)
 5. [Screens](#5-screens)
 6. [Interaction Patterns](#6-interaction-patterns)
 7. [Navigation & Routing](#7-navigation--routing)
@@ -23,7 +23,7 @@
 
 **Name:** App in My Life
 **Purpose:** Dark-themed personal PWA for ADHD daily execution — morning planning, task tracking, focus timer, capture inbox, and read-only finance snapshot.
-**Stack:** Vite + React 18, deployed to GitHub Pages. No external UI libraries — custom components only.
+**Stack:** Vite + React 19, deployed to GitHub Pages. No external UI libraries — custom components only.
 **Target device:** Mobile-first, 393px wide, iPhone 16 Pro safe areas.
 
 ---
@@ -126,12 +126,14 @@ src/
     tokens.css            — all design tokens + reset
   context/
     index.js              — barrel re-exports for all contexts
-    AppContext.jsx         — projects, reflectionLog, weeklyPriorities, groceryList, transactions
+    UserContext.jsx        — profile identity and wake/sleep defaults
+    SettingsContext.jsx    — theme, equipment, connection flags, module preferences
     DayContext.jsx         — tasks, meals, workout, energyLevel, dayLockedAt
-    UserContext.jsx        — profile (name)
-    SettingsContext.jsx    — gymAccess, plaidConnected, calendarConnected, theme
     FitnessContext.jsx     — programStartDate/End, workoutLog, todayComplete, focusSessions, program, programConfig
     InboxContext.jsx       — inboxItems, taskPool, calendarItems, notes
+    ProjectsContext.jsx    — generic projects array + focus-project selectors
+    FinanceContext.jsx     — transactions + read-only finance selectors
+    PlanningContext.jsx    — reflectionLog, weeklyPriorities, groceryList
   screens/
     MorningIgnition.jsx   — 3-step ignition flow
     Home.jsx              — main daily screen (clock, training card, timeline, tasks, fuel)
@@ -159,20 +161,28 @@ vite.config.js            — base set to repo name for GitHub Pages
 
 **Provider tree** (outermost → innermost):
 ```
-SettingsProvider > UserProvider > FitnessProvider > DayProvider > InboxProvider > AppProvider > App
+SettingsProvider > UserProvider > FitnessProvider > DayProvider > InboxProvider > ProjectsProvider > FinanceProvider > PlanningProvider > App
 ```
 
-**localStorage keys:**
-| Key | Context | Schema |
-|---|---|---|
-| `aiml_state` | AppContext | raw JSON (legacy format, no version wrapper) |
-| `aiml_day` | DayContext | `{ version: 1, data: {...} }` |
-| `aiml_user` | UserContext | `{ version: 1, data: {...} }` |
-| `aiml_settings` | SettingsContext | `{ version: 1, data: {...} }` |
-| `aiml_fitness` | FitnessContext | `{ version: 1, data: {...} }` |
-| `aiml_inbox` | InboxContext | `{ version: 1, data: {...} }` |
+There is no `AppContext` in the current architecture. State is split across eight domain contexts and exposed through `src/context/index.js`.
 
-Each new context migrates from `aiml_state` on first launch (one-time, non-destructive — `aiml_state` is preserved for backward compatibility).
+**localStorage keys and schema versions:**
+| Key | Owner | Schema | Notes |
+|---|---|---|
+| `aiml_user` | UserContext | `{ version: 1, data }` | Migrates `profile` from legacy `aiml_state` when present. |
+| `aiml_settings` | SettingsContext | `{ version: 1, data }` | Migrates `settings` from legacy `aiml_state`; backfills `modules` defaults. |
+| `aiml_day` | DayContext | `{ version: 1, data: {...} }` |
+| `aiml_fitness` | FitnessContext | `{ version: 2, data }` | v1→v2 adds `program`, `programConfig`, and `sets[]` on log entries. |
+| `aiml_inbox` | InboxContext | `{ version: 2, data }` | v1→v2 backfills task priority, calendar confirmed flag, and note pinned flag. |
+| `aiml_projects` | ProjectsContext | `{ version: 1, data }` | Migrates projects from `aiml_state`; also migrates legacy `sheStitches` into the generic projects array. |
+| `aiml_finance` | FinanceContext | `{ version: 1, data }` | Migrates `transactions` from legacy `aiml_state`. |
+| `aiml_planning` | PlanningContext | `{ version: 1, data }` | Migrates reflection, weekly priorities, and grocery list from legacy `aiml_state`. |
+| `aiml_state` | Legacy only | Raw JSON, no version wrapper | Read once by domain contexts for migration. Do not write new state here. |
+| `sheStitches` | Legacy only | Raw JSON | Migrated once into `aiml_projects`, then removed if migration succeeds. |
+| `lastReflectionDate` | App.jsx overlay guard | ISO date string | Prevents repeated EOD overlay on the same date. |
+| `lastWeeklyPlanDate` | App.jsx overlay guard | ISO date string | Prevents repeated weekly planning overlay in the same Mon–Sun week. |
+
+Each domain context migrates from `aiml_state` on first launch when its own key is missing. Migration is non-destructive for `aiml_state`.
 
 **Overlay z-index hierarchy:** EodReflection and WeeklyPlanning render at z-index 200. WorkoutPlayer renders at z-index 150 — below both overlays.
 
@@ -180,65 +190,92 @@ Each new context migrates from `aiml_state` on first launch (one-time, non-destr
 
 ## 4. Context State Shapes
 
-State is split across six domain contexts. Each has its own localStorage key and schema version.
+State is split across eight domain contexts. Each persistent context owns its localStorage key, reducer, migration path, and schema version. Derived values are computed in selectors/utilities, not stored.
 
 ---
 
-### 4.1 AppContext (`aiml_state`)
-
-Persists: projects, reflectionLog, weeklyPriorities, groceryList, transactions. Day-plan fields (tasks, meals, workout, energyLevel, dayLockedAt) have moved to DayContext. Fitness has moved to FitnessContext. Inbox has moved to InboxContext.
-
-**She Stitches** is `projects[0]` in the generic `projects[]` array. The legacy `'sheStitches'` localStorage key is migrated on first load.
+### 4.1 UserContext (`aiml_user`, schema v1)
 
 ```js
 {
-  // Finance transactions
-  transactions: [
-    { id: string, merchant: string, amount: number, category: string, date: 'YYYY-MM-DD' },
-    // amount is signed: negative = spend, positive = income
-  ],
-
-  // Generic projects array — She Stitches is always projects[0]
-  projects: [
-    {
-      id:               string,          // 'she-stitches'
-      name:             string,          // 'She Stitches'
-      emoji:            string,          // '🪡'
-      startDate:        'YYYY-MM-DD',
-      endDate:          'YYYY-MM-DD',    // '2025-06-29' (day 90)
-      bufferDays:       7,
-      weeklyGoal:       null | number,
-      tasks: [
-        {
-          id:       string,
-          text:     string,
-          done:     boolean,
-          listings: number,
-          week:     number,
-          month:    number,
-          tag:      'Design' | 'Etsy' | 'Marketing' | 'Strategy',
-        },
-      ],
-      lastActivityDate: null | 'YYYY-MM-DD',
-    },
-  ],
-
-  // EOD reflection log (persists across days)
-  reflectionLog: [
-    { date: 'YYYY-MM-DD', feel: 1–5, tomorrowTasks: string[] },
-  ],
-
-  // Weekly planning (persists across days)
-  weeklyPriorities: string[],
-  groceryList: [
-    { id: string, text: string, done: boolean },
-  ],
+  name:      'Lex',
+  wakeTime:  '06:00',
+  sleepTime: '23:00',
 }
 ```
 
----
+Action: `UPDATE_PROFILE { key, value }`.
 
-### 4.2 FitnessContext (`aiml_fitness`, schema v2)
+### 4.2 SettingsContext (`aiml_settings`, schema v1)
+
+```js
+{
+  theme:             'dark',
+  gymAccess:         'bodyweight', // 'bodyweight' | 'dumbbells' | 'gym'
+  plaidConnected:    false,
+  calendarConnected: false,
+  modules: {
+    fitness:    true,
+    nutrition:  false,
+    goals:      false,
+    reflection: false,
+    finance:    true,
+    focus:      true,
+    habits:     false,
+    sleep:      false,
+  },
+}
+```
+
+Actions:
+- `UPDATE_SETTING { key, value }`
+- `UPDATE_MODULE { module, enabled }`
+
+**Current module gating behavior:** `settings.modules` is persisted and migration-safe, but no current screen reads it for rendering. `App.jsx` renders all bottom-nav tabs from `NAV_TABS` and does not gate Fitness, Inbox, Projects, or Finance by module flags. `Home.jsx` imports `settingsState` for `gymAccess` only; it does not currently hide or reorder Home sections by `settings.modules`. Any future module gating must preserve these defaults and explicitly define the migration from preference-only flags to behavior-driving flags.
+
+### 4.3 DayContext (`aiml_day`, schema v1)
+
+```js
+{
+  dayLockedAt:      null | ISO8601,
+  energyLevel:      null | 1 | 2 | 3 | 4,
+  workoutConfirmed: false,
+  confirmedTasks:   string[],
+  confirmedMeals:   string[],
+  tasks: [
+    {
+      id: string,
+      text: string,
+      done: boolean,
+      dueTime: 'HH:MM',
+      scheduledTime: null | 'HH:MM',
+      priority: number,
+      scheduledFor?: 'tomorrow',
+    },
+  ],
+  meals: {
+    breakfast: { label, startTime, endTime, lateAfter, eaten },
+    lunch:     { label, startTime, endTime, lateAfter, eaten },
+    snack:     { label, startTime, endTime, lateAfter, eaten },
+    dinner:    { label, startTime, endTime, lateAfter, eaten },
+  },
+  workout: {
+    type: string,
+    duration: string,
+    pace: string,
+    time: 'HH:MM',
+    confirmed: boolean,
+  },
+}
+```
+
+Day reset: when `dayLockedAt` is from a prior calendar day, `loadDayState()` resets to initial day values, preserves meal time windows while clearing `eaten`, and carries forward only tasks with `scheduledFor: 'tomorrow'`.
+
+Actions: `SET_ENERGY`, `CONFIRM_TASK`, `CONFIRM_MEAL`, `CONFIRM_WORKOUT`, `LOCK_DAY`, `TOGGLE_TASK`, `ADD_TASK`, `REORDER_TASKS`, `UPDATE_TASK_TIME`, `MARK_MEAL_EATEN`, `UPDATE_MEAL_WINDOW`, `SET_TOMORROW_TASKS`.
+
+Helpers exposed via `useDay()`: `updateTaskTime(taskId, time)`, `updateMealWindow(slot, startTime, endTime)`.
+
+### 4.4 FitnessContext (`aiml_fitness`, schema v2)
 
 ```js
 {
@@ -274,9 +311,9 @@ Migration v1→v2: adds `program`, `programConfig`, and `sets: []` on existing `
 Phase is **derived** — call `getPhase(programStartDate)`. Never stored. 13-week repeating cycle: 4 base + 4 build + 4 peak + 1 deload.
 Week number is **derived** — call `getWeekNumber(programStartDate)`. Never stored.
 
----
+Actions: `LOG_WORKOUT`, `LOG_WORKOUT_SETS`, `CONFIGURE_PROGRAM`, `UPDATE_PROGRAM_CONFIG`, `UPDATE_FITNESS`, `INCREMENT_FOCUS_SESSIONS`.
 
-### 4.3 InboxContext (`aiml_inbox`, schema v1)
+### 4.5 InboxContext (`aiml_inbox`, schema v2)
 
 ```js
 {
@@ -290,12 +327,87 @@ Week number is **derived** — call `getWeekNumber(programStartDate)`. Never sto
     { id: string, text: string, date: null, time: null, createdAt: ISO8601 },  // TRIAGE_TO_CALENDAR destination (V1 stub)
   ],
   notes: [
-    { id: string, text: string, createdAt: ISO8601 },  // TRIAGE_TO_NOTE destination
+    { id: string, text: string, createdAt: ISO8601, pinned: boolean },
   ],
 }
 ```
 
-`taskPool`, `calendarItems`, `notes` are V1 placeholders — UI for these destinations is deferred.
+`taskPool`, `calendarItems`, `notes` are triage destinations. Current UI primarily supports inbox capture and row actions; destination-management UI is limited.
+
+Actions: `ADD_INBOX_ITEM`, `REMOVE_INBOX_ITEM`, `TRIAGE_TO_TASK`, `TRIAGE_TO_CALENDAR`, `TRIAGE_TO_NOTE`, `UPDATE_POOL_TASK`, `UPDATE_CALENDAR_ITEM`, `PIN_NOTE`, `DELETE_POOL_TASK`, `DELETE_CALENDAR_ITEM`, `DELETE_NOTE`.
+
+### 4.6 ProjectsContext (`aiml_projects`, schema v1)
+
+```js
+{
+  projects: [
+    {
+      id: string,
+      name: string,
+      emoji: string,
+      startDate: 'YYYY-MM-DD',
+      endDate: 'YYYY-MM-DD',
+      bufferDays: number,
+      weeklyGoal: null | number,
+      tasks: [
+        {
+          id: string,
+          text: string,
+          done: boolean,
+          listings: number,
+          week: number,
+          month: number,
+          tag: string,
+        },
+      ],
+      lastActivityDate: null | 'YYYY-MM-DD',
+      status: 'focus' | 'active' | 'archived',
+    },
+  ],
+}
+```
+
+Selectors: `getFocusProject(projects)` and `getProjectStats(project)`.
+
+The product architecture is generic Projects. Legacy migration can still create a default She Stitches focus project from the old `sheStitches` key or from initial seed data, but She Stitches is migration/seed behavior, not a core state invariant. Code should select the focus project by `status === 'focus'`, not by assuming `projects[0]`.
+
+Actions: `TOGGLE_PROJECT_TASK`, `ADD_PROJECT`, `UPDATE_PROJECT`.
+
+### 4.7 FinanceContext (`aiml_finance`, schema v1)
+
+```js
+{
+  transactions: [
+    {
+      id: string,
+      merchant: string,
+      amount: number, // negative = spend, positive = income
+      category: string,
+      date: 'YYYY-MM-DD',
+    },
+  ],
+}
+```
+
+Selectors: `getTodaySpend`, `getWeeklySpend`, `getWeekTotal`, `getFourWeekAvg`, `getOddTransaction`, `getTodayTransactions`.
+
+Actions: `ADD_TRANSACTION`, `DELETE_TRANSACTION`.
+
+### 4.8 PlanningContext (`aiml_planning`, schema v1)
+
+```js
+{
+  reflectionLog: [
+    { date: 'YYYY-MM-DD', feel: 1 | 2 | 3 | 4 | 5, tomorrowTasks: string[] },
+  ],
+  weeklyPriorities: string[],
+  groceryList: [
+    { id: string, text: string, done: boolean },
+  ],
+}
+```
+
+Actions: `ADD_REFLECTION`, `SET_WEEKLY_PRIORITIES`, `ADD_GROCERY_ITEM`, `TOGGLE_GROCERY_ITEM`, `DELETE_GROCERY_ITEM`.
 
 ---
 
@@ -322,92 +434,7 @@ Returns `{ status, projectedFinish, daysOver }`.
 | `buffer` | `#8A6A00` | `#8A6A00` | `#F0C040` |
 | `behind` | `var(--color-danger)` | `rgba(224,85,85,0.12)` | `var(--color-danger)` |
 
-**Computed helpers** exposed via `useApp()` (derived from `state.projects[0]`):
-
-| Helper | Type | Description |
-|---|---|---|
-| `ssDoneCount` | `number` | Completed task count |
-| `ssTotalCount` | `number` | Total task count (37) |
-| `ssListingsCount` | `number` | Sum of `listings` for done tasks |
-| `ssNextTask` | `string \| null` | Text of first undone task |
-| `ssDayOf90` | `number` | `min(daysSinceStartDate, 90)` |
-
-### AppContext dispatch actions (`dispatch`)
-
-| Action type | Payload | Effect |
-|---|---|---|
-| `ADD_TRANSACTION` | `{ merchant, amount, category, date }` | Prepends new transaction to `transactions` (amount is signed) |
-| `DELETE_TRANSACTION` | transaction `id` string | Removes transaction from `transactions` |
-| `TOGGLE_PROJECT_TASK` | `{ projectId, taskId }` | Toggles `projects[id].tasks[taskId].done`; sets `lastActivityDate` |
-| `ADD_PROJECT` | `{ project }` | Appends project to `projects[]` |
-| `UPDATE_PROJECT` | `{ projectId, key, value }` | Sets `projects[id][key] = value` |
-| `ADD_REFLECTION` | `{ date, feel, tomorrowTasks[] }` | Appends to `reflectionLog` |
-| `SET_WEEKLY_PRIORITIES` | `{ priorities: string[] }` | Replaces `weeklyPriorities` |
-| `ADD_GROCERY_ITEM` | `{ text }` | Appends `{ id, text, done: false }` to `groceryList` |
-| `TOGGLE_GROCERY_ITEM` | `{ id }` | Toggles `groceryList[id].done` |
-| `DELETE_GROCERY_ITEM` | `{ id }` | Removes item from `groceryList` |
-
-### DayContext dispatch actions (`dayDispatch`)
-
-| Action type | Payload | Effect |
-|---|---|---|
-| `SET_ENERGY` | `1–4` | Sets `energyLevel` |
-| `CONFIRM_TASK` | task `id` string | Appends to `confirmedTasks` (idempotent) |
-| `CONFIRM_MEAL` | `{ slot, startTime, endTime }` | Sets `meals[slot].startTime/endTime/lateAfter` (idempotent) |
-| `CONFIRM_WORKOUT` | `{ type, title, duration, segments, time? }` | Sets `workoutConfirmed: true`, writes `workout` fields |
-| `LOCK_DAY` | — | Sets `dayLockedAt` to current ISO timestamp |
-| `TOGGLE_TASK` | task `id` string | Toggles `tasks[id].done` |
-| `UPDATE_TASK_TIME` | `{ taskId, time: 'HH:MM' }` | Sets `tasks[id].scheduledTime`; task appears in timeline |
-| `MARK_MEAL_EATEN` | slot string | Sets `meals[slot].eaten` to `true`. Does NOT touch time fields. |
-| `UPDATE_MEAL_WINDOW` | `{ slot, startTime, endTime }` | Updates `meals[slot].startTime/endTime/lateAfter`. Does NOT touch `eaten`. |
-| `ADD_TASK` | `{ text }` | Appends new task to `tasks` |
-| `REORDER_TASKS` | `{ orderedIds: string[] }` | Updates `tasks[].priority` based on new order |
-| `RESET_DAY` | — | Resets day-plan state; tasks with `scheduledFor:'tomorrow'` carry forward |
-
-### FitnessContext dispatch actions (`fitnessDispatch`)
-
-| Action type | Payload | Effect |
-|---|---|---|
-| `LOG_WORKOUT` | `{ date, type, title, duration, feel, notes, exercises[] }` | Appends entry to `workoutLog` with `sets: []`; sets `todayComplete: true` |
-| `LOG_WORKOUT_SETS` | `{ workoutId, sets[] }` | Finds `workoutLog` entry by date, appends `sets` array to it |
-| `CONFIGURE_PROGRAM` | `{ type, trainingDays, dayTypes, goal, audioEnabled }` | Sets `program.type`, `program.configured: true`, writes full `programConfig` |
-| `UPDATE_PROGRAM_CONFIG` | `{ key, value }` | Updates `programConfig[key]` |
-| `UPDATE_FITNESS` | `{ key, value }` | Sets `fitnessState[key] = value` — used for `programStartDate`, `programEndDate` |
-| `INCREMENT_FOCUS_SESSIONS` | — | Increments `focusSessions` by 1 |
-
-### InboxContext dispatch actions (`inboxDispatch`)
-
-| Action type | Payload | Effect |
-|---|---|---|
-| `ADD_INBOX_ITEM` | `{ text }` | Prepends new item to `inboxItems` |
-| `REMOVE_INBOX_ITEM` | `{ id }` | Removes item from `inboxItems` |
-| `TRIAGE_TO_TASK` | `{ id, text }` | Removes from `inboxItems`; appends to `taskPool` |
-| `TRIAGE_TO_CALENDAR` | `{ id, text, date?, time? }` | Removes from `inboxItems`; appends to `calendarItems` (V1 stub) |
-| `TRIAGE_TO_NOTE` | `{ id, text }` | Removes from `inboxItems`; appends to `notes` |
-| `DELETE_POOL_TASK` | `{ id }` | Removes from `taskPool` |
-| `DELETE_CALENDAR_ITEM` | `{ id }` | Removes from `calendarItems` |
-| `DELETE_NOTE` | `{ id }` | Removes from `notes` |
-
-### UserContext dispatch actions (`userDispatch`)
-
-| Action type | Payload | Effect |
-|---|---|---|
-| `UPDATE_PROFILE` | `{ key, value }` | Sets `userState[key] = value` (e.g. `name`) |
-
-### SettingsContext dispatch actions (`settingsDispatch`)
-
-| Action type | Payload | Effect |
-|---|---|---|
-| `UPDATE_SETTING` | `{ key, value }` | Sets `settingsState[key] = value` |
-
-### DayContext helper functions
-
-Exposed via `useDay()`:
-
-| Function | Signature | Dispatches |
-|---|---|---|
-| `updateTaskTime` | `(taskId: string, time: 'HH:MM') => void` | `UPDATE_TASK_TIME` |
-| `updateMealWindow` | `(slot: string, startTime: 'HH:MM', endTime: 'HH:MM') => void` | `UPDATE_MEAL_WINDOW` |
+Project stats are exposed by `getProjectStats(project)`, not by `useApp()`.
 
 ---
 
@@ -484,13 +511,15 @@ Exposed via `useDay()`:
 
 Layout zones top to bottom:
 
-1. **Hero time** — greeting line ("Good morning/afternoon/evening, {name}") + gear icon (32px circle, `#1E1E18` bg, `#2A2A22` border, `#8C8C7A` ⚙ icon) top-right → `onNavigate('settings')`. Below: DM Serif Display 52px clock. Colon in accent color. Right-aligned "⊙ Focus" pill. Full date below.
-2. **Burn bar** — 2px track, fills based on % of waking day elapsed (6am–11pm). Left: "X% of day gone". Right: `nextLabel` — next upcoming commitment ("Tempo run in 47 min"). `nextLabel` only surfaces future items: tasks where `scheduledTime > now`, meals where `endTime > now` (expired windows are skipped), workout if `workoutTime > now`. Shows nothing if no upcoming items.
-3. **Today's Training** — card showing today's generated workout (icon, title, subtitle). "Start →" button calls `onStartWorkout(workout)`; green "✓ Completed" state when `fitness.todayComplete`.
-4. **Today at a glance** — dark card, vertical timeline. Items: Morning ignition, Now marker, meals, scheduled tasks.
-5. **3 Things** — task rows. Tap to check off. Done: strikethrough + green + reduced opacity. Overdue badge on relevant items.
-6. **Focus project** — section label reads `state.projects?.find(p => p.status === 'focus')?.name ?? 'Projects'`. Goal card shows progress bar, listings, and next undone task from the focus project (`focusProject.tasks?.find(t => !t.done)?.text`). If no focus project, next task shows "Set a focus project in Projects". Tap → `onNavigate('projects')`.
-7. **Fuel gauge** — 4 meal slots (Breakfast / Lunch / Snack / Dinner). Tap slot body → `MARK_MEAL_EATEN`. Tap ◷ icon → `FuelEditSheet` bottom sheet for time editing.
+1. **Hero header** — greeting line ("Good morning/afternoon/evening, {name}") from `UserContext`, gear icon top-right → `onNavigate('settings')`, date row, and right-aligned "⊙ Focus" pill → `onOpenFocus`. The currently implemented HeroClock does not render the large clock display described in older specs.
+2. **Burn bar** — 2px track, fills based on % of waking day elapsed (6am–11pm). Left: "X% of day gone". Right: `nextLabel` — computed inline with `useMemo`, not a named `nextAction` helper. It considers future incomplete scheduled tasks, future uneaten meal windows, and confirmed workout time. If the next item is more than 3 hours away, it prefixes the time string with a short label.
+3. **Today's Training** — card showing today's generated workout. `Start →` is the primary CTA for the section and calls `onStartWorkout(workout)`; green "✓ Completed" state when `fitnessState.todayComplete`. Rest days render without a start button.
+4. **Today at a glance** — dark card, vertical timeline. Items: Morning ignition, confirmed workout, scheduled tasks, meal windows, and a chronological "you are here" marker.
+5. **3 Things** — task rows from `DayContext`. Tapping the check circle toggles done. Tapping row text expands/collapses the inline time picker. Done rows are strikethrough + green + reduced opacity. Overdue badge appears when `dueTime` is earlier than now and the task is not done.
+6. **Focus project** — section label is the uppercase name of the project with `status === 'focus'`, or `PROJECTS` when none exists. Goal card shows progress, listings, and the next undone task from `getProjectStats(focusProject)`. If no focus project exists, next task shows "Set a focus project in Projects". Tap → `onNavigate('projects')`.
+7. **Fuel gauge** — 4 meal slots (Breakfast / Lunch / Snack / Dinner). Tap slot body → `MARK_MEAL_EATEN` (toggle). Tap ◷ icon → `FuelEditSheet` bottom sheet for time editing.
+
+Current Home does **not** implement a single global next-action card, a global primary CTA beyond section-local CTAs, a secondary-action maximum rule, collapsible supporting cards outside task rows, or module-gated Home sections. `settings.modules` is available in state but unused by Home rendering.
 
 ---
 
@@ -501,7 +530,7 @@ Layout zones top to bottom:
 **Nav:** Hidden (full-screen overlay).
 
 - Back arrow top-left → `onClose()`
-- Session counter top-right: "Session X of 4" — X driven by local `completedSessions` state (resets when overlay closes). `state.focusSessions` in AppContext is the cumulative lifetime count; `INCREMENT_FOCUS_SESSIONS` dispatched on each completion.
+- Session counter top-right: "Session X of 4" — X driven by local `completedSessions` state (resets when overlay closes). `fitnessState.focusSessions` is the cumulative lifetime count; `INCREMENT_FOCUS_SESSIONS` dispatched on each completion.
 - Preset pills: 15m / 25m / 45m / 60m — default 25m. Disabled (opacity 0.4, pointer-events none) while status is not `'ready'`.
 - SVG ring: 200px container, 88px radius, `stroke-linecap: round`
   - Track circle: `#252520`, strokeWidth 8
@@ -515,7 +544,7 @@ Layout zones top to bottom:
 - On completion: ring turns `#1D9E75`, status shows `done ✓`, dot fills, 2s pause then auto-resets for next session
 - Timer intervals managed with `useRef` — cleared in tick effect cleanup and on unmount
 
-**Deviation from build instructions:** instructions referenced `focusSessionsCompleted` which does not exist in AppContext. Correct field is `focusSessions` (§4). Per-overlay session counting uses local state.
+**Deviation from old build instructions:** instructions referenced `focusSessionsCompleted`, which does not exist. Correct field is `fitnessState.focusSessions` (§4). Per-overlay session counting uses local state.
 
 ---
 
@@ -541,12 +570,12 @@ Layout zones top to bottom:
 
 **File:** `src/screens/Projects.jsx` ✅ Done
 **Trigger:** Tap the goal card on Home.
-**Nav:** Hidden (full-screen, back arrow only).
+**Nav:** Shown by the current route map when `screen === 'projects'`; the screen also includes a back arrow.
 **Props:** `onBack()` → navigates to `'home'`.
 
-**Layout:** Header (← Home, italic title, subtitle) → Progress card (stats row + gradient bar) → 3 collapsible month cards → Weekly Rhythm 2×2 grid → The One Rule card.
+**Layout:** Header (← Home, title, subtitle) → Progress card (stats row + gradient bar) → 3 collapsible month cards → Weekly Rhythm 2×2 grid → The One Rule card.
 
-**State source:** `useApp()` + computed helpers from `AppContext` (`TOGGLE_PROJECT_TASK` dispatch). Persisted to `localStorage` under key `'aiml_state'` — independent of daily reset.
+**State source:** `useProjects()` + `getFocusProject()` + `getProjectStats()`. Persisted to `aiml_projects` through `ProjectsContext` — independent of daily reset.
 
 ---
 
@@ -572,7 +601,7 @@ Layout zones top to bottom:
 **Nav:** Hidden (back arrow header only).
 
 - **Profile card** — text input for `profile.name`; onBlur dispatches `UPDATE_PROFILE { name }`.
-- **Training card** — 3-pill equipment toggle (Bodyweight / Dumbbells / Full gym); dispatches `UPDATE_SETTINGS { key: 'gymAccess', value }`. Controls which exercise list `generateWorkout` selects.
+- **Training card** — 3-pill equipment toggle (Bodyweight / Dumbbells / Full gym); dispatches `UPDATE_SETTING { key: 'gymAccess', value }`. Controls which exercise list `generateWorkout` selects.
 - **Program card** — start date input → `UPDATE_FITNESS { key: 'programStartDate', value }` · race date input → `UPDATE_FITNESS { key: 'programEndDate', value }`. Both ISO date strings or null.
 - **Connections card** — Plaid (bank & spending) and Google Calendar rows. Stub `StubSheet` bottom-sheet explains V2 timeline.
 - **About card** — shows app version, current training phase label (`PHASE_LABELS[getPhase(programStartDate, programEndDate)]`), and week number (`getWeekNumber(programStartDate)`).
@@ -616,7 +645,7 @@ Layout zones top to bottom:
 
 5 steps:
 
-**Step 1 — Week review:** "This week" heading. Stat rows: workouts completed (from `fitness.workoutLog` filtered to this week) · tasks done · She Stitches tasks done. Read-only.
+**Step 1 — Week review:** "This week" heading. Stat rows: workouts completed (from `fitnessState.workoutLog` filtered to this week), day tasks done, and a legacy-labeled "She Stitches tasks" count derived from `projectsState.projects[0]`. This is a known legacy label/selector issue, not the generic Projects architecture.
 
 **Step 2 — Next week priorities:** "3 big things next week." 3 dark inline text inputs (optional). Saves via `SET_WEEKLY_PRIORITIES`.
 
@@ -775,14 +804,14 @@ Used in Home screen task rows.
 - Selecting a time saves via `UPDATE_TASK_TIME` dispatch: `{ taskId, time: 'HH:MM' }` — updates `tasks[id].dueTime`
 - Tasks with a scheduled time appear as dynamic items in "Today at a glance", inserted chronologically among the fixed timeline items
 - Tapping the row header again (not the picker itself) collapses the picker
-- AppContext action: `UPDATE_TASK_TIME` — see §4 dispatch table
+- DayContext action: `UPDATE_TASK_TIME` — see §4.
 
 ### Meal time editing
 Used in Home screen fuel gauge slots.
 - Tapping ◷ icon on a fuel slot opens `FuelEditSheet` — a slide-up bottom sheet with two native `<input type="time">` fields (iOS-safe)
 - Saves via `UPDATE_MEAL_WINDOW` dispatch: `{ slot, startTime: 'HH:MM', endTime: 'HH:MM' }`
 - Late state: triggered when `currentTime > meals[slot].lateAfter` AND `meals[slot].eaten === false` — slot renders in terracotta
-- AppContext action: `UPDATE_MEAL_WINDOW` — see §4 dispatch table
+- DayContext action: `UPDATE_MEAL_WINDOW` — see §4.
 
 ---
 
@@ -794,10 +823,10 @@ Used in Home screen fuel gauge slots.
 
 **Bottom nav** (`src/App.jsx`):
 - 72px height, `#1A1A14` bg, `0.5px` top border
-- 4 tabs: Home `⌂` / Fitness `◉` / Inbox `◎` / Finance `◈`
+- 5 tabs from `NAV_TABS`: Home `⌂` / Fitness `◉` / Inbox `◎` / Projects `▣` / Finance `◈`
 - Active: label + icon color → `#C17B56`, small 4px pip dot below icon
 - Fixed to bottom of the 393px column, `z-index: 100`
-- Hidden when `screen === 'ignition'` or `screen === 'focus'` or `screen === 'projects'` or `screen === 'settings'`
+- Hidden by `navigation/router.js` for `fitness-setup`, `settings`, `ignition`, `focus`, `eod`, and `weekly`. The current route map shows nav on `home`, `fitness`, `inbox`, `projects`, and `finance`.
 
 **Global overlays** (rendered above nav in `App.jsx`):
 - `WorkoutPlayer` (z-index 150): shown when `activeWorkout !== null`; cleared on save or close
@@ -809,7 +838,7 @@ Used in Home screen fuel gauge slots.
 | `ignition` | `home` | `onComplete()` inside MorningIgnition Step 3 |
 | `home` | `focus` | `onOpenFocus()` prop |
 | `home` | `settings` | Gear icon in HeroClock → `onNavigate('settings')` |
-| `home` | `projects` | `onNavigate('projects')` via She Stitches goal card tap |
+| `home` | `projects` | `onNavigate('projects')` via focus-project goal card tap |
 | `settings` | `home` | `onBack()` prop |
 | `focus` | `home` | `onClose()` prop |
 | `projects` | `home` | `onBack()` prop |
@@ -861,17 +890,19 @@ File: `.github/workflows/pages.yml`
 ### In V1
 
 - Morning Ignition full 3-step flow (Energy → Brief → Locked)
-- Home screen: greeting + gear icon, clock, Today's Training card, burn bar, timeline, tasks, She Stitches goal card, fuel gauge
+- Home screen: greeting + gear icon, Focus pill, Today's Training card, burn bar, timeline, tasks, generic focus-project goal card, fuel gauge
 - Focus Timer full implementation (ring, presets, session tracking)
 - Inbox capture + triage; "Task" button dispatches ADD_TASK with green flash confirmation
-- Finance screen with mock data
+- Finance screen with local transaction data, manual add/delete, Plaid connection stub, and read-only summary selectors
 - Settings screen: profile name, equipment toggle, Plaid/Calendar connection stubs
 - Fitness tab: Today's Training card, weekly strip, recent workout log
 - WorkoutPlayer: full segment flow + post-workout log (feel, notes, saves to fitness.workoutLog)
 - 26-week training block: generateWorkout utility with phase-aware exercise selection
 - Fuel slot time editing via FuelEditSheet bottom sheet (iOS-safe native time inputs)
-- LocalStorage persistence with daily reset (profile/settings/fitness preserved)
+- LocalStorage persistence with eight domain keys and daily reset scoped to DayContext
 - PWA manifest + GitHub Pages deploy
+
+**Module defaults in V1:** `settings.modules.fitness`, `settings.modules.finance`, and `settings.modules.focus` default to enabled. `nutrition`, `goals`, `reflection`, `habits`, and `sleep` default to disabled. These flags are currently persisted preferences only; V1 does not gate App nav or Home sections from them.
 
 ### Deferred (V2+)
 
@@ -882,7 +913,8 @@ File: `.github/workflows/pages.yml`
 - **Task editing** — add/edit/delete tasks from the app
 - **Meal customization** — edit meal labels and time windows
 - **Notifications / reminders** — push or local alerts for commitments
-- **Onboarding flow** — first-time setup for tasks, meals, workout defaults
+- **Module-driven UI gating** — hide/show App nav and Home sections from `settings.modules`
+- **Onboarding flow** — first-time setup for tasks, meals, workout defaults, and module preferences
 - **Multiple energy history** — chart of energy levels over time
 - **Swipe left to delete** on task rows
 - **iCloud / remote sync** — multi-device state
@@ -896,18 +928,18 @@ File: `.github/workflows/pages.yml`
 
 | Step | Description | Status | Files |
 |---|---|---|---|
-| 1 | Design tokens + AppContext | ✅ Done | `src/styles/tokens.css`, `src/context/AppContext.jsx` |
+| 1 | Design tokens + initial state architecture | ✅ Done | `src/styles/tokens.css`, current state now lives in `src/context/*Context.jsx` |
 | 2 | App shell + bottom nav routing | ✅ Done | `src/main.jsx`, `src/App.jsx`, `src/index.css`, `index.html`, `src/screens/*.jsx` (stubs) |
 | 3 | Morning Ignition (all 3 steps) | ✅ Done | `src/screens/MorningIgnition.jsx` |
 | 4 | Home screen (all zones) | ✅ Done | `src/screens/Home.jsx` |
 | 5 | Focus Timer overlay | ✅ Done | `src/screens/FocusTimer.jsx` |
 | 6 | Inbox | ✅ Done | `src/screens/Inbox.jsx` |
-| 6b | She Stitches Studio — goal card + roadmap screen | ✅ Done | `src/context/AppContext.jsx`, `src/screens/SheStitches.jsx`, `src/screens/Home.jsx`, `src/App.jsx` |
-| 7 | Finance (mock data) | ✅ Done | `src/screens/Finance.jsx` |
+| 6b | Legacy She Stitches seed project — goal card + roadmap screen | ✅ Superseded | Current code uses `ProjectsContext.jsx`, `Projects.jsx`, and generic focus-project selection. |
+| 7 | Finance (local transaction data) | ✅ Done | `src/screens/Finance.jsx`, `src/context/FinanceContext.jsx` |
 | 8 | PWA manifest + GitHub Pages deploy | ✅ Done | `public/manifest.json`, `public/icons/icon-192.png`, `public/icons/icon-512.png`, `vite.config.js`, `.github/workflows/pages.yml` |
-| 9 | Fitness tab, workout generator, settings, polish | ✅ Done | `src/utils/fitness.js`, `src/screens/Fitness.jsx`, `src/screens/Settings.jsx`, `src/components/WorkoutPlayer.jsx`, `src/components/FuelEditSheet.jsx`, `src/screens/Home.jsx` (training card, gear icon, greeting), `src/screens/Inbox.jsx` (ADD_TASK + flash), `src/screens/MorningIgnition.jsx` (meal labels), `src/context/AppContext.jsx` (profile/settings/fitness slices), `src/App.jsx` (4-tab nav, global WorkoutPlayer overlay) |
-| 11 | Finance transactions, fitness program dates, workout preview | ✅ Done | `src/context/AppContext.jsx` (transactions[], programStartDate/End, ADD_TRANSACTION, DELETE_TRANSACTION, UPDATE_FITNESS), `src/screens/Finance.jsx` (dynamic Plaid badge, live calculations, TransactionSheet, swipe-delete), `src/utils/fitness.js` (getWeekNumber, getPhase(startDate,endDate), shared WARMUP/COOLDOWN, section field on all segments), `src/screens/Fitness.jsx` (program-date header, weeks-to-race, expandable TodayCard preview), `src/screens/Settings.jsx` (Program section with date inputs) |
-| 12 | Projects system, EOD reflection, Sunday weekly planning | ✅ Done | `src/utils/projectUtils.js` (getProjectPace), `src/context/AppContext.jsx` (projects[], reflectionLog, weeklyPriorities, groceryList + all new actions, She Stitches migrated from ssState → projects[0], RESET_DAY carries tomorrow tasks), `src/screens/SheStitches.jsx` (reads projects[0], dispatches TOGGLE_PROJECT_TASK), `src/screens/Home.jsx` (pace status on goal card — border + badge by status), `src/screens/EodReflection.jsx` (3-step overlay: review/carry, feel, tomorrow tasks), `src/screens/WeeklyPlanning.jsx` (5-step overlay: week review, priorities, grocery, training preview, project check-ins), `src/App.jsx` (EodReflection + WeeklyPlanning overlay triggers with localStorage guards) |
+| 9 | Fitness tab, workout generator, settings, polish | ✅ Done | `src/utils/fitness.js`, `src/screens/Fitness.jsx`, `src/screens/Settings.jsx`, `src/components/WorkoutPlayer.jsx`, `src/components/FuelEditSheet.jsx`, `src/screens/Home.jsx`, `src/screens/Inbox.jsx`, domain contexts in `src/context/`, `src/App.jsx` (5-tab nav, global WorkoutPlayer overlay) |
+| 11 | Finance transactions, fitness program dates, workout preview | ✅ Done | `src/context/FinanceContext.jsx`, `src/context/FitnessContext.jsx`, `src/screens/Finance.jsx`, `src/utils/fitness.js`, `src/screens/Fitness.jsx`, `src/screens/Settings.jsx` |
+| 12 | Projects system, EOD reflection, Sunday weekly planning | ✅ Done | `src/utils/projectUtils.js`, `src/context/ProjectsContext.jsx`, `src/context/PlanningContext.jsx`, `src/context/DayContext.jsx`, `src/screens/Projects.jsx`, `src/screens/Home.jsx`, `src/screens/EodReflection.jsx`, `src/screens/WeeklyPlanning.jsx`, `src/App.jsx` |
 | 14b-i | Remove HYROX, fitness program schema v2, selectors, phase config | ✅ Done | `src/constants/fitness.js` (PHASES: base/build/peak/deload; PHASE_LABELS updated), `src/utils/fitness.js` (getPhase 13-week cycle, getPhaseConfig, getDayTypeLabel; hyroxStation removed; hyrox segment field removed), `src/utils/fitnessSelectors.js` (getExerciseHistory, getLastPerformance, getTodayWorkoutType, getWeekStrip), `src/context/FitnessContext.jsx` (schema v2 + v1→v2 migration; program/programConfig state; CONFIGURE_PROGRAM, UPDATE_PROGRAM_CONFIG, LOG_WORKOUT_SETS actions), `src/components/WorkoutPlayer.jsx` (HYROX station badge removed) |
 | 14b-ii | Exercise library data files | ✅ Done | `src/data/exercises.js` (EXERCISES: upper/lower/full_body/push/pull/mobility, 3 equipment tiers, 90+ exercises), `src/data/runSegments.js` (RUN_SEGMENTS: warmup/cooldown/main segments, pure data) |
 | 14b-iii | Workout generator — pure functions, progressive overload, run segments | ✅ Done | `src/utils/workoutGenerator.js` (getExercisePool, selectExercises, getLoadSuggestion, buildStrengthWorkout, buildRunWorkout, buildMobilityWorkout, generateWorkout — new config-based API), `src/utils/fitness.js` (@deprecated on old generateWorkout) |

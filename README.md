@@ -1,16 +1,35 @@
-# React + Vite
+# App in My Life
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Dark-themed personal PWA for ADHD daily execution: morning planning, task tracking, focus sessions, inbox capture, projects, fitness, and a local finance snapshot.
 
-Currently, two official plugins are available:
+Before changing code, read [SPEC.md](./SPEC.md). It is the living source of truth for product behavior, state shape, interaction patterns, and screen specs.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Local Setup
 
-## React Compiler
+```bash
+npm install
+npm run dev
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Vite serves the app at `http://localhost:5173` by default.
 
-## Expanding the ESLint configuration
+## Commands
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+npm run dev       # start local dev server
+npm run build     # production build to dist/
+npm run preview   # serve the production build locally
+npm run lint      # run ESLint
+```
+
+## Live URL
+
+https://lexthe-creator.github.io/verbose-octo-robot/
+
+## Architecture
+
+- Vite + React single-page PWA.
+- No router library; screen state is managed by `useNavigate()` and rendered in `App.jsx`.
+- Eight domain contexts own localStorage persistence: User, Settings, Day, Fitness, Inbox, Projects, Finance, and Planning.
+- Design tokens live in `src/styles/tokens.css`; do not change tokens or UI behavior without checking SPEC first.
+- Deployment is GitHub Pages via `.github/workflows/pages.yml`.
