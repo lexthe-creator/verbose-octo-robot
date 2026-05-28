@@ -19,9 +19,10 @@ import EodReflection   from './screens/EodReflection.jsx'
 import WeeklyPlanning  from './screens/WeeklyPlanning.jsx'
 
 function getInitialScreen(dayLockedAt) {
-  if (!dayLockedAt) return SCREENS.IGNITION
+  if (!dayLockedAt) return SCREENS.HOME
   const lockedDate = new Date(dayLockedAt).toDateString()
-  return lockedDate === new Date().toDateString() ? SCREENS.HOME : SCREENS.IGNITION
+  if (lockedDate !== new Date().toDateString()) return SCREENS.HOME
+  return SCREENS.HOME
 }
 
 export default function App() {
