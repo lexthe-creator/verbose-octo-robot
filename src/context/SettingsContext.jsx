@@ -6,6 +6,8 @@ const SCHEMA_VERSION       = 1
 const initialSettingsState = {
   theme:             'dark',
   gymAccess:         'bodyweight',
+  homeDensity:       'balanced',
+  homeMode:          'build',
   plaidConnected:    false,
   calendarConnected: false,
   modules: {

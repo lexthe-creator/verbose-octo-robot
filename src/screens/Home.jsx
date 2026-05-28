@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useUser } from '../context/UserContext.jsx'
 import { useSettings } from '../context/SettingsContext.jsx'
-import { useDay, useFitness, useProjects, getProjectStats } from '../context/index.js'
+import { useDay, useFitness, useInbox, useProjects, getProjectStats } from '../context/index.js'
 import FuelEditSheet from '../components/FuelEditSheet.jsx'
 import { getTodayType, generateWorkout, getWeekNumber } from '../utils/fitness.js'
 import { getProjectPace } from '../utils/projectUtils.js'
@@ -38,6 +38,20 @@ const SECTION_KEYS = {
   MEALS:    'meals',
   FOCUS:    'focus',
 }
+
+const TIMELINE_SECTIONS = [
+  { key: 'morning', label: 'Morning', range: '6 AM - 12 PM' },
+  { key: 'work', label: 'Day Flow', range: '12 PM - 5 PM' },
+  { key: 'evening', label: 'Evening', range: '5 PM - 11 PM' },
+]
+
+const DENSITY_OPTIONS = ['minimal', 'balanced', 'detailed']
+
+const SUPPORT_BUTTONS = [
+  { key: 'journal', label: 'Journal', icon: '◇' },
+  { key: 'nutrition', label: 'Nutrition', icon: '◷' },
+  { key: 'focus', label: 'Focus', icon: '⊙' },
+]
 
 function getEnabledModules(modules = {}) {
   return {
@@ -182,38 +196,6 @@ const hero = {
   },
 }
 
-// ─── Burn bar ──────────────────────────────────────────────────────────────────
-
-function BurnBar({ now, nextLabel }) {
-  const DAY_START = 6 * 60   // 6am in mins
-  const DAY_END   = 23 * 60  // 11pm in mins
-  const current   = toMins(now)
-  const pct = Math.min(100, Math.max(0,
-    Math.round(((current - DAY_START) / (DAY_END - DAY_START)) * 100)
-  ))
-
-  return (
-    <div style={burn.wrap}>
-      <div style={burn.labels}>
-        <span style={burn.left}>{pct}% of day gone</span>
-        {nextLabel && <span style={burn.right}>{nextLabel}</span>}
-      </div>
-      <div style={burn.track}>
-        <div style={{ ...burn.fill, width: `${pct}%` }} />
-      </div>
-    </div>
-  )
-}
-
-const burn = {
-  wrap:   { padding: '16px 20px 0' },
-  labels: { display: 'flex', justifyContent: 'space-between', marginBottom: '6px' },
-  left:   { fontSize: '11px', color: 'var(--color-muted)' },
-  right:  { fontSize: '11px', color: 'var(--color-accent)', fontWeight: 500 },
-  track:  { height: '2px', background: 'var(--color-faint)', borderRadius: 'var(--radius-pill)', overflow: 'hidden' },
-  fill:   { height: '100%', background: 'var(--color-accent)', borderRadius: 'var(--radius-pill)', transition: 'width 1s linear' },
-}
-
 // ─── Timeline ─────────────────────────────────────────────────────────────────
 
 function buildTimeline(state, nowMinutes, options = {}) {
@@ -224,8 +206,9 @@ function buildTimeline(state, nowMinutes, options = {}) {
   items.push({
     key:      'ignition',
     timeMins: 6 * 60,
-    label:    'Morning ignition',
-    type:     'ignition',
+    label:    'Morning Check-In',
+    detail:   state.dayLockedAt ? 'Day rhythm set' : 'Mood · energy · mode',
+    type:     'routine',
     done:     !!state.dayLockedAt,
   })
 
@@ -236,6 +219,7 @@ function buildTimeline(state, nowMinutes, options = {}) {
       key:      'workout',
       timeMins: wm,
       label:    `${state.workout.type} · ${state.workout.duration}`,
+      detail:   state.workout.pace || 'Warmup · main work · cooldown',
       type:     'workout',
       done:     state.workout.confirmed || (state.workoutConfirmed && nowMinutes > wm),
       planned:  !state.workoutConfirmed && !state.workout.confirmed,
@@ -249,6 +233,7 @@ function buildTimeline(state, nowMinutes, options = {}) {
         key:      t.id,
         timeMins: parseHHMM(t.scheduledTime),
         label:    t.text,
+        detail:   'Scheduled task',
         type:     'task',
         done:     t.done,
       })
@@ -261,6 +246,7 @@ function buildTimeline(state, nowMinutes, options = {}) {
       key:      `meal-${slot}`,
       timeMins: parseHHMM(meal.startTime),
       label:    `${meal.label} window`,
+      detail:   `${formatMealTime(meal.startTime)} - ${formatMealTime(meal.endTime)}`,
       type:     'meal',
       done:     meal.eaten,
       late:     !meal.eaten && nowMinutes > parseHHMM(meal.lateAfter),
@@ -269,13 +255,29 @@ function buildTimeline(state, nowMinutes, options = {}) {
 
   items.sort((a, b) => a.timeMins - b.timeMins)
 
+  const timeCounts = items.reduce((acc, item) => {
+    acc[item.timeMins] = (acc[item.timeMins] || 0) + 1
+    return acc
+  }, {})
+
+  items.forEach(item => {
+    item.section = getTimelineSection(item.timeMins)
+    item.overlaps = timeCounts[item.timeMins] > 1
+  })
+
   // Insert "now" marker at chronological position
-  const nowItem = { key: 'now', timeMins: nowMinutes, label: 'you are here', type: 'now' }
+  const nowItem = { key: 'now', timeMins: nowMinutes, label: 'Right now', detail: 'You are here', type: 'now', section: getTimelineSection(nowMinutes) }
   const insertAt = items.findIndex(item => item.timeMins > nowMinutes)
   if (insertAt === -1) items.push(nowItem)
   else items.splice(insertAt, 0, nowItem)
 
   return items
+}
+
+function getTimelineSection(timeMins) {
+  if (timeMins < 12 * 60) return 'morning'
+  if (timeMins < 17 * 60) return 'work'
+  return 'evening'
 }
 
 function getTimelinePreview(items, nowMinutes) {
@@ -291,90 +293,141 @@ function getTimelinePreview(items, nowMinutes) {
 
 function getBurnBarLabel(timelinePreview) {
   if (!timelinePreview.next) return 'Clear for now'
-  return `Next ${formatMins(timelinePreview.next.timeMins)} · ${timelinePreview.next.label}`
+  return `${formatMins(timelinePreview.next.timeMins)} · ${timelinePreview.next.label}`
 }
 
 function TimelinePreview({ preview }) {
   const nextLabel = preview.next
     ? `${formatMins(preview.next.timeMins)} · ${preview.next.label}`
-    : 'All visible items are complete'
+    : 'Your visible flow is clear'
 
   return (
     <div style={tl.preview}>
       <span style={tl.previewNow}>●</span>
       <div style={tl.previewText}>
         <span style={tl.previewMain}>{nextLabel}</span>
-        <span style={tl.previewSub}>{preview.remainingCount} remaining scheduled item{preview.remainingCount === 1 ? '' : 's'} today</span>
+        <span style={tl.previewSub}>{preview.remainingCount} scheduled item{preview.remainingCount === 1 ? '' : 's'} still available today</span>
       </div>
     </div>
   )
 }
 
-function Timeline({ items }) {
+function Timeline({ items, density, collapsedSections, onToggleSection }) {
   function dotColor(item) {
     if (item.type === 'now')     return 'var(--color-accent)'
     if (item.done)               return 'var(--color-success)'
-    if (item.late)               return 'var(--color-danger)'
+    if (item.late)               return 'var(--color-accent)'
     if (item.type === 'workout') return 'var(--color-accent)'
+    if (item.type === 'routine') return 'var(--color-accent-light)'
     return 'var(--color-faint)'
   }
 
   return (
     <div style={tl.card}>
-      <p style={tl.heading}>Today at a glance</p>
-      <div style={tl.list}>
-        {items.map((item, idx) => (
-          <div key={item.key} style={tl.row}>
-            {/* Left: time */}
-            <span style={tl.time}>
-              {item.type === 'now' ? '' : formatMins(item.timeMins)}
-            </span>
+      {TIMELINE_SECTIONS.map(section => {
+        const sectionItems = items.filter(item => item.section === section.key)
+        const collapsed = collapsedSections.includes(section.key)
+        const active = sectionItems.some(item => item.type === 'now')
 
-            {/* Dot + line */}
-            <div style={tl.dotCol}>
-              <div style={{ ...tl.dot, background: dotColor(item), boxShadow: item.type === 'now' ? `0 0 0 3px var(--color-accent-bg)` : 'none' }} />
-              {idx < items.length - 1 && <div style={tl.line} />}
-            </div>
+        return (
+          <div key={section.key} style={tl.section}>
+            <button
+              style={tl.sectionHeader}
+              onClick={() => onToggleSection(section.key)}
+              aria-expanded={!collapsed}
+            >
+              <span style={tl.sectionTitleWrap}>
+                <span style={tl.sectionTitle}>{section.label}</span>
+                <span style={tl.sectionRange}>{active ? 'Right now' : section.range}</span>
+              </span>
+              <span style={tl.sectionMeta}>{sectionItems.length} item{sectionItems.length === 1 ? '' : 's'}</span>
+            </button>
 
-            {/* Label */}
-            <span style={{
-              ...tl.label,
-              color:          item.type === 'now' ? 'var(--color-accent)' : item.done ? 'var(--color-success)' : item.late ? 'var(--color-danger)' : 'var(--color-text)',
-              fontWeight:     item.type === 'now' ? 600 : 400,
-              textDecoration: item.done && item.type !== 'now' ? 'line-through' : 'none',
-              opacity:        item.done ? 0.6 : item.planned ? 0.82 : 1,
-            }}>
-              {item.label}
-              {item.planned && <span style={tl.plannedPip}>planned</span>}
-              {item.type === 'now' && <span style={tl.nowPip}>●</span>}
-            </span>
+            {!collapsed && (
+              <div style={tl.list}>
+                {sectionItems.map((item, idx) => (
+                  <div key={item.key} style={{ ...tl.row, ...(item.overlaps ? tl.overlapRow : {}) }}>
+                    <span style={tl.time}>
+                      {item.type === 'now' ? '' : formatMins(item.timeMins)}
+                    </span>
+
+                    <div style={tl.dotCol}>
+                      <div style={{ ...tl.dot, background: dotColor(item), boxShadow: item.type === 'now' ? `0 0 0 4px var(--color-accent-bg)` : 'none' }} />
+                      {idx < sectionItems.length - 1 && <div style={tl.line} />}
+                    </div>
+
+                    <div style={tl.labelWrap}>
+                      <span style={{
+                        ...tl.label,
+                        color:          item.type === 'now' ? 'var(--color-accent)' : item.done ? 'var(--color-success)' : 'var(--color-text)',
+                        fontWeight:     item.type === 'now' ? 700 : 500,
+                        textDecoration: item.done && item.type !== 'now' ? 'line-through' : 'none',
+                        opacity:        item.done ? 0.62 : item.planned ? 0.84 : 1,
+                      }}>
+                        {item.label}
+                      </span>
+                      {density !== 'minimal' && item.detail && <span style={tl.detail}>{item.detail}</span>}
+                      <span style={tl.pips}>
+                        {item.overlaps && <span style={tl.softPip}>overlaps</span>}
+                        {item.planned && <span style={tl.softPip}>planned</span>}
+                        {item.type === 'now' && <span style={tl.nowPip}>current</span>}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        ))}
-      </div>
+        )
+      })}
     </div>
   )
 }
 
 const tl = {
   card:    { background: 'transparent', border: 'none', borderRadius: 0, padding: 0 },
-  heading: { fontSize: '11px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-muted)', marginBottom: '12px' },
+  section: { padding: '2px 0 12px' },
+  sectionHeader: {
+    width:          '100%',
+    minHeight:      '34px',
+    display:        'flex',
+    alignItems:     'center',
+    justifyContent: 'space-between',
+    gap:            '12px',
+    padding:        '0 2px 8px',
+    color:          'var(--color-text)',
+    textAlign:      'left',
+  },
+  sectionTitleWrap: { display: 'flex', flexDirection: 'column', gap: '1px' },
+  sectionTitle: { fontSize: '13px', fontWeight: 700, color: 'var(--color-text)' },
+  sectionRange: { fontSize: '11px', color: 'var(--color-muted)' },
+  sectionMeta: { fontSize: '11px', color: 'var(--color-muted)', flexShrink: 0 },
   list:    { display: 'flex', flexDirection: 'column' },
-  row:     { display: 'flex', alignItems: 'flex-start', gap: '10px', minHeight: '28px' },
+  row:     { display: 'flex', alignItems: 'flex-start', gap: '10px', minHeight: '38px' },
+  overlapRow: { paddingLeft: '6px', borderLeft: '1px solid var(--color-accent-bg)' },
   time:    { fontSize: '11px', color: 'var(--color-muted)', width: '52px', flexShrink: 0, paddingTop: '2px', textAlign: 'right' },
   dotCol:  { display: 'flex', flexDirection: 'column', alignItems: 'center', width: '10px', flexShrink: 0 },
   dot:     { width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0, marginTop: '3px' },
-  line:    { width: '1px', flex: 1, minHeight: '20px', background: 'var(--color-faint)', margin: '2px 0' },
-  label:   { fontSize: '13px', paddingTop: '1px', flex: 1, lineHeight: 1.4 },
-  nowPip:  { color: 'var(--color-accent)', fontSize: '8px', marginLeft: '4px', verticalAlign: 'middle' },
-  plannedPip: {
-    marginLeft:    '6px',
+  line:    { width: '1px', flex: 1, minHeight: '26px', background: 'color-mix(in srgb, var(--color-faint) 72%, transparent)', margin: '3px 0' },
+  labelWrap: { flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', paddingBottom: '12px' },
+  label:   { fontSize: '14px', paddingTop: '0', flex: 1, lineHeight: 1.35 },
+  detail:  { fontSize: '11px', color: 'var(--color-muted)', lineHeight: 1.35 },
+  pips:    { display: 'flex', gap: '5px', flexWrap: 'wrap' },
+  nowPip:  {
+    padding:       '1px 6px',
+    borderRadius:  'var(--radius-pill)',
+    background:    'var(--color-accent-bg)',
+    color:         'var(--color-accent-light)',
+    fontSize:      '10px',
+    fontWeight:    600,
+  },
+  softPip: {
     padding:       '1px 6px',
     borderRadius:  'var(--radius-pill)',
     background:    'var(--color-chart-bar)',
     color:         'var(--color-muted)',
     fontSize:      '10px',
     fontWeight:    600,
-    verticalAlign: 'middle',
   },
   preview: {
     borderTop:    'var(--border)',
@@ -412,7 +465,7 @@ const tl = {
 // ─── Task row ─────────────────────────────────────────────────────────────────
 
 function TaskRow({ task, expanded, onToggleExpand, onToggleDone, onTimeSelect }) {
-  const isOverdue = task.dueTime && !task.done && toMins(new Date()) > parseHHMM(task.dueTime)
+  const isAvailable = task.dueTime && !task.done && toMins(new Date()) > parseHHMM(task.dueTime)
 
   return (
     <div style={tr.wrap}>
@@ -445,8 +498,8 @@ function TaskRow({ task, expanded, onToggleExpand, onToggleDone, onTimeSelect })
             {task.scheduledTime && (
               <span style={tr.timeBadge}>{formatMins(parseHHMM(task.scheduledTime))}</span>
             )}
-            {isOverdue && !task.done && (
-              <span style={tr.overdueBadge}>overdue</span>
+            {isAvailable && !task.done && (
+              <span style={tr.availableBadge}>still available</span>
             )}
             <span style={{ ...tr.chevron, transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>›</span>
           </div>
@@ -489,7 +542,7 @@ const tr = {
   taskText:   { fontSize: '15px', fontWeight: 500, flex: 1, lineHeight: 1.3, transition: 'color 0.15s, opacity 0.15s' },
   meta:       { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 },
   timeBadge:  { fontSize: '11px', color: 'var(--color-accent)', background: 'var(--color-accent-bg)', padding: '2px 7px', borderRadius: 'var(--radius-pill)', border: '0.5px solid var(--color-accent)' },
-  overdueBadge: { fontSize: '10px', color: 'var(--color-danger)', background: 'rgba(224,85,85,0.12)', padding: '2px 7px', borderRadius: 'var(--radius-pill)' },
+  availableBadge: { fontSize: '10px', color: 'var(--color-accent-light)', background: 'var(--color-accent-bg)', padding: '2px 7px', borderRadius: 'var(--radius-pill)' },
   chevron:    { fontSize: '18px', color: 'var(--color-faint)', transition: 'transform 0.2s var(--ease-out)', lineHeight: 1 },
   pickerWrap: { borderTop: 'var(--border)', padding: '10px 0 12px' },
   pickerLabel:{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-muted)', padding: '0 14px', marginBottom: '8px' },
@@ -740,7 +793,7 @@ function TodayTrainingCard({ todayComplete, gymAccess, weekNumber, onStart, comp
           <p style={tt.name}>{compact ? 'Workout details' : workout.title}</p>
           <p style={tt.sub}>{compact ? 'Warmup · Main · Cooldown' : workout.subtitle}</p>
         </div>
-        {todayComplete && <span style={tt.doneBadge}>✓ Done</span>}
+        {todayComplete && <span style={tt.doneBadge}>Logged</span>}
       </div>
       {workout.type !== 'rest' && (
         <button
@@ -759,10 +812,188 @@ function TodayTrainingCard({ todayComplete, gymAccess, weekNumber, onStart, comp
           onClick={canStart ? onStart : undefined}
           disabled={!canStart}
         >
-          {todayComplete ? '✓ Completed' : 'Start →'}
+          {todayComplete ? 'Logged' : 'Start →'}
         </button>
       )}
     </div>
+  )
+}
+
+function TodayHeader({ now, name, mode, energy, density, onDensityChange, onOpenSettings }) {
+  return (
+    <header style={th.wrap}>
+      <div style={th.topRow}>
+        <div>
+          <p style={th.greeting}>{greeting(now, name)}</p>
+          <h1 style={th.title}>{formatFullDate(now)}</h1>
+        </div>
+        <button style={th.settingsBtn} onClick={onOpenSettings} aria-label="Settings">⚙</button>
+      </div>
+      <div style={th.metaRow}>
+        <span style={th.metaPill}>{mode}</span>
+        <span style={th.metaPill}>{energy ? `Energy ${energy}/4` : 'Energy open'}</span>
+      </div>
+      <div style={th.densityRow} aria-label="Timeline density">
+        {DENSITY_OPTIONS.map(option => (
+          <button
+            key={option}
+            style={{
+              ...th.densityBtn,
+              ...(density === option ? th.densityBtnActive : {}),
+            }}
+            onClick={() => onDensityChange(option)}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
+    </header>
+  )
+}
+
+function MorningCheckInCard({ complete, energy, onStart }) {
+  if (complete) return null
+
+  return (
+    <section style={mc.wrap}>
+      <div style={mc.copy}>
+        <span style={mc.kicker}>First gentle step</span>
+        <h2 style={mc.title}>Morning Check-In</h2>
+        <p style={mc.detail}>Mood, energy, mode, and one intention before the day starts moving.</p>
+      </div>
+      <button style={mc.button} onClick={onStart}>
+        {energy ? 'Continue' : 'Check in'}
+      </button>
+    </section>
+  )
+}
+
+function getCurrentFocus({ dayState, timelineItems, currentMins, canStartWorkout }) {
+  const workoutItem = timelineItems.find(item => item.type === 'workout' && !item.done)
+  const currentBlock = timelineItems.find(item =>
+    item.type !== 'now' &&
+    !item.done &&
+    item.timeMins <= currentMins &&
+    currentMins - item.timeMins <= 75
+  )
+  const nextBlock = timelineItems.find(item =>
+    item.type !== 'now' &&
+    !item.done &&
+    item.timeMins > currentMins
+  )
+
+  if (!dayState.dayLockedAt) {
+    return {
+      eyebrow: 'Right now',
+      title: 'Check in and set the tone',
+      detail: 'A quick reset helps AIML shape the rest of your day.',
+      action: 'Check in',
+      actionType: 'checkin',
+    }
+  }
+
+  if (currentBlock?.type === 'routine') {
+    return {
+      eyebrow: 'Current Focus',
+      title: currentBlock.label,
+      detail: currentBlock.detail || 'Move through the next small rhythm.',
+      action: 'Continue',
+      actionType: 'timeline',
+    }
+  }
+
+  if (currentBlock?.type === 'workout' || (canStartWorkout && workoutItem && Math.abs(workoutItem.timeMins - currentMins) <= 90)) {
+    return {
+      eyebrow: 'Current Focus',
+      title: workoutItem?.label ?? currentBlock.label,
+      detail: 'Warmup, main work, cooldown, then log what happened.',
+      action: 'Start workout',
+      actionType: 'workout',
+    }
+  }
+
+  if (currentBlock) {
+    return {
+      eyebrow: 'Current Focus',
+      title: currentBlock.label,
+      detail: currentBlock.detail || 'Stay with this block for now.',
+      action: 'Pick back up',
+      actionType: 'timeline',
+    }
+  }
+
+  if (nextBlock) {
+    return {
+      eyebrow: 'Continue Your Flow',
+      title: nextBlock.label,
+      detail: `${formatMins(nextBlock.timeMins)} · ${nextBlock.detail || 'Coming up in your day flow'}`,
+      action: 'View flow',
+      actionType: 'timeline',
+    }
+  }
+
+  return {
+    eyebrow: 'Pick Back Up',
+    title: 'Today can still reflow',
+    detail: 'Nothing urgent is asking for attention. Capture, reset, or continue gently.',
+    action: 'Reflow day',
+    actionType: 'reset',
+  }
+}
+
+function CurrentFocus({ focus, onAction }) {
+  return (
+    <section style={cf.wrap}>
+      <div style={cf.copy}>
+        <span style={cf.eyebrow}>{focus.eyebrow}</span>
+        <h2 style={cf.title}>{focus.title}</h2>
+        <p style={cf.detail}>{focus.detail}</p>
+      </div>
+      <button style={cf.button} onClick={() => onAction(focus.actionType)}>
+        {focus.action}
+      </button>
+    </section>
+  )
+}
+
+function SupportButtonRow({ onJournal, onNutrition, onFocus }) {
+  const handlers = {
+    journal: onJournal,
+    nutrition: onNutrition,
+    focus: onFocus,
+  }
+
+  return (
+    <div style={sb.row}>
+      {SUPPORT_BUTTONS.map(button => (
+        <button key={button.key} style={sb.button} onClick={handlers[button.key]}>
+          <span style={sb.icon}>{button.icon}</span>
+          <span style={sb.label}>{button.label}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function UtilityLayer({ value, inboxCount, onChange, onSubmit, onOpenInbox, onReflow }) {
+  return (
+    <section style={ut.wrap}>
+      <form style={ut.form} onSubmit={onSubmit}>
+        <input
+          style={ut.input}
+          value={value}
+          onChange={event => onChange(event.target.value)}
+          placeholder="Capture anything else"
+          aria-label="Quick add"
+        />
+        <button style={ut.addBtn} type="submit">Add</button>
+      </form>
+      <div style={ut.actions}>
+        <button style={ut.linkBtn} onClick={onOpenInbox}>Inbox · {inboxCount}</button>
+        <button style={ut.linkBtn} onClick={onReflow}>Reflow day</button>
+        <button style={ut.linkBtn} onClick={onReflow}>Continue later</button>
+      </div>
+    </section>
   )
 }
 
@@ -788,15 +1019,15 @@ function CollapsibleCard({ id, title, subtitle, preview, expanded, onToggle, chi
 
 const cc = {
   wrap: {
-    margin:       '12px 20px 0',
-    background:   'var(--color-card)',
-    border:       'var(--border)',
-    borderRadius: 'var(--radius-card)',
+    margin:       '12px 0 0',
+    background:   'color-mix(in srgb, var(--color-card) 80%, transparent)',
+    border:       '0.5px solid color-mix(in srgb, var(--color-border) 72%, transparent)',
+    borderRadius: '16px',
     overflow:     'hidden',
   },
   header: {
     width:          '100%',
-    minHeight:      '58px',
+    minHeight:      '54px',
     padding:        '12px 14px',
     background:     'none',
     border:         'none',
@@ -831,7 +1062,7 @@ const cc = {
     flexShrink: 0,
   },
   body: {
-    borderTop:     'var(--border)',
+    borderTop:     '0.5px solid color-mix(in srgb, var(--color-border) 72%, transparent)',
     padding:       '12px',
     display:       'flex',
     flexDirection: 'column',
@@ -892,14 +1123,244 @@ const tt = {
   },
 }
 
+const th = {
+  wrap: {
+    padding:       '20px 20px 0',
+    display:       'flex',
+    flexDirection: 'column',
+    gap:           '10px',
+  },
+  topRow: {
+    display:        'flex',
+    justifyContent: 'space-between',
+    alignItems:     'flex-start',
+    gap:            '14px',
+  },
+  greeting: {
+    margin:    0,
+    fontSize:  '13px',
+    color:     'var(--color-muted)',
+    fontWeight: 500,
+  },
+  title: {
+    margin:      '2px 0 0',
+    fontFamily: 'var(--font-display)',
+    fontSize:   '30px',
+    fontWeight: 400,
+    lineHeight: 1.04,
+    color:      'var(--color-text)',
+  },
+  settingsBtn: {
+    width:          '34px',
+    height:         '34px',
+    borderRadius:   '50%',
+    border:         'var(--border)',
+    background:     'color-mix(in srgb, var(--color-card) 78%, transparent)',
+    color:          'var(--color-muted)',
+    display:        'flex',
+    alignItems:     'center',
+    justifyContent: 'center',
+    flexShrink:     0,
+  },
+  metaRow: {
+    display:   'flex',
+    gap:       '8px',
+    flexWrap:  'wrap',
+  },
+  metaPill: {
+    padding:      '4px 9px',
+    borderRadius: 'var(--radius-pill)',
+    background:   'var(--color-chart-bar)',
+    color:        'var(--color-muted)',
+    fontSize:     '11px',
+    fontWeight:   600,
+  },
+  densityRow: {
+    display:       'flex',
+    gap:           '6px',
+    paddingTop:    '2px',
+  },
+  densityBtn: {
+    padding:       '5px 9px',
+    borderRadius:  'var(--radius-pill)',
+    border:        'var(--border)',
+    background:    'transparent',
+    color:         'var(--color-muted)',
+    fontSize:      '11px',
+    textTransform: 'capitalize',
+  },
+  densityBtnActive: {
+    background: 'var(--color-accent-bg)',
+    color:      'var(--color-accent-light)',
+    border:     '0.5px solid var(--color-accent)',
+  },
+}
+
+const mc = {
+  wrap: {
+    margin:        '18px 20px 0',
+    padding:       '16px',
+    borderRadius:  '18px',
+    border:        '0.5px solid color-mix(in srgb, var(--color-accent) 38%, var(--color-border))',
+    background:    'linear-gradient(145deg, color-mix(in srgb, var(--color-accent-bg) 62%, transparent), var(--color-card))',
+    display:       'flex',
+    alignItems:    'center',
+    gap:           '14px',
+  },
+  copy: { flex: 1, minWidth: 0 },
+  kicker: {
+    fontSize:      '10px',
+    fontWeight:    700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    color:         'var(--color-accent-light)',
+  },
+  title: {
+    margin:      '3px 0 4px',
+    fontFamily: 'var(--font-display)',
+    fontSize:   '23px',
+    fontWeight: 400,
+    lineHeight: 1.1,
+  },
+  detail: {
+    margin:     0,
+    fontSize:   '12px',
+    lineHeight: 1.45,
+    color:      'var(--color-muted)',
+  },
+  button: {
+    padding:      '9px 12px',
+    borderRadius: 'var(--radius-pill)',
+    background:   'var(--color-accent)',
+    color:        '#fff',
+    fontSize:     '12px',
+    fontWeight:   700,
+    flexShrink:   0,
+  },
+}
+
+const cf = {
+  wrap: {
+    margin:        '18px 20px 0',
+    padding:       '16px',
+    borderRadius:  '18px',
+    background:    'var(--color-card)',
+    border:        '0.5px solid color-mix(in srgb, var(--color-border) 70%, transparent)',
+    boxShadow:     '0 18px 50px rgba(0,0,0,0.12)',
+    display:       'flex',
+    alignItems:    'center',
+    gap:           '14px',
+  },
+  copy: { flex: 1, minWidth: 0 },
+  eyebrow: {
+    fontSize:      '10px',
+    fontWeight:    700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    color:         'var(--color-accent-light)',
+  },
+  title: {
+    margin:      '4px 0',
+    fontFamily: 'var(--font-display)',
+    fontSize:   '25px',
+    fontWeight: 400,
+    lineHeight: 1.08,
+    color:      'var(--color-text)',
+  },
+  detail: {
+    margin:     0,
+    fontSize:   '12px',
+    lineHeight: 1.45,
+    color:      'var(--color-muted)',
+  },
+  button: {
+    padding:      '9px 12px',
+    borderRadius: 'var(--radius-pill)',
+    background:   'var(--color-chart-bar)',
+    color:        'var(--color-text)',
+    border:       'var(--border)',
+    fontSize:     '12px',
+    fontWeight:   700,
+    flexShrink:   0,
+  },
+}
+
+const sb = {
+  row: {
+    display:             'grid',
+    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+    gap:                 '8px',
+  },
+  button: {
+    minHeight:     '48px',
+    borderRadius:  '14px',
+    background:    'var(--color-chart-bar)',
+    border:        '0.5px solid color-mix(in srgb, var(--color-border) 72%, transparent)',
+    color:         'var(--color-text)',
+    display:       'flex',
+    flexDirection: 'column',
+    alignItems:    'center',
+    justifyContent:'center',
+    gap:           '3px',
+  },
+  icon: { color: 'var(--color-accent-light)', fontSize: '14px', lineHeight: 1 },
+  label: { fontSize: '11px', fontWeight: 700 },
+}
+
+const ut = {
+  wrap: {
+    margin:        '18px 20px 0',
+    padding:       '12px',
+    borderRadius:  '18px',
+    background:    'color-mix(in srgb, var(--color-card) 74%, transparent)',
+    border:        '0.5px solid color-mix(in srgb, var(--color-border) 70%, transparent)',
+    display:       'flex',
+    flexDirection: 'column',
+    gap:           '10px',
+  },
+  form: {
+    display: 'flex',
+    gap:     '8px',
+  },
+  input: {
+    flex:         1,
+    minWidth:    0,
+    minHeight:   '40px',
+    borderRadius:'var(--radius-pill)',
+    background:  'var(--color-bg)',
+    border:      'var(--border)',
+    padding:     '0 13px',
+    fontSize:    '13px',
+  },
+  addBtn: {
+    padding:      '0 14px',
+    borderRadius: 'var(--radius-pill)',
+    background:   'var(--color-accent)',
+    color:        '#fff',
+    fontSize:     '12px',
+    fontWeight:   700,
+  },
+  actions: {
+    display:   'flex',
+    gap:       '8px',
+    flexWrap:  'wrap',
+  },
+  linkBtn: {
+    color:     'var(--color-muted)',
+    fontSize:  '12px',
+    padding:   '3px 0',
+  },
+}
+
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
   const { projectsState }                              = useProjects()
   const { userState }                                  = useUser()
-  const { settingsState }                              = useSettings()
+  const { settingsState, settingsDispatch }            = useSettings()
   const { dayState, dayDispatch, updateTaskTime, updateMealWindow } = useDay()
   const { fitnessState }                               = useFitness()
+  const { inboxState, inboxDispatch }                  = useInbox()
 
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
@@ -911,7 +1372,10 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
 
   const [expandedTask, setExpandedTask] = useState(null)
   const [editingSlot, setEditingSlot] = useState(null)
-  const [expandedSection, setExpandedSection] = useState(SECTION_KEYS.TIMELINE)
+  const [expandedSection, setExpandedSection] = useState(null)
+  const [collapsedTimelineSections, setCollapsedTimelineSections] = useState([])
+  const [showUnscheduledTasks, setShowUnscheduledTasks] = useState(true)
+  const [quickAddText, setQuickAddText] = useState('')
 
   const focusProject = useMemo(
     () => projectsState.projects?.find(p => p.status === PROJECT_STATUS.FOCUS) ?? null,
@@ -945,10 +1409,13 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
     () => getTimelinePreview(timelineItems, currentMins),
     [timelineItems, currentMins]
   )
-  const burnBarLabel = useMemo(
-    () => getBurnBarLabel(timelinePreview),
-    [timelinePreview]
-  )
+
+  const homeDensity = DENSITY_OPTIONS.includes(settingsState.homeDensity)
+    ? settingsState.homeDensity
+    : 'balanced'
+  const homeMode = settingsState.homeMode
+    ? `${settingsState.homeMode.charAt(0).toUpperCase()}${settingsState.homeMode.slice(1)}`
+    : 'Build'
 
   const showFocusProjects = enabledModules.focus || enabledModules.goals || !!focusProject
 
@@ -956,9 +1423,14 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
     ? focusProject.name.toUpperCase()
     : 'PROJECTS'
   const focusNextTask    = nextTask ?? 'Set a focus project in Projects'
-  const incompleteTasks  = dayState.tasks.filter(task => !task.done).length
+  const unscheduledTasks = dayState.tasks.filter(task => !task.scheduledTime)
   const eatenMeals       = Object.values(dayState.meals).filter(meal => meal.eaten).length
   const totalMeals       = Object.values(dayState.meals).length
+  const canStartWorkout = enabledModules.fitness && todayWorkout.type !== 'rest' && !fitnessState.todayComplete
+  const currentFocus = useMemo(
+    () => getCurrentFocus({ dayState, timelineItems, currentMins, canStartWorkout }),
+    [dayState, timelineItems, currentMins, canStartWorkout]
+  )
 
   function handleToggleExpand(taskId) {
     setExpandedTask(prev => prev === taskId ? null : taskId)
@@ -986,46 +1458,134 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
     setExpandedSection(prev => prev === id ? null : id)
   }
 
+  function handleToggleTimelineSection(id) {
+    setCollapsedTimelineSections(prev =>
+      prev.includes(id) ? prev.filter(section => section !== id) : [...prev, id]
+    )
+  }
+
   function handleOpenMeals() {
     setExpandedSection(SECTION_KEYS.MEALS)
   }
 
-  const canStartWorkout = enabledModules.fitness && todayWorkout.type !== 'rest' && !fitnessState.todayComplete
+  function handleDensityChange(value) {
+    settingsDispatch({ type: 'UPDATE_SETTING', payload: { key: 'homeDensity', value } })
+  }
+
+  function handleCurrentFocusAction(actionType) {
+    if (actionType === 'checkin') {
+      onNavigate(SCREENS.IGNITION)
+      return
+    }
+    if (actionType === 'workout') {
+      handleStartTodayWorkout()
+      return
+    }
+    if (actionType === 'reset') {
+      setShowUnscheduledTasks(true)
+      setCollapsedTimelineSections([])
+      return
+    }
+    setCollapsedTimelineSections([])
+  }
+
+  function handleQuickAdd(event) {
+    event.preventDefault()
+    const text = quickAddText.trim()
+    if (!text) return
+    inboxDispatch({ type: 'ADD_INBOX_ITEM', payload: { text } })
+    setQuickAddText('')
+  }
 
   return (
     <div style={s.screen}>
-      <QuickActionsHero
+      <TodayHeader
         now={now}
         name={userState.name}
-        showFocus={enabledModules.focus}
-        showMeals={enabledModules.nutrition}
-        showWorkout={canStartWorkout}
-        onFocus={onOpenFocus}
-        onJournal={() => onNavigate(SCREENS.EOD)}
-        onMeals={handleOpenMeals}
-        onWorkout={handleStartTodayWorkout}
+        mode={homeMode}
+        energy={dayState.energyLevel}
+        density={homeDensity}
+        onDensityChange={handleDensityChange}
         onOpenSettings={() => onNavigate(SCREENS.SETTINGS)}
       />
 
-      <BurnBar now={now} nextLabel={burnBarLabel} />
+      <main style={s.primaryLayer}>
+        <MorningCheckInCard
+          complete={!!dayState.dayLockedAt}
+          energy={dayState.energyLevel}
+          onStart={() => onNavigate(SCREENS.IGNITION)}
+        />
 
-      <div style={s.cards}>
-        <CollapsibleCard
-          id={SECTION_KEYS.TIMELINE}
-          title="Today Timeline"
-          subtitle={timelinePreview.next ? `Next: ${formatMins(timelinePreview.next.timeMins)}` : 'Clear for now'}
-          preview={<TimelinePreview preview={timelinePreview} />}
-          expanded={expandedSection === SECTION_KEYS.TIMELINE}
-          onToggle={handleToggleSection}
-        >
-          <Timeline items={timelineItems} />
-        </CollapsibleCard>
+        <CurrentFocus
+          focus={currentFocus}
+          onAction={handleCurrentFocusAction}
+        />
+
+        <section style={s.timelineShell}>
+          <div style={s.layerHeading}>
+            <div>
+              <p style={s.layerKicker}>Daily Flow</p>
+              <h2 style={s.layerTitle}>Today Timeline</h2>
+            </div>
+            <span style={s.layerMeta}>{getBurnBarLabel(timelinePreview)}</span>
+          </div>
+          <Timeline
+            items={timelineItems}
+            density={homeDensity}
+            collapsedSections={collapsedTimelineSections}
+            onToggleSection={handleToggleTimelineSection}
+          />
+        </section>
+
+        <section style={s.unscheduledShell}>
+          <button
+            style={s.unscheduledHeader}
+            onClick={() => setShowUnscheduledTasks(prev => !prev)}
+            aria-expanded={showUnscheduledTasks}
+          >
+            <span>
+              <span style={s.unscheduledTitle}>Unscheduled tasks</span>
+              <span style={s.unscheduledSub}>{unscheduledTasks.length} still available</span>
+            </span>
+            <span style={s.unscheduledAction}>{showUnscheduledTasks ? 'Hide' : 'Show'}</span>
+          </button>
+          {showUnscheduledTasks && (
+            <div style={s.unscheduledList}>
+              {unscheduledTasks.length > 0 ? unscheduledTasks.map(task => (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  expanded={expandedTask === task.id}
+                  onToggleExpand={() => handleToggleExpand(task.id)}
+                  onToggleDone={() => handleToggleDone(task.id)}
+                  onTimeSelect={time => handleTimeSelect(task.id, time)}
+                />
+              )) : (
+                <p style={s.emptyText}>Nothing loose right now.</p>
+              )}
+            </div>
+          )}
+        </section>
+      </main>
+
+      <section style={s.supportLayer}>
+        <div style={s.layerHeading}>
+          <div>
+            <p style={s.layerKicker}>Support</p>
+            <h2 style={s.layerTitle}>Quick tools</h2>
+          </div>
+        </div>
+        <SupportButtonRow
+          onJournal={() => onNavigate(SCREENS.EOD)}
+          onNutrition={handleOpenMeals}
+          onFocus={onOpenFocus}
+        />
 
         {enabledModules.fitness && (
           <CollapsibleCard
             id={SECTION_KEYS.TRAINING}
-            title="Training"
-            subtitle={fitnessState.todayComplete ? 'Completed today' : 'Warmup · Main · Cooldown'}
+            title="Workout"
+            subtitle={fitnessState.todayComplete ? 'Logged today' : 'Warmup · main · cooldown'}
             expanded={expandedSection === SECTION_KEYS.TRAINING}
             onToggle={handleToggleSection}
           >
@@ -1039,32 +1599,11 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
           </CollapsibleCard>
         )}
 
-        <CollapsibleCard
-          id={SECTION_KEYS.TASKS}
-          title="Tasks"
-          subtitle={`${incompleteTasks} open`}
-          expanded={expandedSection === SECTION_KEYS.TASKS}
-          onToggle={handleToggleSection}
-        >
-          <div style={s.stack}>
-            {dayState.tasks.map(task => (
-              <TaskRow
-                key={task.id}
-                task={task}
-                expanded={expandedTask === task.id}
-                onToggleExpand={() => handleToggleExpand(task.id)}
-                onToggleDone={() => handleToggleDone(task.id)}
-                onTimeSelect={time => handleTimeSelect(task.id, time)}
-              />
-            ))}
-          </div>
-        </CollapsibleCard>
-
         {enabledModules.nutrition && (
           <CollapsibleCard
             id={SECTION_KEYS.MEALS}
-            title="Meals"
-            subtitle={`${eatenMeals} of ${totalMeals} eaten`}
+            title="Nutrition"
+            subtitle={`${eatenMeals} of ${totalMeals} checked in`}
             expanded={expandedSection === SECTION_KEYS.MEALS}
             onToggle={handleToggleSection}
           >
@@ -1086,14 +1625,14 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
         {showFocusProjects && (
           <CollapsibleCard
             id={SECTION_KEYS.FOCUS}
-            title="Focus / Projects"
-            subtitle={focusProject?.name ?? 'Focus session'}
+            title="Focus support"
+            subtitle={focusProject?.name ?? 'Timer ready'}
             expanded={expandedSection === SECTION_KEYS.FOCUS}
             onToggle={handleToggleSection}
           >
             {enabledModules.focus && !focusProject && (
               <p style={s.focusContext}>
-                Focus timer is ready from the hero or secondary action.
+                Focus timer is ready when you want a quieter container.
               </p>
             )}
             {(enabledModules.goals || focusProject) && (
@@ -1114,7 +1653,19 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
             )}
           </CollapsibleCard>
         )}
-      </div>
+      </section>
+
+      <UtilityLayer
+        value={quickAddText}
+        inboxCount={inboxState.inboxItems.length}
+        onChange={setQuickAddText}
+        onSubmit={handleQuickAdd}
+        onOpenInbox={() => onNavigate(SCREENS.INBOX)}
+        onReflow={() => {
+          setShowUnscheduledTasks(true)
+          setCollapsedTimelineSections([])
+        }}
+      />
 
       {editingSlot && (
         <FuelEditSheet
@@ -1137,11 +1688,104 @@ const s = {
     display:       'flex',
     flexDirection: 'column',
     gap:           '0',
-    paddingTop:    'max(env(safe-area-inset-top), 52px)',
+    paddingTop:    'max(env(safe-area-inset-top), 32px)',
     paddingBottom: 'calc(var(--safe-bottom) + var(--nav-height) + 24px)',
     minHeight:     '100dvh',
     position:      'relative',
     background:    'var(--color-bg)',
+  },
+  primaryLayer: {
+    display:       'flex',
+    flexDirection: 'column',
+  },
+  supportLayer: {
+    margin:        '24px 20px 0',
+    display:       'flex',
+    flexDirection: 'column',
+    gap:           '4px',
+  },
+  timelineShell: {
+    margin:        '20px 20px 0',
+    padding:       '18px 16px 8px',
+    borderRadius:  '20px',
+    background:    'color-mix(in srgb, var(--color-card) 88%, transparent)',
+    border:        '0.5px solid color-mix(in srgb, var(--color-border) 68%, transparent)',
+  },
+  layerHeading: {
+    display:        'flex',
+    justifyContent: 'space-between',
+    alignItems:     'flex-start',
+    gap:            '12px',
+    marginBottom:   '14px',
+  },
+  layerKicker: {
+    margin:        0,
+    color:         'var(--color-muted)',
+    fontSize:      '10px',
+    fontWeight:    700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+  },
+  layerTitle: {
+    margin:      '2px 0 0',
+    fontFamily: 'var(--font-display)',
+    fontSize:   '24px',
+    fontWeight: 400,
+    lineHeight: 1.1,
+  },
+  layerMeta: {
+    maxWidth:     '138px',
+    color:        'var(--color-muted)',
+    fontSize:     '11px',
+    lineHeight:   1.35,
+    textAlign:    'right',
+  },
+  unscheduledShell: {
+    margin:        '14px 20px 0',
+    borderRadius:  '18px',
+    background:    'transparent',
+    border:        '0.5px solid color-mix(in srgb, var(--color-border) 60%, transparent)',
+    overflow:      'hidden',
+  },
+  unscheduledHeader: {
+    width:          '100%',
+    minHeight:      '54px',
+    padding:        '12px 14px',
+    display:        'flex',
+    alignItems:     'center',
+    justifyContent: 'space-between',
+    gap:            '12px',
+    textAlign:      'left',
+  },
+  unscheduledTitle: {
+    display:    'block',
+    color:      'var(--color-text)',
+    fontSize:   '13px',
+    fontWeight: 700,
+  },
+  unscheduledSub: {
+    display:   'block',
+    color:     'var(--color-muted)',
+    fontSize:  '11px',
+    marginTop: '1px',
+  },
+  unscheduledAction: {
+    color:      'var(--color-accent-light)',
+    fontSize:   '12px',
+    fontWeight: 700,
+  },
+  unscheduledList: {
+    borderTop:     '0.5px solid color-mix(in srgb, var(--color-border) 60%, transparent)',
+    padding:       '12px',
+    display:       'flex',
+    flexDirection: 'column',
+    gap:           '8px',
+  },
+  emptyText: {
+    margin:     0,
+    color:      'var(--color-muted)',
+    fontSize:   '13px',
+    lineHeight: 1.4,
   },
   section: {
     display:       'flex',
