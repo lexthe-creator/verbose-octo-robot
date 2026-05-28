@@ -75,6 +75,10 @@ npm run lint       # ESLint across all .js/.jsx files
 
 No test suite exists. Verify changes visually via `npm run dev`.
 
+## Branch and PR workflow
+
+All implementation work should be completed on a feature branch and opened as a PR before merging to main. Start from updated `main`, create a branch before editing, commit only to that branch, push the branch, and open a PR into `main`. Do not push implementation work directly to `main`.
+
 ## Dev-only overlay access
 
 EOD Reflection and Weekly Planning are time-triggered overlays — they appear automatically based on clock and localStorage guards. There are no UI buttons to trigger them manually. For dev/testing access, use URL params:
