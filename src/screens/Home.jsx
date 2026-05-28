@@ -406,13 +406,13 @@ const tr = {
   textBtn:    { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 },
   taskText:   { fontSize: '15px', fontWeight: 500, flex: 1, lineHeight: 1.3, transition: 'color 0.15s, opacity 0.15s' },
   meta:       { display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 },
-  timeBadge:  { fontSize: '11px', color: 'var(--color-accent)', background: 'var(--color-accent-bg)', padding: '2px 7px', borderRadius: 'var(--radius-pill)', border: '0.5px solid var(--color-accent)' },
-  availableBadge: { fontSize: '10px', color: 'var(--color-accent-light)', background: 'var(--color-accent-bg)', padding: '2px 7px', borderRadius: 'var(--radius-pill)' },
+  timeBadge:  { fontSize: '11px', color: 'var(--color-accent)', background: 'color-mix(in srgb, var(--color-accent-bg) 92%, transparent)', padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: '0.5px solid var(--color-accent)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.04)' },
+  availableBadge: { fontSize: '10px', color: 'var(--color-muted)', background: 'var(--color-card)', padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: 'var(--border)' },
   chevron:    { fontSize: '18px', color: 'var(--color-faint)', transition: 'transform 0.2s var(--ease-out)', lineHeight: 1 },
   pickerWrap: { borderTop: 'var(--border)', padding: '10px 0 12px' },
   pickerLabel:{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-muted)', padding: '0 14px', marginBottom: '8px' },
-  pills:      { display: 'flex', gap: '6px', overflowX: 'auto', padding: '2px 14px', scrollbarWidth: 'none', msOverflowStyle: 'none' },
-  pill:       { flexShrink: 0, padding: '5px 10px', borderRadius: 'var(--radius-pill)', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background 0.15s, color 0.15s' },
+  pills:      { display: 'flex', gap: '8px', overflowX: 'auto', padding: '4px 14px', scrollbarWidth: 'none', msOverflowStyle: 'none' },
+  pill:       { flexShrink: 0, padding: '10px 12px', borderRadius: 'var(--radius-sm)', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background 0.15s, color 0.15s, border-color 0.15s', border: 'var(--border)', background: 'var(--color-card)' },
 }
 
 // ─── Fuel slot ────────────────────────────────────────────────────────────────
@@ -549,7 +549,10 @@ const ss = {
     borderRadius: 'var(--radius-card)',
     overflow:     'hidden',
     cursor:       'pointer',
-    transition:   'border-color 0.3s ease',
+    transition:   'border-color 0.3s ease, transform 0.2s ease',
+    border:       '0.5px solid var(--border)',
+    boxShadow:    '0 18px 50px rgba(0,0,0,0.08)',
+    background:   'var(--color-card)',
   },
   paceBadge: {
     flexShrink:   0,
@@ -898,10 +901,11 @@ function CollapsibleCard({ id, title, subtitle, preview, expanded, onToggle, chi
 const cc = {
   wrap: {
     margin:       '12px 0 0',
-    background:   'color-mix(in srgb, var(--color-card) 80%, transparent)',
-    border:       '0.5px solid color-mix(in srgb, var(--color-border) 72%, transparent)',
+    background:   'var(--color-card)',
+    border:       'var(--border)',
     borderRadius: '16px',
     overflow:     'hidden',
+    boxShadow:    '0 18px 50px rgba(0,0,0,0.05)',
   },
   header: {
     width:          '100%',
@@ -950,13 +954,14 @@ const cc = {
 
 const tt = {
   wrap: {
-    background:    'transparent',
-    border:        'none',
-    borderRadius:  0,
-    padding:       0,
+    background:    'var(--color-card)',
+    border:        'var(--border)',
+    borderRadius:  'var(--radius-card)',
+    padding:       '16px',
     display:       'flex',
     flexDirection: 'column',
     gap:           '12px',
+    boxShadow:     '0 14px 40px rgba(0,0,0,0.06)',
   },
   top: { display: 'flex', alignItems: 'center', gap: '12px' },
   typeTag: {
@@ -994,6 +999,9 @@ const tt = {
     borderRadius: 'var(--radius-sm)',
     fontSize:     '14px',
     fontWeight:   600,
+    border:       'none',
+    cursor:       'pointer',
+    transition:   'background 0.2s ease, color 0.2s ease',
   },
   startBtnSecondary: {
     padding:  '10px',
@@ -1046,9 +1054,10 @@ const th = {
     flexWrap:  'wrap',
   },
   metaPill: {
-    padding:      '4px 9px',
-    borderRadius: 'var(--radius-pill)',
-    background:   'var(--color-chart-bar)',
+    padding:      '5px 10px',
+    borderRadius: 'var(--radius-sm)',
+    background:   'color-mix(in srgb, var(--color-card) 88%, transparent)',
+    border:       'var(--border)',
     color:        'var(--color-muted)',
     fontSize:     '11px',
     fontWeight:   600,

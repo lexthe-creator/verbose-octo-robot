@@ -94,8 +94,16 @@ function StatCard({ label, value, valueColor, sub }) {
 }
 
 const sc = {
-  card:  { background: 'var(--color-card)', border: 'var(--border)', borderRadius: '12px', padding: '12px', flex: 1 },
-  label: { fontSize: '9px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-faint)', margin: '0 0 4px' },
+  card:  {
+    background:   'var(--color-card)',
+    border:       'var(--border)',
+    borderRadius: '12px',
+    padding:      '16px',
+    flex:         1,
+    boxShadow:    '0 18px 45px rgba(0,0,0,0.07)',
+    transition:   'transform 0.2s ease',
+  },
+  label: { fontSize: '9px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-faint)', margin: '0 0 6px' },
   value: { fontFamily: 'var(--font-display)', fontSize: '20px', lineHeight: 1, margin: '0 0 3px' },
   sub:   { fontSize: '10px', color: 'var(--color-faint)', margin: 0 },
 }
@@ -359,8 +367,8 @@ const sh = {
   amountRow: { display: 'flex', gap: '8px', alignItems: 'stretch' },
   toggle:    { display: 'flex', gap: '3px', background: 'var(--color-chart-bar)', borderRadius: '8px', padding: '3px', flexShrink: 0 },
   toggleBtn: { padding: '6px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' },
-  pillWrap:  { display: 'flex', flexWrap: 'wrap', gap: '6px' },
-  pill:      { padding: '7px 11px', borderRadius: 'var(--radius-pill)', fontSize: '12px', fontWeight: 500, cursor: 'pointer' },
+  pillWrap:  { display: 'flex', flexWrap: 'wrap', gap: '8px' },
+  pill:      { padding: '10px 14px', borderRadius: 'var(--radius-sm)', fontSize: '12px', fontWeight: 500, cursor: 'pointer', border: 'var(--border)', background: 'var(--color-card)' },
   saveBtn:   { width: '100%', padding: '14px', borderRadius: '12px', background: 'var(--color-accent)', color: '#fff', fontSize: '15px', fontWeight: 600, border: 'none', cursor: 'pointer', marginTop: '4px', transition: 'opacity 0.15s' },
 }
 
