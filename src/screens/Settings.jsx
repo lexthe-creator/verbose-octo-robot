@@ -36,6 +36,7 @@ export default function Settings({ onBack, onNavigate }) {
   const { programStartDate, programEndDate } = fitnessState
   const phaseKey = getPhase(programStartDate, programEndDate)
   const weekNum  = getWeekNumber(programStartDate)
+  const DENSITY_OPTIONS = ['minimal', 'balanced', 'detailed']
 
   return (
     <div style={s.screen}>
@@ -192,6 +193,32 @@ export default function Settings({ onBack, onNavigate }) {
               )
             })}
           </div>
+        </div>
+        <div style={s.field}>
+          <label style={s.fieldLabel}>Timeline density</label>
+          <div style={{ ...s.pillRow, gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            {DENSITY_OPTIONS.map(option => {
+              const active = settingsState.homeDensity === option
+              return (
+                <button
+                  key={option}
+                  style={{
+                    ...s.pill,
+                    background: active ? 'var(--color-accent-bg)'          : 'var(--color-chart-bar)',
+                    border:     active ? '0.5px solid var(--color-accent)'  : 'var(--border)',
+                    color:      active ? 'var(--color-accent)'              : 'var(--color-faint)',
+                    fontWeight: active ? 600                                 : 500,
+                  }}
+                  onClick={() => settingsDispatch({ type: 'UPDATE_SETTING', payload: { key: 'homeDensity', value: option } })}
+                >
+                  {option}
+                </button>
+              )
+            })}
+          </div>
+          <p style={s.helper}>
+            How compact your home timeline should feel.
+          </p>
         </div>
       </section>
 

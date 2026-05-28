@@ -687,7 +687,7 @@ function TodayTrainingCard({ todayComplete, gymAccess, weekNumber, onStart, comp
   )
 }
 
-function TodayHeader({ now, name, mode, energy, density, onDensityChange, onOpenSettings }) {
+function TodayHeader({ now, name, mode, energy, onOpenSettings }) {
   return (
     <header style={th.wrap}>
       <div style={th.topRow}>
@@ -700,20 +700,6 @@ function TodayHeader({ now, name, mode, energy, density, onDensityChange, onOpen
       <div style={th.metaRow}>
         <span style={th.metaPill}>{mode}</span>
         <span style={th.metaPill}>{energy ? `Energy ${energy}/4` : 'Energy open'}</span>
-      </div>
-      <div style={th.densityRow} aria-label="Timeline density">
-        {DENSITY_OPTIONS.map(option => (
-          <button
-            key={option}
-            style={{
-              ...th.densityBtn,
-              ...(density === option ? th.densityBtnActive : {}),
-            }}
-            onClick={() => onDensityChange(option)}
-          >
-            {option}
-          </button>
-        ))}
       </div>
     </header>
   )
@@ -1367,10 +1353,6 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
     quickAddRef.current?.focus()
   }
 
-  function handleDensityChange(value) {
-    settingsDispatch({ type: 'UPDATE_SETTING', payload: { key: 'homeDensity', value } })
-  }
-
   function handleCurrentFocusAction(actionType) {
     if (actionType === 'checkin') {
       onNavigate(SCREENS.IGNITION)
@@ -1403,8 +1385,6 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
         name={userState.name}
         mode={homeMode}
         energy={dayState.energyLevel}
-        density={homeDensity}
-        onDensityChange={handleDensityChange}
         onOpenSettings={() => onNavigate(SCREENS.SETTINGS)}
       />
 
