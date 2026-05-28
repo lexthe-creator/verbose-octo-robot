@@ -51,6 +51,7 @@ const SUPPORT_BUTTONS = [
   { key: 'journal', label: 'Journal', icon: '◇' },
   { key: 'nutrition', label: 'Nutrition', icon: '◷' },
   { key: 'focus', label: 'Focus', icon: '⊙' },
+  { key: 'quickAdd', label: 'Quick Add', icon: '+' },
 ]
 
 function getEnabledModules(modules = {}) {
@@ -63,137 +64,12 @@ function getEnabledModules(modules = {}) {
   }
 }
 
-// ─── Hero header ───────────────────────────────────────────────────────────────
+// ─── Header helpers ───────────────────────────────────────────────────────────
 
 function greeting(now, name) {
   const h = now.getHours()
   const part = h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening'
   return `Good ${part}, ${name}`
-}
-
-function QuickActionsHero({
-  now,
-  name,
-  showFocus,
-  showMeals,
-  showWorkout,
-  onFocus,
-  onJournal,
-  onMeals,
-  onWorkout,
-  onOpenSettings,
-}) {
-  return (
-    <div style={hero.wrap}>
-      <div style={hero.topRow}>
-        <span style={hero.greeting}>{greeting(now, name)}</span>
-        <button style={hero.gearBtn} onClick={onOpenSettings} aria-label="Settings">
-          ⚙
-        </button>
-      </div>
-      <div style={hero.dateRow}>
-        <p style={hero.date}>{formatFullDate(now)}</p>
-      </div>
-      <div style={hero.actionCard}>
-        <h1 style={hero.actionTitle}>What do you need right now?</h1>
-        <p style={hero.actionDetail}>Pick the support that fits this moment.</p>
-        <div style={hero.quickGrid}>
-          {showFocus && (
-            <button style={hero.quickBtn} onClick={onFocus}>
-              <span style={hero.quickIcon}>⊙</span>
-              <span>Focus</span>
-            </button>
-          )}
-          <button style={hero.quickBtn} onClick={onJournal}>
-            <span style={hero.quickIcon}>◇</span>
-            <span>Journal</span>
-          </button>
-          {showMeals && (
-            <button style={hero.quickBtn} onClick={onMeals}>
-              <span style={hero.quickIcon}>◷</span>
-              <span>Meals</span>
-            </button>
-          )}
-          {showWorkout && (
-            <button style={hero.quickBtn} onClick={onWorkout}>
-              <span style={hero.quickIcon}>◉</span>
-              <span>Workout</span>
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-const hero = {
-  wrap:    { padding: '20px 20px 0' },
-  topRow:  { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' },
-  greeting:{ fontSize: '13px', color: 'var(--color-muted)', fontWeight: 500 },
-  gearBtn: {
-    width:           '32px',
-    height:          '32px',
-    borderRadius:    '50%',
-    background:      'var(--color-card)',
-    border:          'var(--border)',
-    color:           'var(--color-muted)',
-    fontSize:        '16px',
-    display:         'flex',
-    alignItems:      'center',
-    justifyContent:  'center',
-    cursor:          'pointer',
-    flexShrink:      0,
-  },
-  dateRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  date:    { fontSize: '14px', color: 'var(--color-muted)', margin: 0 },
-  actionCard: {
-    marginTop:      '16px',
-    background:     'var(--color-card)',
-    border:         'var(--border)',
-    borderRadius:   'var(--radius-card)',
-    padding:        '16px',
-    display:        'flex',
-    flexDirection:  'column',
-    gap:            '12px',
-  },
-  actionTitle: {
-    margin:         0,
-    fontFamily:    'var(--font-display)',
-    fontSize:      '28px',
-    lineHeight:    1.08,
-    fontWeight:    400,
-    color:         'var(--color-text)',
-  },
-  actionDetail: {
-    margin:     0,
-    fontSize:   '13px',
-    lineHeight: 1.45,
-    color:      'var(--color-muted)',
-  },
-  quickGrid: {
-    display:             'grid',
-    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-    gap:                 '8px',
-  },
-  quickBtn: {
-    minHeight:     '44px',
-    borderRadius:  'var(--radius-sm)',
-    border:        'var(--border)',
-    background:    'var(--color-chart-bar)',
-    color:         'var(--color-text)',
-    display:       'flex',
-    alignItems:    'center',
-    justifyContent:'center',
-    gap:           '7px',
-    fontSize:      '13px',
-    fontWeight:    700,
-    cursor:        'pointer',
-  },
-  quickIcon: {
-    color:      'var(--color-accent)',
-    fontSize:   '14px',
-    lineHeight: 1,
-  },
 }
 
 // ─── Timeline ─────────────────────────────────────────────────────────────────
@@ -236,6 +112,7 @@ function buildTimeline(state, nowMinutes, options = {}) {
         detail:   'Scheduled task',
         type:     'task',
         done:     t.done,
+        task:     t,
       })
     }
   })
@@ -296,23 +173,16 @@ function getBurnBarLabel(timelinePreview) {
   return `${formatMins(timelinePreview.next.timeMins)} · ${timelinePreview.next.label}`
 }
 
-function TimelinePreview({ preview }) {
-  const nextLabel = preview.next
-    ? `${formatMins(preview.next.timeMins)} · ${preview.next.label}`
-    : 'Your visible flow is clear'
-
-  return (
-    <div style={tl.preview}>
-      <span style={tl.previewNow}>●</span>
-      <div style={tl.previewText}>
-        <span style={tl.previewMain}>{nextLabel}</span>
-        <span style={tl.previewSub}>{preview.remainingCount} scheduled item{preview.remainingCount === 1 ? '' : 's'} still available today</span>
-      </div>
-    </div>
-  )
-}
-
-function Timeline({ items, density, collapsedSections, onToggleSection }) {
+function Timeline({
+  items,
+  density,
+  collapsedSections,
+  expandedTask,
+  onToggleSection,
+  onToggleTask,
+  onToggleTaskDone,
+  onTaskTimeSelect,
+}) {
   function dotColor(item) {
     if (item.type === 'now')     return 'var(--color-accent)'
     if (item.done)               return 'var(--color-success)'
@@ -345,36 +215,60 @@ function Timeline({ items, density, collapsedSections, onToggleSection }) {
 
             {!collapsed && (
               <div style={tl.list}>
-                {sectionItems.map((item, idx) => (
-                  <div key={item.key} style={{ ...tl.row, ...(item.overlaps ? tl.overlapRow : {}) }}>
-                    <span style={tl.time}>
-                      {item.type === 'now' ? '' : formatMins(item.timeMins)}
-                    </span>
+                {sectionItems.map((item, idx) => {
+                  if (item.type === 'task' && item.task) {
+                    return (
+                      <div key={item.key} style={{ ...tl.row, ...(item.overlaps ? tl.overlapRow : {}) }}>
+                        <span style={tl.time}>{formatMins(item.timeMins)}</span>
+                        <div style={tl.dotCol}>
+                          <div style={{ ...tl.dot, background: dotColor(item) }} />
+                          {idx < sectionItems.length - 1 && <div style={tl.line} />}
+                        </div>
+                        <div style={tl.interactiveItem}>
+                          <TaskRow
+                            task={item.task}
+                            expanded={expandedTask === item.task.id}
+                            onToggleExpand={() => onToggleTask(item.task.id)}
+                            onToggleDone={() => onToggleTaskDone(item.task.id)}
+                            onTimeSelect={time => onTaskTimeSelect(item.task.id, time)}
+                          />
+                          {item.overlaps && <span style={tl.inlinePip}>overlaps</span>}
+                        </div>
+                      </div>
+                    )
+                  }
 
-                    <div style={tl.dotCol}>
-                      <div style={{ ...tl.dot, background: dotColor(item), boxShadow: item.type === 'now' ? `0 0 0 4px var(--color-accent-bg)` : 'none' }} />
-                      {idx < sectionItems.length - 1 && <div style={tl.line} />}
-                    </div>
+                  return (
+                    <div key={item.key} style={{ ...tl.row, ...(item.overlaps ? tl.overlapRow : {}) }}>
+                      <span style={tl.time}>
+                        {item.type === 'now' ? '' : formatMins(item.timeMins)}
+                      </span>
 
-                    <div style={tl.labelWrap}>
-                      <span style={{
-                        ...tl.label,
-                        color:          item.type === 'now' ? 'var(--color-accent)' : item.done ? 'var(--color-success)' : 'var(--color-text)',
-                        fontWeight:     item.type === 'now' ? 700 : 500,
-                        textDecoration: item.done && item.type !== 'now' ? 'line-through' : 'none',
-                        opacity:        item.done ? 0.62 : item.planned ? 0.84 : 1,
-                      }}>
-                        {item.label}
-                      </span>
-                      {density !== 'minimal' && item.detail && <span style={tl.detail}>{item.detail}</span>}
-                      <span style={tl.pips}>
-                        {item.overlaps && <span style={tl.softPip}>overlaps</span>}
-                        {item.planned && <span style={tl.softPip}>planned</span>}
-                        {item.type === 'now' && <span style={tl.nowPip}>current</span>}
-                      </span>
+                      <div style={tl.dotCol}>
+                        <div style={{ ...tl.dot, background: dotColor(item), boxShadow: item.type === 'now' ? `0 0 0 4px var(--color-accent-bg)` : 'none' }} />
+                        {idx < sectionItems.length - 1 && <div style={tl.line} />}
+                      </div>
+
+                      <div style={tl.labelWrap}>
+                        <span style={{
+                          ...tl.label,
+                          color:          item.type === 'now' ? 'var(--color-accent)' : item.done ? 'var(--color-success)' : 'var(--color-text)',
+                          fontWeight:     item.type === 'now' ? 700 : 500,
+                          textDecoration: item.done && item.type !== 'now' ? 'line-through' : 'none',
+                          opacity:        item.done ? 0.62 : item.planned ? 0.84 : 1,
+                        }}>
+                          {item.label}
+                        </span>
+                        {density !== 'minimal' && item.detail && <span style={tl.detail}>{item.detail}</span>}
+                        <span style={tl.pips}>
+                          {item.overlaps && <span style={tl.softPip}>overlaps</span>}
+                          {item.planned && <span style={tl.softPip}>planned</span>}
+                          {item.type === 'now' && <span style={tl.nowPip}>current</span>}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
@@ -410,6 +304,7 @@ const tl = {
   dot:     { width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0, marginTop: '3px' },
   line:    { width: '1px', flex: 1, minHeight: '26px', background: 'color-mix(in srgb, var(--color-faint) 72%, transparent)', margin: '3px 0' },
   labelWrap: { flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', paddingBottom: '12px' },
+  interactiveItem: { flex: 1, display: 'flex', flexDirection: 'column', gap: '6px', paddingBottom: '12px' },
   label:   { fontSize: '14px', paddingTop: '0', flex: 1, lineHeight: 1.35 },
   detail:  { fontSize: '11px', color: 'var(--color-muted)', lineHeight: 1.35 },
   pips:    { display: 'flex', gap: '5px', flexWrap: 'wrap' },
@@ -429,37 +324,7 @@ const tl = {
     fontSize:      '10px',
     fontWeight:    600,
   },
-  preview: {
-    borderTop:    'var(--border)',
-    padding:      '0 14px 12px',
-    display:      'flex',
-    alignItems:   'flex-start',
-    gap:          '9px',
-  },
-  previewNow: {
-    color:      'var(--color-accent)',
-    fontSize:   '9px',
-    lineHeight: 1,
-    marginTop:  '5px',
-  },
-  previewText: {
-    minWidth:      0,
-    display:       'flex',
-    flexDirection: 'column',
-    gap:           '2px',
-  },
-  previewMain: {
-    fontSize:     '13px',
-    color:        'var(--color-text)',
-    whiteSpace:   'nowrap',
-    overflow:     'hidden',
-    textOverflow: 'ellipsis',
-    maxWidth:     '292px',
-  },
-  previewSub: {
-    fontSize: '11px',
-    color:    'var(--color-muted)',
-  },
+  inlinePip: { alignSelf: 'flex-start', fontSize: '10px', color: 'var(--color-muted)', background: 'var(--color-chart-bar)', borderRadius: 'var(--radius-pill)', padding: '1px 6px' },
 }
 
 // ─── Task row ─────────────────────────────────────────────────────────────────
@@ -912,6 +777,9 @@ function getCurrentFocus({ dayState, timelineItems, currentMins, canStartWorkout
     }
   }
 
+  // TODO: Include active focus sessions here once FocusTimer exposes running
+  // session state outside of its screen-local component state.
+
   if (currentBlock) {
     return {
       eyebrow: 'Current Focus',
@@ -956,16 +824,25 @@ function CurrentFocus({ focus, onAction }) {
   )
 }
 
-function SupportButtonRow({ onJournal, onNutrition, onFocus }) {
+function getSupportButtons(enabledModules) {
+  const defaults = enabledModules.nutrition
+    ? ['journal', 'nutrition', 'focus']
+    : ['journal', 'quickAdd', 'focus']
+
+  return defaults.map(key => SUPPORT_BUTTONS.find(button => button.key === key))
+}
+
+function SupportButtonRow({ buttons, onJournal, onNutrition, onFocus, onQuickAdd }) {
   const handlers = {
     journal: onJournal,
     nutrition: onNutrition,
     focus: onFocus,
+    quickAdd: onQuickAdd,
   }
 
   return (
     <div style={sb.row}>
-      {SUPPORT_BUTTONS.map(button => (
+      {buttons.map(button => (
         <button key={button.key} style={sb.button} onClick={handlers[button.key]}>
           <span style={sb.icon}>{button.icon}</span>
           <span style={sb.label}>{button.label}</span>
@@ -975,11 +852,12 @@ function SupportButtonRow({ onJournal, onNutrition, onFocus }) {
   )
 }
 
-function UtilityLayer({ value, inboxCount, onChange, onSubmit, onOpenInbox, onReflow }) {
+function UtilityLayer({ inputRef, value, inboxCount, onChange, onSubmit, onOpenInbox, onReflow }) {
   return (
     <section style={ut.wrap}>
       <form style={ut.form} onSubmit={onSubmit}>
         <input
+          ref={inputRef}
           style={ut.input}
           value={value}
           onChange={event => onChange(event.target.value)}
@@ -1376,6 +1254,7 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
   const [collapsedTimelineSections, setCollapsedTimelineSections] = useState([])
   const [showUnscheduledTasks, setShowUnscheduledTasks] = useState(true)
   const [quickAddText, setQuickAddText] = useState('')
+  const quickAddRef = useRef(null)
 
   const focusProject = useMemo(
     () => projectsState.projects?.find(p => p.status === PROJECT_STATUS.FOCUS) ?? null,
@@ -1418,6 +1297,10 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
     : 'Build'
 
   const showFocusProjects = enabledModules.focus || enabledModules.goals || !!focusProject
+  const supportButtons = useMemo(
+    () => getSupportButtons(enabledModules),
+    [enabledModules]
+  )
 
   const projectSectionLabel = focusProject?.name
     ? focusProject.name.toUpperCase()
@@ -1466,6 +1349,10 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
 
   function handleOpenMeals() {
     setExpandedSection(SECTION_KEYS.MEALS)
+  }
+
+  function handleOpenQuickAdd() {
+    quickAddRef.current?.focus()
   }
 
   function handleDensityChange(value) {
@@ -1533,7 +1420,11 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
             items={timelineItems}
             density={homeDensity}
             collapsedSections={collapsedTimelineSections}
+            expandedTask={expandedTask}
             onToggleSection={handleToggleTimelineSection}
+            onToggleTask={handleToggleExpand}
+            onToggleTaskDone={handleToggleDone}
+            onTaskTimeSelect={handleTimeSelect}
           />
         </section>
 
@@ -1576,9 +1467,11 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
           </div>
         </div>
         <SupportButtonRow
+          buttons={supportButtons}
           onJournal={() => onNavigate(SCREENS.EOD)}
           onNutrition={handleOpenMeals}
           onFocus={onOpenFocus}
+          onQuickAdd={handleOpenQuickAdd}
         />
 
         {enabledModules.fitness && (
@@ -1656,6 +1549,7 @@ export default function Home({ onOpenFocus, onNavigate, onStartWorkout }) {
       </section>
 
       <UtilityLayer
+        inputRef={quickAddRef}
         value={quickAddText}
         inboxCount={inboxState.inboxItems.length}
         onChange={setQuickAddText}
