@@ -1,6 +1,6 @@
 /* ─── App in My Life — Design Tokens ─────────────────────────────────────── */
 
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Serif+Display&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&family=Lexend:wght@400;500;600;700&display=swap');
 
 /* ─── Dark theme ─────────────────────────────────────────────────────────── */
 [data-theme="dark"] {
@@ -74,8 +74,8 @@
   --radius-pill:       999px;
 
   /* ── Typography ──────────────────────────────────────────────────────────── */
-  --font-body:         'DM Sans', system-ui, sans-serif;
-  --font-display:      'DM Serif Display', Georgia, serif;
+  --font-body:         'Poppins', system-ui, sans-serif;
+  --font-display:      'Lexend', system-ui, sans-serif;
 
   /* ── Spacing ─────────────────────────────────────────────────────────────── */
   --space-1:  4px;
@@ -121,12 +121,18 @@ html, body, #root {
 
 body {
   font-family: var(--font-body);
+  text-transform: lowercase;
   font-size: 16px;
   line-height: 1.5;
   color: var(--color-text);
   background: var(--color-bg);
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  text-transform: uppercase;
 }
 
 #root {
