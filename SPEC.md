@@ -7,15 +7,19 @@
 ## Table of Contents
 
 1. [Project Overview](#1-project-overview)
-2. [Design System](#2-design-system)
-3. [App Structure](#3-app-structure)
-4. [Context State Shapes](#4-context-state-shapes)
-5. [Screens](#5-screens)
-6. [Interaction Patterns](#6-interaction-patterns)
-7. [Navigation & Routing](#7-navigation--routing)
-8. [PWA Configuration](#8-pwa-configuration)
-9. [V1 Scope vs Deferred](#9-v1-scope-vs-deferred)
-10. [Build Order & Progress](#10-build-order--progress)
+2. [Product Roadmap: 3-Phase Evolution](#product-roadmap-3-phase-evolution)
+3. [Behavioral Design Principles](#behavioral-design-principles)
+4. [Phase 1 Product Behavior Rules](#phase-1-product-behavior-rules)
+5. [Home + Timeline Interaction Model](#home--timeline-interaction-model)
+6. [Design System](#2-design-system)
+7. [App Structure](#3-app-structure)
+8. [Context State Shapes](#4-context-state-shapes)
+9. [Screens](#5-screens)
+10. [Interaction Patterns](#6-interaction-patterns)
+11. [Navigation & Routing](#7-navigation--routing)
+12. [PWA Configuration](#8-pwa-configuration)
+13. [V1 Scope vs Deferred](#9-v1-scope-vs-deferred)
+14. [Build Order & Progress](#10-build-order--progress)
 
 ---
 
@@ -25,6 +29,382 @@
 **Purpose:** Dark-themed personal PWA for ADHD daily execution — morning planning, task tracking, focus timer, capture inbox, and read-only finance snapshot.
 **Stack:** Vite + React 19, deployed to GitHub Pages. No external UI libraries — custom components only.
 **Target device:** Mobile-first, 393px wide, iPhone 16 Pro safe areas.
+
+---
+
+## Product Roadmap: 3-Phase Evolution
+
+App in My Life is evolving away from a traditional task manager or productivity dashboard and toward a calm lifestyle operating system for structured, intentional living. The product direction should be timeline-first, emotionally aware, supportive, and centered on the rhythm of a real day.
+
+### Phase 1 — Core Life Operating System
+
+**Goal:** Make AIML feel calm, emotionally cohesive, and useful every day.
+
+Finalized priorities:
+- Timeline-first Home experience
+- Mood + mode system
+- Day templates / saved rhythms
+- Routine engine refinement
+- Lightweight journaling + reflection
+- Frictionless quick capture
+- Visual identity + theming foundation
+
+Product direction:
+- The timeline is the center of the product and should anchor the Home experience.
+- Avoid redundant "Next Action" patterns and task-manager framing when the timeline already expresses what matters next.
+- Support cards should sit below the primary day flow, reinforcing the day rather than competing with it.
+- Language should feel soft and supportive, not corporate, productivity-heavy, or optimization-obsessed.
+
+### Phase 2 — Execution + Adaptive Performance
+
+**Goal:** Turn AIML from a planner into an intelligent execution system.
+
+Finalized priorities:
+- Complete HYROX/workout execution architecture
+- Nutrition simplification layer
+- Recovery + wellness system
+- Focus ecosystem
+- Weekly reset + planning system
+- Calendar refinement
+- Life domains system
+
+Product direction:
+- Do not build a complex calorie tracker.
+- Nutrition should remain lightweight, low-friction, and easy to maintain during normal life.
+- Recovery, fitness, mood, and scheduling should begin connecting so the product can understand daily capacity and rhythm.
+
+### Phase 3 — Intelligence + Ecosystem
+
+**Goal:** Make AIML feel adaptive, predictive, and personally useful.
+
+Finalized priorities:
+- AI guidance layer
+- Adaptive scheduling
+- Data intelligence + trends
+- Deeper integrations
+- Advanced emotional theming
+
+Product direction:
+- AI should feel calm, observant, and supportive.
+- Avoid aggressive productivity coaching or pressure-based optimization.
+- Insights should help the user understand their rhythm, not optimize every minute.
+
+### Do Not Build Yet
+
+- Social features
+- Public feeds
+- Heavy gamification
+- Enterprise collaboration
+- Complicated analytics dashboards
+- Excessive notifications
+- Productivity KPI obsession
+- Heavy backend dependency
+
+### Positioning Note
+
+AIML should be positioned as:
+
+> "a lifestyle operating system for structured, intentional living."
+
+Not:
+- a task manager
+- a habit tracker
+- a productivity dashboard
+
+## Behavioral Design Principles
+
+### 1. Adaptive structure over rigid planning
+
+AIML should assume real life is fluid. Blocks may overlap, schedules may shift, routines may change, and users may not complete everything. The app should help the user return to flow instead of treating deviations as failures.
+
+### 2. The user should always feel recoverable
+
+No matter how disrupted the day becomes, AIML should help the user re-enter structure quickly. Use reset, reflow, continue later, and rebuild-the-day patterns instead of failure states.
+
+### 3. Momentum matters more than completion
+
+The app should reward engagement, consistency, returning, and intention. It should avoid overemphasizing perfect completion, streak pressure, or productivity KPIs.
+
+### 4. Language must stay soft and supportive
+
+Avoid harsh language such as:
+- failed
+- overdue
+- missed
+- behind
+- incomplete
+- streak lost
+
+Prefer language such as:
+- continue
+- move
+- reset
+- still available
+- pick back up
+- reflow
+- shift this
+- today changed
+
+### 5. Timeline is soft guidance, not strict enforcement
+
+The timeline is the primary day-flow layer, but it should support overlapping blocks, hidden unscheduled tasks, customizable density, and future AI-assisted scheduling. It should guide the user through the day without making the schedule feel brittle.
+
+### 6. Routines anchor the day
+
+Routines may behave as checklist sequences, timeline blocks, or guided players. Morning routines, evening routines, work startup routines, workout routines, and recovery routines should all be treated as rhythm anchors rather than generic tasks.
+
+### 7. Workouts can behave like routines
+
+Workouts should follow the same guided-execution philosophy as routines: steps, timers, progress, completion, modification, and recovery options.
+
+### 8. Capture should be instant
+
+Quick capture should always be low-friction. Categorization can happen later. The inbox is mandatory as the holding area. Capture should eventually support typed entry, natural language parsing, voice capture, and immediate or later scheduling.
+
+### 9. Modes shape the experience
+
+Modes may be emotional, functional, energy-based, schedule-based, daily, user-selected, or automatic. Start with a small set of modes and allow the user to expand later.
+
+Initial recommended modes:
+- Build
+- Recovery
+- Focus
+- Reset
+
+Modes may influence:
+- visible widgets
+- timeline density
+- support prompts
+- accent colors
+- workout emphasis
+- recovery suggestions
+- wording tone
+
+### 10. Support layer should be user-configurable
+
+The user should be able to choose three permanent support buttons visible on the dashboard. Examples:
+- Journal
+- Nutrition
+- Focus
+- Quick Add
+- Hydration
+- Routine
+- Mood
+- Workout
+
+### 11. Home is both planner and widget board
+
+Home should feel like the user's all-in-one life planner. It should show the planner/day flow first, while still supporting a widget board for quick access to life systems. The planner should guide daily execution, while widgets should support context and action.
+
+### 12. Morning Check-In is the first action
+
+The Morning Check-In should be the first recommended action of the day. It should gather mood, energy, mode, and relevant daily context before the app guides the rest of the day.
+
+## Phase 1 Product Behavior Rules
+
+- Home must prioritize daily execution and planner flow.
+- The dashboard should include both the planner/timeline and configurable support widgets.
+- Morning Check-In should be the first recommended action.
+- Timeline density should be customizable.
+- Timeline blocks may overlap.
+- Unscheduled tasks should show by default but be hideable.
+- Routines may be checklist-based, timeline-based, or guided.
+- Routines may generate tasks.
+- Tasks may be independent or dependent.
+- Events are passive schedule items unless converted into actions.
+- Workouts should behave like routines.
+- Capture should be instant and routed through the inbox if not immediately categorized.
+- The app should gently guide, not manage or punish.
+
+## Home + Timeline Interaction Model
+
+This section defines the Phase 1 Home behavior in dependency order. Each layer should support the one before it: the screen hierarchy establishes what matters, the interaction hierarchy defines what the user is guided toward, and the timeline behaviors adapt around the user's real day.
+
+### 1. Screen hierarchy
+
+Home should have three layers.
+
+**Primary layer: Daily Execution Planner**
+
+This is the planner/timeline. It answers: "What is happening today, and what should I move through next?"
+
+Required elements:
+- Morning Check-In first, until completed
+- Today header with date, mode, energy
+- Current Focus / active block
+- Timeline/day flow
+- Unscheduled tasks, hideable
+- Active workout or routine if applicable
+
+**Secondary layer: Support Widget Board**
+
+This gives quick access to life systems without taking over the screen.
+
+Required elements:
+- 3 user-selected permanent support buttons
+- Suggested options: Journal, Nutrition, Focus
+- Optional widget cards below: Hydration, Workout, Mood, Quick Add, Routine
+
+**Utility layer: Capture + Recovery**
+
+This is always available.
+
+Required elements:
+- Quick Add
+- Inbox
+- Reflow day / reset rhythm
+- Continue later
+
+### 2. Interaction hierarchy
+
+Morning Check-In always comes first if incomplete. After check-in, the app should prioritize Current Focus. After Current Focus, the timeline should guide the user. After timeline, support widgets should help the user log, reflect, or adjust.
+
+The interaction order is:
+1. "Check in"
+2. "Here's your current focus"
+3. "Here's your day flow"
+4. "Here are your support tools"
+5. "Capture anything else"
+
+### 3. Morning Check-In flow
+
+Morning Check-In should stay short and take under 60 seconds. It should gather enough context to guide the day without becoming a long planning session.
+
+V1 fields:
+- Mood
+- Energy
+- Mode
+- Today's intention
+- Optional body/recovery note
+
+Recommended V1 modes:
+- Build
+- Focus
+- Recovery
+- Reset
+
+### 4. Timeline rendering logic
+
+The timeline should use soft guidance. It should show the shape of the day without enforcing the day as brittle or failure-prone.
+
+Timeline should show:
+- scheduled blocks
+- routines
+- workouts
+- meals
+- events
+- unscheduled tasks section
+- current-time marker
+
+Timeline should allow:
+- overlapping blocks
+- hidden unscheduled tasks
+- compact / balanced / detailed density
+- passive events
+- active routines/workouts
+
+### 5. Current Focus behavior
+
+Current Focus should not duplicate the timeline. It should summarize the active or next meaningful block and help the user pick back up.
+
+Priority order:
+1. active routine
+2. active workout
+3. active focus session
+4. current scheduled block
+5. next scheduled block
+6. suggested reset/check-in if the day is off track
+
+Suggested language:
+- Right now
+- Current focus
+- Pick back up
+- Continue your flow
+
+Avoid:
+- Next Action
+- Overdue
+- Incomplete
+
+### 6. Collapse behavior
+
+Default state:
+- Morning Check-In expanded until complete
+- Current Focus visible
+- Timeline visible
+- Support widgets compact
+- Unscheduled tasks visible but hideable
+
+Collapsed state should show:
+- title
+- status
+- next step
+- small action button
+
+Expanded state should show:
+- details
+- checklist/steps
+- secondary actions
+
+### 7. Support widget behavior
+
+The user should choose 3 permanent dashboard buttons.
+
+Recommended default:
+- Journal
+- Nutrition
+- Focus
+
+Alternative for fitness-heavy setup:
+- Nutrition
+- Workout
+- Journal
+
+Support buttons should be quick actions, not full cards. Contextual widgets can appear below them based on the day.
+
+### 8. Routine insertion rules
+
+Routines can appear as:
+- timeline blocks
+- checklist sequences
+- guided players
+- task generators
+
+Example: a morning routine may appear from 7:00-7:30 and contain steps such as brush teeth, skincare, vitamins, fill water, and feed dog. If the user notes "ran out of moisturizer," the routine can generate an inbox task: "Order moisturizer."
+
+Workouts should follow the same pattern:
+- warmup
+- main work
+- cooldown
+- log/complete
+
+### 9. Contextual card logic
+
+Cards should appear only when relevant.
+
+Examples:
+- If Morning Check-In is incomplete: show it first.
+- If workout today: show workout card.
+- If meal window is near: show nutrition prompt.
+- If evening: show reflection.
+- If low energy mode: show recovery card.
+- If inbox has unprocessed items: show light inbox reminder.
+- If timeline is empty: show day template prompt.
+
+### 10. Adaptive density behavior
+
+Density options:
+- Minimal: current focus + next 2 blocks + support buttons
+- Balanced: current focus + timeline sections + key widgets
+- Detailed: full timeline + tasks + routines + cards
+
+Mode can influence density:
+- Recovery -> Minimal
+- Reset -> Balanced
+- Focus -> Minimal with focus tools
+- Build -> Balanced/Detailed
+
+V1 should default to Balanced. Minimal and Detailed should be available later unless a specific Phase 1 implementation requires them sooner.
 
 ---
 
