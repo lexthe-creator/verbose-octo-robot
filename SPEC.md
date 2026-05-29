@@ -216,6 +216,129 @@ The Morning Check-In should be the first recommended action of the day. It shoul
 - Capture should be instant and routed through the inbox if not immediately categorized.
 - The app should gently guide, not manage or punish.
 
+## Home Typography Rules
+
+Home should maintain a consistent visual language.
+
+Rules:
+- Avoid inconsistent Title Case.
+- Use uppercase for structural labels and section headings.
+- Use lowercase sentence-style text for timeline items, guidance, actions, and planner content.
+- Do not randomly capitalize planner labels.
+
+Correct:
+- DAILY FLOW
+- CURRENT FOCUS
+- QUICK TOOLS
+- breakfast window
+- pick back up
+- today can still reflow
+- you are here
+
+Incorrect:
+- Morning
+- Day Flow
+- Evening
+- Breakfast Window
+- Pick Back Up
+
+User-created content should preserve its original casing.
+
+## Home Planner Philosophy
+
+Home is not a dashboard.
+
+Home is:
+- a planner surface
+- a daily execution system
+- a timeline-first experience
+- a life operating system
+
+The primary purpose of Home is helping the user understand:
+- where they are
+- what is happening now
+- what comes next
+- how to re-enter flow
+
+Anything that visually competes with Daily Flow should be simplified, reduced, or removed.
+
+## Daily Flow Rules
+
+Daily Flow is the primary planner surface.
+
+Timeline rendering should prioritize:
+1. time
+2. flow
+3. execution
+
+over:
+1. categories
+2. widgets
+3. dashboard summaries
+
+Morning, Day Flow, and Evening are contextual markers only.
+
+They are not separate planner sections.
+
+## Default Planner Window
+
+Default planner hours:
+- 6:00 AM - 10:00 PM
+
+Future user settings may include:
+- planner start time
+- planner end time
+- time interval
+  - 60 minute
+  - 30 minute
+  - 15 minute
+- density
+  - minimal
+  - balanced
+  - detailed
+
+The planner should eventually render only the active configured window.
+
+## Timeline Architecture Direction
+
+Daily Flow should evolve toward a continuous hourly planner.
+
+Future support:
+- drag/drop scheduling
+- overlapping blocks
+- calendar overlays
+- time-grid rendering
+- planner-style rescheduling
+
+Current implementation should not block these future capabilities.
+
+## Behavioral Inputs
+
+Mode, Energy, Mood, and Recovery are behavioral inputs.
+
+They should primarily influence:
+- recommendations
+- density
+- recovery guidance
+- adaptive planner behavior
+- future AI assistance
+
+They should not permanently occupy prime Home screen space after check-in completion.
+
+## Implementation Discipline
+
+When durable product decisions are made:
+- update SPEC.md first
+- then implement
+
+Codex should:
+- stay within prompt scope
+- avoid unrelated changes
+- avoid opportunistic refactors
+- avoid modifying unrelated modules
+
+Each PR should remain tightly scoped.
+
 ## Home + Timeline Interaction Model
 
 This section defines the Phase 1 Home behavior in dependency order. Each layer should support the one before it: the screen hierarchy establishes what matters, the interaction hierarchy defines what the user is guided toward, and the timeline behaviors adapt around the user's real day.

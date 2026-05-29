@@ -175,7 +175,7 @@ export default function Settings({ onBack, onNavigate }) {
           <label style={s.fieldLabel}>Theme</label>
           <div style={{ ...s.pillRow, gridTemplateColumns: 'repeat(2, 1fr)' }}>
             {[THEMES.DARK, THEMES.LIGHT].map(theme => {
-              const active = (settingsState.theme || THEMES.DARK) === theme
+              const active = (settingsState.theme || THEMES.LIGHT) === theme
               return (
                 <button
                   key={theme}

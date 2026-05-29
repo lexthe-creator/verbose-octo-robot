@@ -4,7 +4,7 @@ const SETTINGS_STORAGE_KEY = 'aiml_settings'
 const SCHEMA_VERSION       = 1
 
 const initialSettingsState = {
-  theme:             'dark',
+  theme:             'light',
   gymAccess:         'bodyweight',
   homeDensity:       'balanced',
   homeMode:          'build',
@@ -87,7 +87,7 @@ export function SettingsProvider({ children }) {
   useEffect(() => { saveSettingsState(settingsState) }, [settingsState])
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', settingsState.theme || 'dark')
+    document.documentElement.setAttribute('data-theme', settingsState.theme || 'light')
   }, [settingsState.theme])
 
   return (
