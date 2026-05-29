@@ -1,7 +1,11 @@
 export const SCREENS = {
   HOME:          'home',
+  PLAN:          'plan',
+  CALENDAR:      'calendar',
+  TASKS:         'tasks',
   FITNESS:       'fitness',
   FITNESS_SETUP: 'fitness-setup',
+  MORE:          'more',
   INBOX:         'inbox',
   PROJECTS:      'projects',
   FINANCE:       'finance',
@@ -13,11 +17,11 @@ export const SCREENS = {
 }
 
 export const NAV_TABS = [
+  { screen: SCREENS.CALENDAR, label: 'Calendar', icon: '□' },
+  { screen: SCREENS.TASKS,    label: 'Tasks',    icon: '☑' },
   { screen: SCREENS.HOME,     label: 'Home',     icon: '⌂' },
-  { screen: SCREENS.FITNESS,  label: 'Fitness',  icon: '◉', module: 'fitness' },
-  { screen: SCREENS.INBOX,    label: 'Inbox',    icon: '◎' },
-  { screen: SCREENS.PROJECTS, label: 'Projects', icon: '▣', module: 'goals' },
-  { screen: SCREENS.FINANCE,  label: 'Finance',  icon: '◈', module: 'finance' },
+  { screen: SCREENS.FITNESS,  label: 'Fitness',  icon: '◉' },
+  { screen: SCREENS.MORE,     label: 'More',     icon: '⋯' },
 ]
 
 export function getEnabledNavTabs(modules = {}) {

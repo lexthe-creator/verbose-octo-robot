@@ -9,17 +9,18 @@
 1. [Project Overview](#1-project-overview)
 2. [Product Roadmap: 3-Phase Evolution](#product-roadmap-3-phase-evolution)
 3. [Behavioral Design Principles](#behavioral-design-principles)
-4. [Phase 1 Product Behavior Rules](#phase-1-product-behavior-rules)
-5. [Home + Timeline Interaction Model](#home--timeline-interaction-model)
-6. [Design System](#2-design-system)
-7. [App Structure](#3-app-structure)
-8. [Context State Shapes](#4-context-state-shapes)
-9. [Screens](#5-screens)
-10. [Interaction Patterns](#6-interaction-patterns)
-11. [Navigation & Routing](#7-navigation--routing)
-12. [PWA Configuration](#8-pwa-configuration)
-13. [V1 Scope vs Deferred](#9-v1-scope-vs-deferred)
-14. [Build Order & Progress](#10-build-order--progress)
+4. [Architecture Guardrail](#architecture-guardrail)
+5. [Phase 1 Product Behavior Rules](#phase-1-product-behavior-rules)
+6. [Home + Timeline Interaction Model](#home--timeline-interaction-model)
+7. [Design System](#2-design-system)
+8. [App Structure](#3-app-structure)
+9. [Context State Shapes](#4-context-state-shapes)
+10. [Screens](#5-screens)
+11. [Interaction Patterns](#6-interaction-patterns)
+12. [Navigation & Routing](#7-navigation--routing)
+13. [PWA Configuration](#8-pwa-configuration)
+14. [V1 Scope vs Deferred](#9-v1-scope-vs-deferred)
+15. [Build Order & Progress](#10-build-order--progress)
 
 ---
 
@@ -199,6 +200,29 @@ Home should feel like the user's all-in-one life planner. It should show the pla
 ### 12. Morning Check-In is the first action
 
 The Morning Check-In should be the first recommended action of the day. It should gather mood, energy, mode, and relevant daily context before the app guides the rest of the day.
+
+## Architecture Guardrail
+
+App in My Life is a planner-first application.
+
+When evaluating UI decisions, use this priority order:
+1. Planner experience
+2. Daily execution
+3. Data visibility
+4. Analytics
+
+Avoid introducing dashboard patterns, KPI-heavy layouts, productivity-software conventions, or duplicated information.
+
+If two components communicate the same information, prefer the simpler planner-oriented presentation and remove the duplicate.
+
+SPEC-first development is mandatory:
+- Review `SPEC.md` before implementation.
+- Treat `SPEC.md` as the source of truth.
+- Compare requested behavior against the current spec.
+- If the request conflicts with the spec, do not implement it.
+- Explain the conflict, propose the required `SPEC.md` updates, and wait for approval.
+- If the request represents a durable design, architecture, navigation, workflow, planner philosophy, or interaction decision, update `SPEC.md` before implementing code.
+- Never implement behavior that is not reflected in `SPEC.md`.
 
 ## Phase 1 Product Behavior Rules
 
@@ -734,7 +758,7 @@ Actions:
 - `UPDATE_SETTING { key, value }`
 - `UPDATE_MODULE { module, enabled }`
 
-**Current module gating behavior:** `settings.modules` is persisted and migration-safe. `App.jsx` filters bottom-nav tabs through `getEnabledNavTabs(settings.modules)`: Home and Inbox are always shown; Fitness, Projects, and Finance are gated by `fitness`, `goals`, and `finance`. `Home.jsx` uses the same module flags for support sections: Training follows `fitness`, Meals follows `nutrition`, Focus / Projects follows `focus`, `goals`, or an available focus project. Tasks and Today Timeline remain core Home cards and are always available.
+**Current module gating behavior:** `settings.modules` is persisted and migration-safe. `App.jsx` uses the fixed bottom-nav order Calendar, Tasks, Home, Fitness, More so Home remains centered. Inbox and Settings remain globally accessible from the Home top-right utility cluster rather than the bottom nav. Finance and Projects are reachable from More when their modules or existing screens are available. Home keeps Daily Flow and task visibility as core planner behavior.
 
 ### 4.3 DayContext (`aiml_day`, schema v1)
 
@@ -945,7 +969,7 @@ Project stats are exposed by `getProjectStats(project)`, not by `useApp()`.
 
 ### Screen Names (state values in App.jsx)
 
-`'ignition'` · `'home'` · `'fitness'` · `'focus'` · `'inbox'` · `'finance'` · `'projects'` · `'settings'`
+`'ignition'` · `'home'` · `'plan'` · `'calendar'` · `'tasks'` · `'fitness'` · `'more'` · `'focus'` · `'inbox'` · `'finance'` · `'projects'` · `'settings'`
 
 **Overlay screens** (rendered as `position: fixed, z-index: 200` above all screens):
 
@@ -1014,15 +1038,55 @@ Project stats are exposed by `getProjectStats(project)`, not by `useApp()`.
 
 Layout zones top to bottom:
 
-1. **Hero header + Quick Actions** — greeting line ("Good morning/afternoon/evening, {name}") from `UserContext`, gear icon top-right → `onNavigate('settings')`, date row, then a calm Quick Actions card. Heading: "What do you need right now?" Subtitle: "Pick the support that fits this moment." There is no global "Next Action" hero.
-2. **Quick action buttons** — Focus appears when `settings.modules.focus !== false` and opens `FocusTimer` through `onOpenFocus`. Journal calls `onNavigate('eod')` and uses the existing EodReflection overlay; there is no separate journal screen in V1. Meals appears only when `settings.modules.nutrition === true` and expands the Meals support card. Workout appears only when fitness is enabled, today's generated workout is not a rest day, and `fitnessState.todayComplete` is false; tapping it starts today's workout.
-3. **Burn bar** — 2px track, fills based on % of waking day elapsed (6am-11pm). Left: "X% of day gone". Right: the next Today Timeline item, or "Clear for now" when nothing remains. It is timeline/time-of-day context, not hero action detail.
-4. **Collapsible support cards** — Home support content is grouped into collapsible cards and only one card is expanded by default. Today Timeline starts expanded. Cards can be toggled open/closed by their headers.
-5. **Today Timeline card** — core Home card, not a separate nav/module. Collapsed state shows the next upcoming item, remaining scheduled-item count, and a small current-position dot. Expanded state renders the full derived chronological timeline: Morning ignition, scheduled tasks, meal windows, planned or confirmed workout, and the current "you are here" marker.
-6. **Training card** — gated by `settings.modules.fitness !== false`. Shows supporting workout detail with subtitle "Warmup · Main · Cooldown" or "Completed today". Expanded card may include a smaller secondary `Start ->` button, but Workout is only a top-level action when the user taps the optional Quick Actions button. Green "✓ Completed" state when `fitnessState.todayComplete`. Rest days render without a start button.
-7. **Tasks card** — always available. Contains task rows from `DayContext`. Tapping the check circle toggles done. Tapping row text expands/collapses the inline time picker. Done rows are strikethrough + green + reduced opacity. Overdue badge appears when `dueTime` is earlier than now and the task is not done.
-8. **Meals card** — gated by `settings.modules.nutrition === true`. Shows 4 meal slots (Breakfast / Lunch / Snack / Dinner). Tap slot body → `MARK_MEAL_EATEN` (toggle). Tap ◷ icon → `FuelEditSheet` bottom sheet for time editing.
-9. **Focus / Projects card** — shown when focus is enabled, goals are enabled, or an existing focus project is available. The card gives project/focus context and does not render a competing large focus CTA; the hero or one secondary Home action owns focus launch. Goal card selects the project with `status === 'focus'`, shows progress/listings/next task from `getProjectStats(focusProject)`, and taps through to `onNavigate('projects')`.
+1. **Daily Execution header** — compact planner header, not a dashboard hero. The visual hierarchy is greeting, date, planner status, then Daily Flow. The date should be roughly 20-25% smaller than the previous hero-like date treatment and should feel like a planner page heading, not a dashboard headline. Inbox and Settings sit together in the top-right utility cluster and remain globally accessible from Home.
+2. **Greeting and date** — greeting line ("GOOD MORNING/AFTERNOON/EVENING, {name}") from `UserContext`, with date below in planner-style title case, e.g. `Friday May 29`.
+3. **Planner status tabs** — compact monochrome horizontal row under the date: `○ Journal`, `○ Nutrition`, `○ Plan`. These visually match the existing Inbox and Settings icon style: low-density, no labels above them, no emojis, no colorful badges, no cards, and 15-20% tighter spacing than the first implementation. Plan is a planner workspace and AI guidance surface. It is not a duplicate Tasks view. Tasks stores work. Plan helps the user decide what to do with that work.
+4. **Daily summary grid** — compact two-row aligned grid beneath the tabs. Tasks and Morning share the first row. Events and Evening share the second row. Use a true grid so the left side grows naturally and the right column has a fixed width and right alignment. Example:
+   - `Tasks   |||..      Morning ✓`
+   - `Events  ||||       Evening ○`
+   Progress marks should stay planner-style, slightly stronger than muted helper text, and monochrome. Do not convert marks into progress bars or colored indicators. The summary should render as a compact inline planner block, not full-width. Use `fit-content` or a constrained max-width, center the compact block within the header, and use a small column gap of about 28-40px. Avoid excessive side padding. Morning remains aligned with Tasks and Evening remains aligned with Events.
+5. **Home header spacing** — the header should feel like one compact planner block rather than separated widgets. Target spacing: greeting to date 4-8px, date to planner tabs about 12px, planner tabs to summary 8-12px, and summary to Daily Flow 16-20px.
+6. **Daily Flow** — primary Home content after the header. It renders the full derived chronological timeline: Morning ignition, scheduled tasks, meal windows, planned or confirmed workout, events when available, and the current "you are here" marker. Preserve the current timeline look unless a small spacing adjustment is required to fit the new header.
+7. **Tasks in Daily Flow** — task rows from `DayContext` remain interactive inside the planner flow. Tapping the check circle toggles done. Tapping row text expands/collapses the inline time picker. Done rows are strikethrough + green + reduced opacity.
+8. **Nutrition behavior** — nutrition in the header is a compact status affordance only. Meal windows remain timeline guidance blocks and may route to Nutrition logging later. Do not introduce a large new Nutrition system until supported elsewhere in the spec.
+9. **Removed/avoided Home patterns** — do not render Current Focus if it duplicates Daily Flow. Do not render a large Next Action hero card. Do not add another dashboard card, redundant CTA, or duplicated Fitness quick tool on Home because Fitness has bottom navigation.
+
+Planner tab status rules:
+- Journal: `○` not started, `◐` partially completed, `☑` completed.
+- Nutrition: `○` no nutrition logging, `◐` partial nutrition logging, `☑` completed nutrition logging for the day.
+- Plan: `○` no daily plan started, `◐` partial planning inputs exist, `☑` daily plan set.
+
+V1 data mapping:
+- Journal can use today's reflection/EOD completion state when available; otherwise default to not started.
+- Nutrition uses `DayContext.meals[*].eaten`.
+- Plan may default to `○` until a dedicated daily plan state exists.
+- Events use today's confirmed `InboxContext.calendarItems` count when available. Meal windows are excluded.
+
+---
+
+### 5.2b Plan (`'plan'`)
+
+**File:** light route owned by `App.jsx` or future `src/screens/Plan.jsx`
+**Nav:** Not a bottom-nav tab. Opened from the Home planner status bar.
+
+Plan is a lightweight daily planning workspace and future AI guidance surface.
+
+Plan is not:
+- a duplicate Tasks view
+- a project manager
+- a calendar
+
+Plan may eventually synthesize Calendar, Tasks, Fitness, Nutrition, Energy, and Morning Check-In into a daily plan.
+
+Initial fields/concepts:
+- Current Focus
+- Top 3 priorities
+- Brain dump / notes
+- Next available time block
+- Suggested next step
+- AI suggestion
+
+V1 may render the lightest placeholder that communicates the intended workspace without creating a full planner system.
 
 ---
 
@@ -1121,6 +1185,23 @@ Layout zones top to bottom:
 - **Today card** — generated via `generateWorkout(getTodayType(), gymAccess, weekNum)` where `weekNum = getWeekNumber(programStartDate)`. Card header is tappable: toggles full workout preview with 300ms max-height animation. Preview shows WARM UP / MAIN / COOL DOWN sections; each row: name left + `3×10` or `2:00` right in accent. Footer: `~Xmin` + "Start Workout" button. Collapsed state shows original Start/Completed button.
 - **Weekly strip** — 7-column grid (Mon–Sun). Each cell shows day initial + workout type abbr. Today's cell: accent bg + accent border.
 - **Recent log** — last 5 entries from `fitness.workoutLog` (reverse order). Each row: title, date + duration, feel label.
+
+---
+
+### 5.8b More (`'more'`)
+
+**File:** light route owned by `App.jsx` or `src/screens/More.jsx`
+**Nav:** Shown (More tab in bottom nav).
+
+V1 may be a lightweight placeholder list. It should use existing routes when available and avoid building full new systems.
+
+List entries:
+- Nutrition — placeholder until a Nutrition screen exists.
+- Projects — routes to `projects` when available.
+- Finance — routes to `finance` when available.
+- Insights — placeholder until analytics/insights exist.
+
+Settings does not need to appear in More while it remains available in the Home top-right utility cluster beside Inbox.
 
 ---
 
@@ -1322,14 +1403,16 @@ Used in Home screen fuel gauge slots.
 
 **Pattern:** `useState`-based screen switcher in `App.jsx` — no router library.
 
-**Screen values:** `'ignition'` · `'home'` · `'fitness'` · `'focus'` · `'inbox'` · `'finance'` · `'projects'` · `'settings'`
+**Screen values:** `'ignition'` · `'home'` · `'plan'` · `'calendar'` · `'tasks'` · `'fitness'` · `'more'` · `'focus'` · `'inbox'` · `'finance'` · `'projects'` · `'settings'`
 
 **Bottom nav** (`src/App.jsx`):
 - 72px height, `#1A1A14` bg, `0.5px` top border
-- Tabs come from `getEnabledNavTabs(settings.modules)`: Home `⌂` and Inbox `◎` are always available; Fitness `◉` is gated by `modules.fitness`; Projects `▣` is gated by `modules.goals`; Finance `◈` is gated by `modules.finance`.
+- Tabs come from `getEnabledNavTabs(settings.modules)`: Calendar, Tasks, Home, Fitness, More. Home remains centered.
+- Inbox is removed from bottom navigation and remains globally accessible from the Home top-right utility cluster beside Settings.
+- Finance is removed from bottom navigation and routes through More.
 - Active: label + icon color → `#C17B56`, small 4px pip dot below icon
 - Fixed to bottom of the 393px column, `z-index: 100`
-- Hidden by `navigation/router.js` for `fitness-setup`, `settings`, `ignition`, `focus`, `eod`, and `weekly`. The current route map shows nav on `home`, `fitness`, `inbox`, `projects`, and `finance`.
+- Hidden by `navigation/router.js` for `fitness-setup`, `settings`, `ignition`, `focus`, `eod`, and `weekly`. The current route map shows nav on `calendar`, `tasks`, `home`, `fitness`, `more`, `projects`, and `finance`.
 
 **Global overlays** (rendered above nav in `App.jsx`):
 - `WorkoutPlayer` (z-index 150): shown when `activeWorkout !== null`; cleared on save or close
@@ -1339,12 +1422,15 @@ Used in Home screen fuel gauge slots.
 | From | To | Trigger |
 |---|---|---|
 | `ignition` | `home` | `onComplete()` inside MorningIgnition Step 3 |
+| `home` | `inbox` | Inbox icon in the Home top-right utility cluster |
+| `home` | `settings` | Settings icon in the Home top-right utility cluster |
+| `home` | `plan` | Plan tab in the Home planner status bar |
 | `home` | `focus` | `onOpenFocus()` prop |
-| `home` | `settings` | Gear icon in HomeHero → `onNavigate('settings')` |
 | `home` | `projects` | `onNavigate('projects')` via focus-project goal card tap |
 | `settings` | `home` | `onBack()` prop |
 | `focus` | `home` | `onClose()` prop |
 | `projects` | `home` | `onBack()` prop |
+| `more` | `projects` / `finance` | More list row tap when the screen exists |
 | `home` or `fitness` | WorkoutPlayer overlay | "Start →" button → `onStartWorkout(workout)` in App.jsx |
 | Any nav tab | target screen | Bottom nav tab tap |
 
@@ -1393,7 +1479,7 @@ File: `.github/workflows/pages.yml`
 ### In V1
 
 - Morning Ignition full 3-step flow (Energy → Brief → Locked)
-- Home screen: greeting + gear icon, Focus pill, Today's Training card, burn bar, timeline, tasks, generic focus-project goal card, fuel gauge
+- Home screen: compact Daily Execution header, top-right Inbox + Settings utilities, daily task/event tally, Morning/Evening check-in status, Daily Flow timeline, inline task scheduling, and meal guidance blocks
 - Focus Timer full implementation (ring, presets, session tracking)
 - Inbox capture + triage; "Task" button dispatches ADD_TASK with green flash confirmation
 - Finance screen with local transaction data, manual add/delete, Plaid connection stub, and read-only summary selectors
@@ -1405,7 +1491,7 @@ File: `.github/workflows/pages.yml`
 - LocalStorage persistence with eight domain keys and daily reset scoped to DayContext
 - PWA manifest + GitHub Pages deploy
 
-**Module defaults in V1:** `settings.modules.fitness`, `settings.modules.finance`, and `settings.modules.focus` default to enabled. `nutrition`, `goals`, `reflection`, `habits`, and `sleep` default to disabled. App nav now gates Fitness, Projects, and Finance from these flags while keeping Home and Inbox always available. Home gates Training, Meals, and Focus / Projects support cards from these flags, while keeping Tasks available.
+**Module defaults in V1:** `settings.modules.fitness`, `settings.modules.finance`, and `settings.modules.focus` default to enabled. `nutrition`, `goals`, `reflection`, `habits`, and `sleep` default to disabled. App nav uses the fixed order Calendar, Tasks, Home, Fitness, More. Inbox and Settings are Home top-right utilities. Finance and Projects are reachable from More when their routes are available. Home keeps Daily Flow, task tally, and planner status available regardless of module flags.
 
 ### Deferred (V2+)
 

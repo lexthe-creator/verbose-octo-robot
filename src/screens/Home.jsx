@@ -1,9 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useUser } from '../context/UserContext.jsx'
 import { useSettings } from '../context/SettingsContext.jsx'
-import { useDay, useFitness } from '../context/index.js'
-import { getTodayType, generateWorkout, getWeekNumber } from '../utils/fitness.js'
-import { formatMealTime, parseHHMM, formatMins } from '../utils/time.js'
+import { useDay, useInbox, usePlanning } from '../context/index.js'
+import { formatMealTime, parseHHMM, formatMins, getTodayISO } from '../utils/time.js'
 import { SCREENS } from '../constants/navigation.js'
 
 // ─── Time utilities ────────────────────────────────────────────────────────────
@@ -15,7 +14,7 @@ function toMins(date) {
 function formatHeaderDate(date) {
   const weekday = date.toLocaleDateString('en-US', { weekday: 'long' })
   const monthDay = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
-  return `${weekday} ${monthDay}`.toUpperCase()
+  return `${weekday} ${monthDay}`
 }
 
 function InboxIcon() {
@@ -69,30 +68,28 @@ const TIMELINE_SECTIONS = [
 
 const DENSITY_OPTIONS = ['minimal', 'balanced', 'detailed']
 
-const SUPPORT_BUTTONS = [
-  { key: 'journal', label: 'journal', icon: '◇' },
-  { key: 'fitness', label: 'fitness', icon: '⬡' },
-  { key: 'reset', label: 'reset', icon: '□' },
-  { key: 'nutrition', label: 'Nutrition', icon: '◷' },
-  { key: 'focus', label: 'Focus', icon: '⊙' },
-]
-
-function getEnabledModules(modules = {}) {
-  return {
-    fitness:   modules.fitness !== false,
-    nutrition: modules.nutrition === true,
-    goals:     modules.goals === true,
-    focus:     modules.focus !== false,
-    finance:   modules.finance !== false,
-  }
-}
-
 // ─── Header helpers ───────────────────────────────────────────────────────────
 
 function greeting(now, name) {
   const h = now.getHours()
   const part = h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening'
   return `Good ${part}, ${name}`
+}
+
+function getStatusSymbol(done, total) {
+  if (!total || done === 0) return '○'
+  if (done >= total) return '☑'
+  return '◐'
+}
+
+function buildTaskMarks(done, total) {
+  if (!total) return ''
+  return Array.from({ length: total }, (_, index) => index < done ? '|' : '·').join('')
+}
+
+function buildEventMarks(count) {
+  if (!count) return ''
+  return '|'.repeat(count)
 }
 
 // ─── Timeline ─────────────────────────────────────────────────────────────────
@@ -150,6 +147,8 @@ function buildTimeline(state, nowMinutes, options = {}) {
       type:     'meal',
       done:     meal.eaten,
       late:     !meal.eaten && nowMinutes > parseHHMM(meal.lateAfter),
+      mealSlot: slot,
+      guidance: true,
     })
   })
 
@@ -166,7 +165,7 @@ function buildTimeline(state, nowMinutes, options = {}) {
   })
 
   // Insert "now" marker at chronological position
-  const nowItem = { key: 'now', timeMins: nowMinutes, label: 'right now', detail: 'you are here', type: 'now', section: getTimelineSection(nowMinutes) }
+  const nowItem = { key: 'now', timeMins: nowMinutes, label: '', detail: '', type: 'now', section: getTimelineSection(nowMinutes) }
   const insertAt = items.findIndex(item => item.timeMins > nowMinutes)
   if (insertAt === -1) items.push(nowItem)
   else items.splice(insertAt, 0, nowItem)
@@ -207,15 +206,20 @@ function getItemTimeLabel(item) {
   return item.timeMins % 60 === 0 ? '' : formatPlannerTime(item.timeMins)
 }
 
+function getPhaseTone(sectionKey) {
+  if (sectionKey === 'morning') return 'color-mix(in srgb, var(--color-accent-light) 58%, var(--color-faint))'
+  if (sectionKey === 'work') return 'color-mix(in srgb, var(--color-accent) 52%, var(--color-faint))'
+  return 'color-mix(in srgb, var(--color-muted) 72%, var(--color-faint))'
+}
+
 function Timeline({
   items,
   density,
-  collapsedSections,
   expandedTask,
-  onToggleSection,
   onToggleTask,
   onToggleTaskDone,
   onTaskTimeSelect,
+  onMealSelect,
 }) {
   function dotColor(item) {
     if (item.type === 'now')     return 'var(--color-accent)'
@@ -230,100 +234,12 @@ function Timeline({
     <div style={tl.card}>
       {TIMELINE_SECTIONS.map(section => {
         const sectionItems = items.filter(item => item.section === section.key)
-        const collapsed = collapsedSections.includes(section.key)
-        const active = sectionItems.some(item => item.type === 'now')
+        const phaseTone = getPhaseTone(section.key)
 
         return (
           <div key={section.key} style={tl.section}>
-            <button
-              style={tl.zoneRow}
-              onClick={() => onToggleSection(section.key)}
-              aria-expanded={!collapsed}
-            >
-              <span style={tl.time}>{formatPlannerTime(section.start)}</span>
-              <div style={tl.dotCol}>
-                <div style={tl.hourLine} />
-              </div>
-              <span style={tl.zoneLabel}>
-                {section.label} · {section.range}
-                {active && <span style={tl.zoneActive}> · right now</span>}
-              </span>
-            </button>
-
-            {!collapsed && (
-              <div style={tl.list}>
-                {getSectionHourMarks(section, sectionItems).map(hour => {
-                  if (hour === section.start) {
-                    const startItems = sectionItems.filter(item => item.timeMins >= hour && item.timeMins < hour + 60)
-
-                    return (
-                      <div key={hour} style={tl.hourGroup}>
-                        {startItems.map(item => {
-                          const idx = sectionItems.findIndex(sectionItem => sectionItem.key === item.key)
-
-                          if (item.type === 'task' && item.task) {
-                            return (
-                              <div
-                                key={item.key}
-                                style={{ ...tl.row, ...(item.overlaps ? tl.overlapRow : {}) }}
-                                data-time-mins={item.timeMins}
-                                data-timeline-type={item.type}
-                              >
-                                <span style={tl.time}>{getItemTimeLabel(item)}</span>
-                                <div style={tl.dotCol}>
-                                  <div style={{ ...tl.dot, background: dotColor(item) }} />
-                                  {idx < sectionItems.length - 1 && <div style={tl.line} />}
-                                </div>
-                                <div style={tl.interactiveItem}>
-                                  <TaskRow
-                                    task={item.task}
-                                    expanded={expandedTask === item.task.id}
-                                    onToggleExpand={() => onToggleTask(item.task.id)}
-                                    onToggleDone={() => onToggleTaskDone(item.task.id)}
-                                    onTimeSelect={time => onTaskTimeSelect(item.task.id, time)}
-                                  />
-                                  {item.overlaps && <span style={tl.inlinePip}>overlaps</span>}
-                                </div>
-                              </div>
-                            )
-                          }
-
-                          return (
-                            <div
-                              key={item.key}
-                              style={{ ...tl.row, ...(item.overlaps ? tl.overlapRow : {}) }}
-                              data-time-mins={item.timeMins}
-                              data-timeline-type={item.type}
-                            >
-                              <span style={tl.time}>{getItemTimeLabel(item)}</span>
-                              <div style={tl.dotCol}>
-                                <div style={{ ...tl.dot, background: dotColor(item), boxShadow: item.type === 'now' ? `0 0 0 4px var(--color-accent-bg)` : 'none' }} />
-                                {idx < sectionItems.length - 1 && <div style={tl.line} />}
-                              </div>
-                              <div style={tl.labelWrap}>
-                                <span style={{
-                                  ...tl.label,
-                                  color:          item.type === 'now' ? 'var(--color-accent)' : item.done ? 'var(--color-success)' : 'var(--color-text)',
-                                  fontWeight:     item.type === 'now' ? 700 : 500,
-                                  textDecoration: item.done && item.type !== 'now' ? 'line-through' : 'none',
-                                  opacity:        item.done ? 0.62 : item.planned ? 0.84 : 1,
-                                }}>
-                                  {getPlannerLabel(item)}
-                                </span>
-                                {density !== 'minimal' && item.detail && <span style={tl.detail}>{getPlannerDetail(item)}</span>}
-                                <span style={tl.pips}>
-                                  {item.overlaps && <span style={tl.softPip}>overlaps</span>}
-                                  {item.planned && <span style={tl.softPip}>planned</span>}
-                                  {item.type === 'now' && <span style={tl.nowPip}>current</span>}
-                                </span>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )
-                  }
-
+            <div style={tl.list}>
+              {getSectionHourMarks(section, sectionItems).map(hour => {
                   const hourItems = sectionItems.filter(item => item.timeMins >= hour && item.timeMins < hour + 60)
 
                   return (
@@ -331,7 +247,7 @@ function Timeline({
                       <div style={tl.hourRow} data-hour-mins={hour}>
                         <span style={tl.time}>{formatPlannerTime(hour)}</span>
                         <div style={tl.dotCol}>
-                          <div style={tl.hourLine} />
+                          <div style={{ ...tl.hourLine, background: phaseTone }} />
                         </div>
                         <div style={tl.hourFill} />
                       </div>
@@ -350,7 +266,7 @@ function Timeline({
                               <span style={tl.time}>{getItemTimeLabel(item)}</span>
                               <div style={tl.dotCol}>
                                 <div style={{ ...tl.dot, background: dotColor(item) }} />
-                                {idx < sectionItems.length - 1 && <div style={tl.line} />}
+                                {idx < sectionItems.length - 1 && <div style={{ ...tl.line, background: phaseTone }} />}
                               </div>
                               <div style={tl.interactiveItem}>
                                 <TaskRow
@@ -366,18 +282,31 @@ function Timeline({
                           )
                         }
 
-                        return (
-                          <div
-                            key={item.key}
-                            style={{ ...tl.row, ...(item.overlaps ? tl.overlapRow : {}) }}
-                            data-time-mins={item.timeMins}
-                            data-timeline-type={item.type}
-                          >
-                            <span style={tl.time}>{getItemTimeLabel(item)}</span>
+                        if (item.type === 'now') {
+                          return (
+                            <div
+                              key={item.key}
+                              style={tl.nowRow}
+                              data-time-mins={item.timeMins}
+                              data-timeline-type={item.type}
+                              aria-label="current time"
+                            >
+                              <span style={tl.time} />
+                              <div style={tl.dotCol}>
+                                <div style={{ ...tl.dot, ...tl.nowDot }} />
+                                {idx < sectionItems.length - 1 && <div style={{ ...tl.line, background: phaseTone }} />}
+                              </div>
+                              <div style={tl.nowMarker} />
+                            </div>
+                          )
+                        }
 
+                        const content = (
+                          <>
+                            <span style={tl.time}>{getItemTimeLabel(item)}</span>
                             <div style={tl.dotCol}>
                               <div style={{ ...tl.dot, background: dotColor(item), boxShadow: item.type === 'now' ? `0 0 0 4px var(--color-accent-bg)` : 'none' }} />
-                              {idx < sectionItems.length - 1 && <div style={tl.line} />}
+                              {idx < sectionItems.length - 1 && <div style={{ ...tl.line, background: phaseTone }} />}
                             </div>
 
                             <div style={tl.labelWrap}>
@@ -385,7 +314,7 @@ function Timeline({
                                 ...tl.label,
                                 color:          item.type === 'now' ? 'var(--color-accent)' : item.done ? 'var(--color-success)' : 'var(--color-text)',
                                 fontWeight:     item.type === 'now' ? 700 : 500,
-                                textDecoration: item.done && item.type !== 'now' ? 'line-through' : 'none',
+                                textDecoration: item.done && item.type !== 'now' && item.type !== 'meal' ? 'line-through' : 'none',
                                 opacity:        item.done ? 0.62 : item.planned ? 0.84 : 1,
                               }}>
                                 {getPlannerLabel(item)}
@@ -394,17 +323,42 @@ function Timeline({
                               <span style={tl.pips}>
                                 {item.overlaps && <span style={tl.softPip}>overlaps</span>}
                                 {item.planned && <span style={tl.softPip}>planned</span>}
-                                {item.type === 'now' && <span style={tl.nowPip}>current</span>}
+                                {item.guidance && <span style={tl.softPip}>guidance</span>}
                               </span>
                             </div>
+                          </>
+                        )
+
+                        if (item.type === 'meal') {
+                          return (
+                            <button
+                              key={item.key}
+                              style={{ ...tl.row, ...tl.mealRow, ...(item.overlaps ? tl.overlapRow : {}) }}
+                              data-time-mins={item.timeMins}
+                              data-timeline-type={item.type}
+                              onClick={() => onMealSelect(item.mealSlot)}
+                              aria-label={`${item.done ? 'unlog' : 'log'} ${getPlannerLabel(item)}`}
+                            >
+                              {content}
+                            </button>
+                          )
+                        }
+
+                        return (
+                          <div
+                            key={item.key}
+                            style={{ ...tl.row, ...(item.overlaps ? tl.overlapRow : {}) }}
+                            data-time-mins={item.timeMins}
+                            data-timeline-type={item.type}
+                          >
+                            {content}
                           </div>
                         )
                       })}
                     </div>
                   )
-                })}
-              </div>
-            )}
+              })}
+            </div>
           </div>
         )
       })}
@@ -415,24 +369,16 @@ function Timeline({
 const tl = {
   card:    { background: 'transparent', border: 'none', borderRadius: 0, padding: 0 },
   section: { padding: '0 0 2px', position: 'relative' },
-  zoneRow: {
-    width:          '100%',
-    minHeight:      '28px',
-    display:        'flex',
-    alignItems:     'center',
-    gap:            '10px',
-    padding:        0,
-    color:          'var(--color-text)',
-    textAlign:      'left',
-  },
-  zoneLabel: { flex: 1, paddingTop: '1px', fontSize: '10px', fontWeight: 700, color: 'var(--color-muted)', letterSpacing: '0.08em' },
-  zoneActive: { color: 'var(--color-accent-light)' },
   list:    { display: 'flex', flexDirection: 'column' },
   hourGroup: { display: 'flex', flexDirection: 'column' },
   hourRow: { display: 'flex', alignItems: 'stretch', gap: '10px', minHeight: '28px', position: 'relative' },
-  hourFill: { flex: 1, borderTop: '0.5px solid color-mix(in srgb, var(--color-border) 28%, transparent)', marginTop: '8px' },
+  hourFill: { flex: 1, borderTop: '0.5px solid color-mix(in srgb, var(--color-border) 28%, transparent)', marginTop: '8px', minWidth: 0 },
   hourLine: { width: '1px', flex: 1, minHeight: '28px', background: 'color-mix(in srgb, var(--color-faint) 42%, transparent)' },
   row:     { display: 'flex', alignItems: 'flex-start', gap: '10px', minHeight: '26px', position: 'relative' },
+  nowRow:  { display: 'flex', alignItems: 'center', gap: '10px', minHeight: '14px', position: 'relative' },
+  nowDot:  { width: '8px', height: '8px', marginTop: 0, background: 'var(--color-accent)', boxShadow: '0 0 0 4px var(--color-accent-bg)' },
+  nowMarker: { flex: 1, height: '1px', background: 'color-mix(in srgb, var(--color-accent) 62%, transparent)' },
+  mealRow: { width: '100%', textAlign: 'left', background: 'transparent', border: 'none', padding: 0, color: 'inherit', cursor: 'pointer' },
   overlapRow: { paddingLeft: '6px', borderLeft: '1px solid var(--color-accent-bg)' },
   time:    { fontSize: '10px', color: 'var(--color-muted)', width: '48px', flexShrink: 0, paddingTop: '1px', textAlign: 'right' },
   dotCol:  { display: 'flex', flexDirection: 'column', alignItems: 'center', width: '10px', flexShrink: 0 },
@@ -443,14 +389,6 @@ const tl = {
   label:   { fontSize: '13px', paddingTop: '0', flex: 1, lineHeight: 1.3 },
   detail:  { fontSize: '10px', color: 'var(--color-muted)', lineHeight: 1.3 },
   pips:    { display: 'flex', gap: '5px', flexWrap: 'wrap' },
-  nowPip:  {
-    padding:       '1px 6px',
-    borderRadius:  'var(--radius-pill)',
-    background:    'var(--color-accent-bg)',
-    color:         'var(--color-accent-light)',
-    fontSize:      '10px',
-    fontWeight:    600,
-  },
   softPip: {
     padding:       '1px 6px',
     borderRadius:  'var(--radius-pill)',
@@ -550,10 +488,24 @@ const tr = {
   pill:       { flexShrink: 0, padding: '10px 12px', borderRadius: 'var(--radius-sm)', fontSize: '12px', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'background 0.15s, color 0.15s, border-color 0.15s', border: 'var(--border)', background: 'var(--color-card)' },
 }
 
-// ─── Fuel slot ────────────────────────────────────────────────────────────────
+// ─── Header ───────────────────────────────────────────────────────────────────
 
-function TodayHeader({ now, name, onOpenSettings, onOpenInbox, supportButtons, onJournal, onFitness, onReset }) {
+function TodayHeader({
+  now,
+  name,
+  onOpenSettings,
+  onOpenInbox,
+  onOpenJournal,
+  onOpenNutrition,
+  onOpenPlan,
+  plannerStatus,
+}) {
   const dateParts = formatHeaderDate(now)
+  const plannerTabs = [
+    { key: 'journal', label: 'Journal', symbol: plannerStatus.journalSymbol, onClick: onOpenJournal },
+    { key: 'nutrition', label: 'Nutrition', symbol: plannerStatus.nutritionSymbol, onClick: onOpenNutrition },
+    { key: 'plan', label: 'Plan', symbol: plannerStatus.planSymbol, onClick: onOpenPlan },
+  ]
 
   return (
     <header style={th.wrap}>
@@ -567,167 +519,31 @@ function TodayHeader({ now, name, onOpenSettings, onOpenInbox, supportButtons, o
           <button style={th.iconBtn} onClick={onOpenSettings} aria-label="Settings"><SettingsIcon /></button>
         </div>
       </div>
-      <div style={th.toolsHeader}>
-        <span style={th.toolsLabel}>QUICK TOOLS</span>
-      </div>
-      <SupportButtonRow
-        buttons={supportButtons}
-        onJournal={onJournal}
-        onFitness={onFitness}
-        onReset={onReset}
-      />
-    </header>
-  )
-}
-
-function MorningCheckInCard({ complete, energy, onStart }) {
-  if (complete) return null
-
-  return (
-    <section style={mc.wrap}>
-      <div style={mc.copy}>
-        <span style={mc.kicker}>First gentle step</span>
-        <h2 style={mc.title}>MORNING CHECK-IN</h2>
-        <p style={mc.detail}>mood, energy, mode, and one intention before the day starts moving.</p>
-      </div>
-      <button style={mc.button} onClick={onStart}>
-        {energy ? 'continue' : 'check in'}
-      </button>
-    </section>
-  )
-}
-
-function getCurrentFocus({ dayState, timelineItems, currentMins, canStartWorkout }) {
-  const workoutItem = timelineItems.find(item => item.type === 'workout' && !item.done)
-  const currentBlock = timelineItems.find(item =>
-    item.type !== 'now' &&
-    !item.done &&
-    item.timeMins <= currentMins &&
-    currentMins - item.timeMins <= 75
-  )
-  const nextBlock = timelineItems.find(item =>
-    item.type !== 'now' &&
-    !item.done &&
-    item.timeMins > currentMins
-  )
-
-  if (!dayState.dayLockedAt) {
-    return {
-      eyebrow: 'CURRENT FOCUS',
-      title: 'check in and set the tone',
-      detail: 'a quick reset helps AIML shape the rest of your day.',
-      action: 'check in',
-      actionType: 'checkin',
-    }
-  }
-
-  if (currentBlock?.type === 'routine') {
-    return {
-      eyebrow: 'CURRENT FOCUS',
-      title: currentBlock.label,
-      detail: getPlannerDetail(currentBlock) || 'move through the next small rhythm.',
-      action: 'continue',
-      actionType: 'timeline',
-    }
-  }
-
-  if (currentBlock?.type === 'workout' || (canStartWorkout && workoutItem && Math.abs(workoutItem.timeMins - currentMins) <= 90)) {
-    return {
-      eyebrow: 'CURRENT FOCUS',
-      title: workoutItem?.label ?? currentBlock.label,
-      detail: 'warmup, main work, cooldown, then log what happened.',
-      action: 'start workout',
-      actionType: 'workout',
-    }
-  }
-
-  // TODO: Include active focus sessions here once FocusTimer exposes running
-  // session state outside of its screen-local component state.
-
-  if (currentBlock) {
-    return {
-      eyebrow: 'CURRENT FOCUS',
-      title: currentBlock.label,
-      detail: getPlannerDetail(currentBlock) || 'stay with this block for now.',
-      action: 'pick back up',
-      actionType: 'timeline',
-    }
-  }
-
-  if (nextBlock) {
-    return {
-      eyebrow: 'CURRENT FOCUS',
-      title: nextBlock.label,
-      detail: `${formatPlannerTime(nextBlock.timeMins)} · ${getPlannerDetail(nextBlock) || 'coming up in your day flow'}`,
-      action: 'view flow',
-      actionType: 'timeline',
-    }
-  }
-
-  return {
-    eyebrow: 'CURRENT FOCUS',
-    title: 'today can still reflow',
-    detail: 'nothing urgent is asking for attention. capture, reset, or continue gently.',
-    action: 'reflow day',
-    actionType: 'reset',
-  }
-}
-
-function CurrentFocus({ focus, onAction }) {
-  function handleKeyDown(event) {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault()
-      onAction(focus.actionType)
-    }
-  }
-
-  return (
-    <section
-      style={cf.wrap}
-      role="button"
-      tabIndex={0}
-      onClick={() => onAction(focus.actionType)}
-      onKeyDown={handleKeyDown}
-    >
-      <span style={cf.marker} />
-      <div style={cf.copy}>
-        <span style={cf.eyebrow}>{focus.eyebrow}</span>
-        <span style={cf.title}>{focus.title}</span>
-        <p style={cf.detail}>{focus.detail}</p>
-      </div>
-      <span style={cf.action}>{focus.action} →</span>
-    </section>
-  )
-}
-
-function getSupportButtons() {
-  const buttons = ['journal', 'fitness', 'reset']
-  return buttons.map(key => SUPPORT_BUTTONS.find(button => button.key === key)).filter(Boolean)
-}
-
-function SupportButtonRow({ buttons, onJournal, onFitness, onReset }) {
-  const handlers = {
-    journal: onJournal,
-    fitness: onFitness,
-    reset:   onReset,
-  }
-
-  return (
-    <div style={sb.row}>
-      {buttons.map(button => {
-        return (
-          <button
-            key={button.key}
-            style={sb.button}
-            onClick={handlers[button.key]}
-            aria-label={button.label}
-          >
-            <span style={sb.icon}>{button.icon}</span>
-            <span style={sb.label}>{button.label}</span>
+      <div style={th.tabRow}>
+        {plannerTabs.map(tab => (
+          <button key={tab.key} style={th.plannerTab} onClick={tab.onClick}>
+            <span style={th.tabSymbol}>{tab.symbol}</span>
+            <span>{tab.label}</span>
           </button>
-        )
-      })}
-    </div>
+        ))}
+      </div>
+      <div style={th.summaryGrid}>
+        <div style={th.summaryLeft}>
+          <span style={th.tallyLabel}>Tasks</span>
+          <span style={th.marks}>{plannerStatus.taskMarks || '·'}</span>
+        </div>
+        <button style={th.checkStatus} onClick={plannerStatus.onMorningClick}>
+          Morning {plannerStatus.morningComplete ? '✓' : '○'}
+        </button>
+        <div style={th.summaryLeft}>
+          <span style={th.tallyLabel}>Events</span>
+          <span style={th.marks}>{plannerStatus.eventMarks || '·'}</span>
+        </div>
+        <button style={th.checkStatus} onClick={plannerStatus.onEveningClick}>
+          Evening {plannerStatus.eveningComplete ? '✓' : '○'}
+        </button>
+      </div>
+    </header>
   )
 }
 
@@ -738,11 +554,36 @@ const th = {
     flexDirection: 'column',
     gap:           '10px',
   },
+  tabRow: {
+    display:        'flex',
+    alignItems:     'center',
+    justifyContent: 'flex-start',
+    gap:            '10px',
+    minHeight:      '20px',
+  },
+  plannerTab: {
+    display:        'inline-flex',
+    alignItems:     'center',
+    gap:            '5px',
+    border:         'none',
+    background:     'transparent',
+    color:          'var(--color-muted)',
+    fontSize:       '12px',
+    fontWeight:     600,
+    padding:        '2px 0',
+    lineHeight:     1,
+  },
+  tabSymbol: {
+    color:      'var(--color-text)',
+    fontSize:   '13px',
+    lineHeight: 1,
+  },
   topRow: {
     display:        'flex',
     justifyContent: 'space-between',
     alignItems:     'flex-start',
     gap:            '14px',
+    marginBottom:   '2px',
   },
   greeting: {
     margin:    0,
@@ -753,11 +594,11 @@ const th = {
     letterSpacing: '0.08em',
   },
   title: {
-    margin:      '2px 0 0',
+    margin:      '5px 0 0',
     fontFamily: 'var(--font-body)',
-    fontSize:   '22px',
+    fontSize:   '17px',
     fontWeight: 600,
-    lineHeight: 1.02,
+    lineHeight: 1.1,
     color:      'var(--color-text)',
     whiteSpace: 'nowrap',
   },
@@ -777,157 +618,56 @@ const th = {
     justifyContent: 'center',
     flexShrink:     0,
   },
-  toolsHeader: {
-    display:        'flex',
-    alignItems:     'center',
-    justifyContent: 'space-between',
-    marginTop:      '2px',
+  summaryGrid: {
+    display:             'grid',
+    gridTemplateColumns: 'max-content max-content',
+    width:               'fit-content',
+    maxWidth:            '100%',
+    columnGap:           '34px',
+    rowGap:              '2px',
+    alignItems:          'center',
+    margin:              '0 auto',
   },
-  toolsLabel: {
-    color:         'var(--color-muted)',
-    fontSize:      '10px',
-    fontWeight:    700,
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
+  summaryLeft: {
+    display:             'grid',
+    gridTemplateColumns: '52px minmax(0, 1fr)',
+    alignItems:          'center',
+    gap:                 '8px',
+    minHeight:           '15px',
+    minWidth:            0,
   },
-}
-
-const mc = {
-  wrap: {
-    position:     'sticky',
-    top:          'calc(var(--safe-area-inset-top) + 10px)',
-    zIndex:       1,
-    margin:       '0 0 4px',
-    padding:      '12px 14px',
-    borderRadius: '12px',
-    border:       '0.5px solid color-mix(in srgb, var(--color-accent) 24%, var(--color-border))',
-    background:   'color-mix(in srgb, var(--color-card) 86%, var(--color-bg))',
-    display:      'flex',
-    alignItems:   'center',
-    gap:          '12px',
-  },
-  copy: { flex: 1, minWidth: 0 },
-  kicker: {
-    fontSize:      '10px',
-    fontWeight:    700,
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
-    color:         'var(--color-accent-light)',
-  },
-  title: {
-    margin:      '3px 0 4px',
-    fontFamily: 'var(--font-display)',
-    fontSize:   '16px',
-    fontWeight: 500,
-    lineHeight: 1.1,
-  },
-  detail: {
-    margin:     0,
+  tallyLabel: {
+    color:      'var(--color-text)',
     fontSize:   '12px',
-    lineHeight: 1.45,
+    fontWeight: 600,
+  },
+  marks: {
+    color:         'color-mix(in srgb, var(--color-text) 76%, var(--color-muted))',
+    fontSize:      '13px',
+    fontWeight:    800,
+    letterSpacing: '0.08em',
+  },
+  checkStatus: {
+    border:     'none',
+    background: 'transparent',
     color:      'var(--color-muted)',
-  },
-  button: {
-    padding:      '8px 10px',
-    borderRadius: 'var(--radius-pill)',
-    background:   'var(--color-accent-bg)',
-    color:        'var(--color-accent)',
-    border:       '0.5px solid var(--color-accent)',
-    fontSize:     '12px',
-    fontWeight:   700,
-    flexShrink:   0,
-  },
-}
-
-const cf = {
-  wrap: {
-    margin:        '0',
-    padding:       '3px 0',
-    borderRadius:  0,
-    background:    'transparent',
-    borderTop:     '0.5px solid color-mix(in srgb, var(--color-border) 42%, transparent)',
-    borderBottom:  '0.5px solid color-mix(in srgb, var(--color-border) 36%, transparent)',
-    display:       'flex',
-    alignItems:    'center',
-    gap:           '6px',
-  },
-  marker: {
-    width:        '5px',
-    height:       '5px',
-    borderRadius: '50%',
-    background:   'var(--color-accent)',
-    flexShrink:   0,
-  },
-  copy: { flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: '5px', rowGap: 0, alignItems: 'baseline' },
-  eyebrow: {
-    fontSize:      '7px',
-    fontWeight:    700,
-    letterSpacing: 0,
-    color:         'var(--color-accent-light)',
-  },
-  title: {
-    minWidth:     0,
-    fontSize:     '11px',
-    fontWeight:   700,
-    lineHeight:   1.25,
-    color:        'var(--color-text)',
-    overflow:     'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace:   'nowrap',
-  },
-  detail: {
-    gridColumn: '1 / -1',
-    margin:     0,
-    fontSize:   '9px',
-    lineHeight: 1.15,
-    color:      'var(--color-muted)',
-    overflow:   'hidden',
-    textOverflow: 'ellipsis',
+    padding:    0,
+    fontSize:   '12px',
+    fontWeight: 600,
+    lineHeight: 1.25,
+    textAlign:  'right',
     whiteSpace: 'nowrap',
   },
-  action: {
-    color:      'var(--color-accent)',
-    fontSize:   '9px',
-    fontWeight: 700,
-    flexShrink: 0,
-    whiteSpace: 'nowrap',
-  },
-}
-
-const sb = {
-  row: {
-    display:    'flex',
-    alignItems: 'center',
-    gap:        '14px',
-    margin:     '2px 0 0',
-    overflowX:  'auto',
-  },
-  button: {
-    minWidth:      '42px',
-    minHeight:     '38px',
-    borderRadius:  0,
-    background:    'transparent',
-    border:        'none',
-    color:         'var(--color-text)',
-    display:       'flex',
-    flexDirection: 'column',
-    alignItems:    'center',
-    justifyContent:'center',
-    gap:           '3px',
-    padding:       '2px 0',
-    flexShrink:    0,
-  },
-  icon: { color: 'var(--color-accent)', fontSize: '14px', lineHeight: 1 },
-  label: { fontSize: '10px', fontWeight: 700, color: 'var(--color-muted)' },
 }
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-export default function Home({ onNavigate, onStartWorkout }) {
+export default function Home({ onNavigate }) {
   const { userState }                                  = useUser()
   const { settingsState }                              = useSettings()
   const { dayState, dayDispatch, updateTaskTime }       = useDay()
-  const { fitnessState }                                = useFitness()
+  const { inboxState }                                 = useInbox()
+  const { planningState }                              = usePlanning()
 
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
@@ -938,19 +678,6 @@ export default function Home({ onNavigate, onStartWorkout }) {
   const currentMins = toMins(now)
 
   const [expandedTask, setExpandedTask] = useState(null)
-  const [collapsedTimelineSections, setCollapsedTimelineSections] = useState([])
-
-
-  const enabledModules = useMemo(
-    () => getEnabledModules(settingsState.modules),
-    [settingsState.modules]
-  )
-
-  const weekNumber = getWeekNumber(fitnessState.programStartDate)
-  const todayWorkout = useMemo(
-    () => generateWorkout(getTodayType(), settingsState.gymAccess, weekNumber),
-    [settingsState.gymAccess, weekNumber]
-  )
 
   const timelineItems = useMemo(
     () => buildTimeline(dayState, currentMins, { includePlannedWorkout: true }),
@@ -960,16 +687,28 @@ export default function Home({ onNavigate, onStartWorkout }) {
   const homeDensity = DENSITY_OPTIONS.includes(settingsState.homeDensity)
     ? settingsState.homeDensity
     : 'balanced'
-  const supportButtons = useMemo(
-    () => getSupportButtons(),
-    []
-  )
+  const plannerStatus = useMemo(() => {
+    const today = getTodayISO()
+    const tasks = dayState.tasks ?? []
+    const completedTasks = tasks.filter(task => task.done).length
+    const meals = Object.values(dayState.meals ?? {})
+    const completedMeals = meals.filter(meal => meal.eaten).length
+    const eventsToday = (inboxState.calendarItems ?? []).filter(item => item.date === today).length
+    const reflectedToday = (planningState.reflectionLog ?? []).some(entry => entry.date === today) ||
+      localStorage.getItem('lastReflectionDate') === today
 
-  const canStartWorkout = enabledModules.fitness && todayWorkout.type !== 'rest' && !fitnessState.todayComplete
-  const currentFocus = useMemo(
-    () => getCurrentFocus({ dayState, timelineItems, currentMins, canStartWorkout }),
-    [dayState, timelineItems, currentMins, canStartWorkout]
-  )
+    return {
+      journalSymbol: reflectedToday ? '☑' : '○',
+      nutritionSymbol: getStatusSymbol(completedMeals, meals.length),
+      planSymbol: '○',
+      taskMarks: buildTaskMarks(completedTasks, tasks.length),
+      eventMarks: buildEventMarks(eventsToday),
+      morningComplete: !!dayState.dayLockedAt,
+      eveningComplete: reflectedToday,
+      onMorningClick: () => onNavigate(SCREENS.IGNITION),
+      onEveningClick: () => onNavigate(SCREENS.EOD),
+    }
+  }, [dayState, inboxState.calendarItems, onNavigate, planningState.reflectionLog])
 
   function handleToggleExpand(taskId) {
     setExpandedTask(prev => prev === taskId ? null : taskId)
@@ -984,61 +723,23 @@ export default function Home({ onNavigate, onStartWorkout }) {
     setExpandedTask(null)
   }
 
-  function handleStartTodayWorkout() {
-    if (todayWorkout.type === 'rest' || fitnessState.todayComplete) return
-    onStartWorkout && onStartWorkout(todayWorkout)
-  }
-
-  function handleToggleTimelineSection(id) {
-    setCollapsedTimelineSections(prev =>
-      prev.includes(id) ? prev.filter(section => section !== id) : [...prev, id]
-    )
-  }
-
-  function handleResetFlow() {
-    setCollapsedTimelineSections([])
-  }
-
-  function handleCurrentFocusAction(actionType) {
-    if (actionType === 'checkin') {
-      onNavigate(SCREENS.IGNITION)
-      return
-    }
-    if (actionType === 'workout') {
-      handleStartTodayWorkout()
-      return
-    }
-    if (actionType === 'reset') {
-      handleResetFlow()
-      return
-    }
-    handleResetFlow()
+  function handleMealSelect(slot) {
+    dayDispatch({ type: 'MARK_MEAL_EATEN', payload: slot })
   }
 
 
   return (
     <div style={s.screen}>
       <main style={s.primaryLayer}>
-        <MorningCheckInCard
-          complete={!!dayState.dayLockedAt}
-          energy={dayState.energyLevel}
-          onStart={() => onNavigate(SCREENS.IGNITION)}
-        />
-
         <TodayHeader
           now={now}
           name={userState.name}
           onOpenSettings={() => onNavigate(SCREENS.SETTINGS)}
           onOpenInbox={() => onNavigate(SCREENS.INBOX)}
-          supportButtons={supportButtons}
-          onJournal={() => onNavigate(SCREENS.EOD)}
-          onFitness={() => onNavigate(SCREENS.FITNESS)}
-          onReset={handleResetFlow}
-        />
-
-        <CurrentFocus
-          focus={currentFocus}
-          onAction={handleCurrentFocusAction}
+          onOpenJournal={() => onNavigate(SCREENS.EOD)}
+          onOpenNutrition={() => onNavigate(SCREENS.MORE)}
+          onOpenPlan={() => onNavigate(SCREENS.PLAN)}
+          plannerStatus={plannerStatus}
         />
 
         <section style={s.timelineShell}>
@@ -1050,12 +751,11 @@ export default function Home({ onNavigate, onStartWorkout }) {
           <Timeline
             items={timelineItems}
             density={homeDensity}
-            collapsedSections={collapsedTimelineSections}
             expandedTask={expandedTask}
-            onToggleSection={handleToggleTimelineSection}
             onToggleTask={handleToggleExpand}
             onToggleTaskDone={handleToggleDone}
             onTaskTimeSelect={handleTimeSelect}
+            onMealSelect={handleMealSelect}
           />
         </section>
       </main>

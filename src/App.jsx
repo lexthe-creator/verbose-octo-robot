@@ -90,9 +90,7 @@ export default function App() {
         )}
         {screen === SCREENS.HOME && (
           <Home
-            onOpenFocus={() => navigate(SCREENS.FOCUS)}
             onNavigate={navigate}
-            onStartWorkout={handleStartWorkout}
           />
         )}
         {screen === SCREENS.FITNESS && (
@@ -114,6 +112,30 @@ export default function App() {
         {screen === SCREENS.FOCUS && (
           <FocusTimer onClose={goBack} />
         )}
+        {screen === SCREENS.PLAN && (
+          <PlannerPlaceholder
+            title="Plan"
+            eyebrow="DAILY GUIDANCE"
+            detail="A lightweight planning workspace for focus, priorities, available time, and suggested next steps."
+          />
+        )}
+        {screen === SCREENS.CALENDAR && (
+          <PlannerPlaceholder
+            title="Calendar"
+            eyebrow="PLANNER"
+            detail="Calendar events will sit here once calendar sync is connected."
+          />
+        )}
+        {screen === SCREENS.TASKS && (
+          <PlannerPlaceholder
+            title="Tasks"
+            eyebrow="DAILY LIST"
+            detail="Tasks stay available in Daily Flow while the dedicated task view comes together."
+          />
+        )}
+        {screen === SCREENS.MORE && (
+          <MoreScreen onNavigate={navigate} />
+        )}
         {screen === SCREENS.INBOX    && <Inbox />}
         {screen === SCREENS.FINANCE  && <Finance />}
       </div>
@@ -121,7 +143,8 @@ export default function App() {
       {showNav && (
         <nav style={styles.nav}>
           {navTabs.map(tab => {
-            const active = screen === tab.screen
+            const active = screen === tab.screen ||
+              (tab.screen === SCREENS.MORE && [SCREENS.PROJECTS, SCREENS.FINANCE].includes(screen))
             return (
               <button
                 key={tab.screen}
@@ -170,6 +193,48 @@ export default function App() {
         />
       )}
     </div>
+  )
+}
+
+function PlannerPlaceholder({ eyebrow, title, detail }) {
+  return (
+    <main style={styles.placeholder}>
+      <p style={styles.placeholderEyebrow}>{eyebrow}</p>
+      <h1 style={styles.placeholderTitle}>{title}</h1>
+      <p style={styles.placeholderDetail}>{detail}</p>
+    </main>
+  )
+}
+
+function MoreScreen({ onNavigate }) {
+  const items = [
+    { label: 'Nutrition', detail: 'Light logging placeholder' },
+    { label: 'Projects', detail: 'Open project planning', screen: SCREENS.PROJECTS },
+    { label: 'Finance', detail: 'Open spending snapshot', screen: SCREENS.FINANCE },
+    { label: 'Insights', detail: 'Coming later' },
+  ]
+
+  return (
+    <main style={styles.more}>
+      <p style={styles.placeholderEyebrow}>MORE</p>
+      <h1 style={styles.placeholderTitle}>Life systems</h1>
+      <div style={styles.moreList}>
+        {items.map(item => {
+          const enabled = !!item.screen
+          return (
+            <button
+              key={item.label}
+              style={{ ...styles.moreRow, opacity: enabled ? 1 : 0.54 }}
+              onClick={() => enabled && onNavigate(item.screen)}
+              disabled={!enabled}
+            >
+              <span style={styles.moreLabel}>{item.label}</span>
+              <span style={styles.moreDetail}>{item.detail}</span>
+            </button>
+          )
+        })}
+      </div>
+    </main>
   )
 }
 
@@ -235,5 +300,61 @@ const styles = {
     height:       '4px',
     borderRadius: '50%',
     background:   'var(--color-accent)',
+  },
+  placeholder: {
+    minHeight:      '100dvh',
+    padding:        'max(env(safe-area-inset-top), 24px) 20px calc(var(--safe-bottom) + var(--nav-height) + 24px)',
+    background:     'var(--color-bg)',
+  },
+  placeholderEyebrow: {
+    margin:        0,
+    color:         'var(--color-muted)',
+    fontSize:      '10px',
+    fontWeight:    700,
+    letterSpacing: '0.1em',
+  },
+  placeholderTitle: {
+    margin:      '6px 0 10px',
+    fontFamily: 'var(--font-display)',
+    fontSize:   '32px',
+    fontWeight: 500,
+    lineHeight: 1.05,
+  },
+  placeholderDetail: {
+    margin:    0,
+    color:     'var(--color-muted)',
+    fontSize:  '14px',
+    lineHeight: 1.45,
+  },
+  more: {
+    minHeight:      '100dvh',
+    padding:        'max(env(safe-area-inset-top), 24px) 20px calc(var(--safe-bottom) + var(--nav-height) + 24px)',
+    background:     'var(--color-bg)',
+  },
+  moreList: {
+    display:       'flex',
+    flexDirection: 'column',
+    gap:           '8px',
+    marginTop:     '18px',
+  },
+  moreRow: {
+    width:          '100%',
+    padding:        '14px 0',
+    border:         'none',
+    borderBottom:   'var(--border)',
+    background:     'transparent',
+    color:          'var(--color-text)',
+    textAlign:      'left',
+    display:        'flex',
+    flexDirection:  'column',
+    gap:            '4px',
+  },
+  moreLabel: {
+    fontSize:   '15px',
+    fontWeight: 600,
+  },
+  moreDetail: {
+    color:     'var(--color-muted)',
+    fontSize:  '12px',
   },
 }

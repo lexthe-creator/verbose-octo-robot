@@ -2,7 +2,11 @@ import { SCREENS } from '../constants/navigation'
 
 const ROUTES = new Map([
   [SCREENS.HOME,          { showNav: true,  isOverlay: false }],
+  [SCREENS.PLAN,          { showNav: true,  isOverlay: false }],
+  [SCREENS.CALENDAR,      { showNav: true,  isOverlay: false }],
+  [SCREENS.TASKS,         { showNav: true,  isOverlay: false }],
   [SCREENS.FITNESS,       { showNav: true,  isOverlay: false }],
+  [SCREENS.MORE,          { showNav: true,  isOverlay: false }],
   [SCREENS.INBOX,         { showNav: true,  isOverlay: false }],
   [SCREENS.PROJECTS,      { showNav: true,  isOverlay: false }],
   [SCREENS.FINANCE,       { showNav: true,  isOverlay: false }],
