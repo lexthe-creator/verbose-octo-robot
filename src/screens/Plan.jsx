@@ -3,34 +3,19 @@ import { usePlanning } from '../context/index.js'
 import { getTodayISO } from '../utils/time.js'
 import { SCREENS } from '../constants/navigation.js'
 
-const STATUS_OPTIONS = [
-  { value: 'on_track', label: 'On Track' },
-  { value: 'needs_adjustment', label: 'Needs adjustment' },
-  { value: 'starting_over', label: 'Starting over' },
+const MODE_OPTIONS = [
+  { value: 'refocus', label: 'Refocus', prompt: 'what matters most next?' },
+  { value: 'simplify', label: 'Simplify', prompt: 'what can wait?' },
+  { value: 'continue', label: 'Continue', prompt: 'what is the next step?' },
 ]
 
 export default function Plan({ onNavigate }) {
   const { planningState, planningDispatch } = usePlanning()
   const today = getTodayISO()
-  const existing = planningState.dailyPlans?.[today] ?? {
-    status: null,
-    currentFocus: '',
-    priorities: ['', '', ''],
-    notes: '',
-  }
+  const existing = planningState.dailyPlans?.[today] ?? { mode: null, response: '', updatedAt: null }
 
-  const [status, setStatus] = useState(existing.status)
-  const [currentFocus, setCurrentFocus] = useState(existing.currentFocus || '')
-  const [priorities, setPriorities] = useState(existing.priorities || ['', '', ''])
-  const [notes, setNotes] = useState(existing.notes || '')
-
-  function updatePriority(index, value) {
-    setPriorities(prev => {
-      const next = [...prev]
-      next[index] = value
-      return next
-    })
-  }
+  const [mode, setMode] = useState(existing.mode)
+  const [response, setResponse] = useState(existing.response || '')
 
   function savePlan() {
     planningDispatch({
@@ -38,10 +23,8 @@ export default function Plan({ onNavigate }) {
       payload: {
         date: today,
         plan: {
-          status: status || null,
-          currentFocus: currentFocus.trim(),
-          priorities: priorities.map(p => p.trim()),
-          notes: notes.trim(),
+          mode: mode || null,
+          response: response.trim(),
           updatedAt: new Date().toISOString(),
         },
       },
@@ -49,216 +32,185 @@ export default function Plan({ onNavigate }) {
     onNavigate(SCREENS.HOME)
   }
 
+  const selectedMode = MODE_OPTIONS.find(option => option.value === mode)
+
   return (
     <main style={styles.screen}>
       <div style={styles.headerRow}>
         <button style={styles.backButton} onClick={() => onNavigate(SCREENS.HOME)}>
-          Back
+          ←
         </button>
         <div>
-          <p style={styles.eyebrow}>Plan</p>
-          <h1 style={styles.title}>Re-center for today</h1>
+          <p style={styles.eyebrow}>PLAN</p>
+          <h1 style={styles.title}>your day can still reflow</h1>
         </div>
       </div>
 
-      <p style={styles.subtitle}>
-        Pause, update what matters, and continue with a calmer next step.
-      </p>
-
       <section style={styles.fieldset}>
-        <p style={styles.label}>How is today feeling?</p>
-        <div style={styles.radioGrid}>
-          {STATUS_OPTIONS.map(option => (
-            <button
-              key={option.value}
-              type="button"
-              style={{
-                ...styles.radioOption,
-                ...(status === option.value ? styles.radioOptionActive : {}),
-              }}
-              onClick={() => setStatus(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
+        <p style={styles.question}>what do you need right now?</p>
+        <div style={styles.modeRow}>
+          {MODE_OPTIONS.map(option => {
+            const active = mode === option.value
+            return (
+              <button
+                key={option.value}
+                type="button"
+                style={{
+                  ...styles.modeChip,
+                  ...(active ? styles.modeChipActive : {}),
+                }}
+                onClick={() => setMode(option.value)}
+              >
+                <span style={styles.modeMarker}>{active ? '●' : '○'}</span>
+                <span>{option.label}</span>
+              </button>
+            )
+          })}
         </div>
       </section>
 
-      <section style={styles.fieldset}>
-        <label style={styles.label} htmlFor="plan-current-focus">
-          Current focus
-        </label>
-        <input
-          id="plan-current-focus"
-          style={styles.input}
-          value={currentFocus}
-          onChange={event => setCurrentFocus(event.target.value)}
-          placeholder="What do I want to move forward with next?"
-        />
-      </section>
-
-      <section style={styles.fieldset}>
-        <p style={styles.label}>Top 3 priorities</p>
-        {[0, 1, 2].map(index => (
-          <input
-            key={index}
-            style={styles.input}
-            value={priorities[index] || ''}
-            onChange={event => updatePriority(index, event.target.value)}
-            placeholder={`Priority ${index + 1}`}
+      {selectedMode && (
+        <section style={styles.fieldset}>
+          <p style={styles.prompt}>{selectedMode.prompt}</p>
+          <textarea
+            style={styles.textarea}
+            value={response}
+            onChange={event => setResponse(event.target.value)}
+            placeholder="write it down..."
+            rows={5}
           />
-        ))}
-      </section>
-
-      <section style={styles.fieldset}>
-        <label style={styles.label} htmlFor="plan-notes">
-          Notes
-        </label>
-        <textarea
-          id="plan-notes"
-          style={styles.textarea}
-          value={notes}
-          onChange={event => setNotes(event.target.value)}
-          placeholder="Context, obstacles, reminders, or thoughts"
-          rows={5}
-        />
-      </section>
+        </section>
+      )}
 
       <div style={styles.actions}>
-        <button style={styles.primaryButton} onClick={savePlan}>
-          Save & continue
+        <button style={styles.saveButton} onClick={savePlan}>
+          save & continue
         </button>
-        <button style={styles.secondaryButton} onClick={() => onNavigate(SCREENS.HOME)}>
-          Close
+        <button style={styles.closeButton} onClick={() => onNavigate(SCREENS.HOME)}>
+          close
         </button>
       </div>
-
-      <p style={styles.tip}>
-        Plan is a quick, low-pressure check-in. Empty fields are okay.
-      </p>
     </main>
   )
 }
 
 const styles = {
   screen: {
-    padding: '24px',
+    padding: '22px 22px 28px',
     minHeight: '100%',
     background: 'var(--color-bg)',
     color: 'var(--color-text)',
   },
   headerRow: {
     display: 'flex',
-    alignItems: 'flex-start',
-    gap: '16px',
-    marginBottom: '20px',
+    alignItems: 'center',
+    gap: '12px',
+    marginBottom: '18px',
   },
   backButton: {
-    border: '1px solid var(--color-border)',
+    width: '30px',
+    height: '30px',
+    borderRadius: '50%',
+    border: '0.5px solid color-mix(in srgb, var(--color-border) 62%, transparent)',
     background: 'transparent',
-    color: 'var(--color-text)',
-    borderRadius: '12px',
-    padding: '10px 12px',
-    fontSize: '13px',
+    color: 'var(--color-muted)',
+    fontSize: '16px',
     cursor: 'pointer',
+    display: 'grid',
+    placeItems: 'center',
   },
   eyebrow: {
     margin: 0,
     color: 'var(--color-muted)',
     fontSize: '11px',
-    letterSpacing: '0.18em',
+    letterSpacing: '0.14em',
     textTransform: 'uppercase',
   },
   title: {
     margin: '6px 0 0',
-    fontSize: '28px',
-    lineHeight: 1.15,
-  },
-  subtitle: {
-    margin: '0 0 26px',
-    color: 'var(--color-muted)',
-    maxWidth: '33rem',
-    fontSize: '15px',
-    lineHeight: 1.6,
+    fontSize: '18px',
+    lineHeight: 1.3,
+    fontWeight: 600,
   },
   fieldset: {
     display: 'grid',
-    gap: '10px',
+    gap: '12px',
     marginBottom: '20px',
   },
-  label: {
+  question: {
     margin: 0,
     color: 'var(--color-text)',
-    fontSize: '13px',
-    fontWeight: 700,
-    letterSpacing: '0.04em',
-    textTransform: 'uppercase',
+    fontSize: '14px',
+    fontWeight: 600,
+    letterSpacing: '0.02em',
   },
-  radioGrid: {
-    display: 'grid',
-    gap: '10px',
+  modeRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '12px',
   },
-  radioOption: {
-    border: '1px solid var(--color-border)',
-    borderRadius: '14px',
-    padding: '12px 14px',
+  modeChip: {
+    border: 'none',
     background: 'transparent',
-    color: 'var(--color-text)',
-    textAlign: 'left',
+    color: 'var(--color-muted)',
+    padding: '6px 0',
+    minWidth: '80px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    fontSize: '14px',
     cursor: 'pointer',
+  },
+  modeChipActive: {
+    color: 'var(--color-accent)',
+    fontWeight: 700,
+  },
+  modeMarker: {
+    display: 'inline-flex',
+    width: '18px',
+    justifyContent: 'center',
     fontSize: '14px',
+    lineHeight: 1,
   },
-  radioOptionActive: {
-    background: 'var(--color-card)',
-    borderColor: 'var(--color-accent)',
-  },
-  input: {
-    width: '100%',
-    border: '1px solid var(--color-border)',
-    borderRadius: '14px',
-    padding: '14px 16px',
-    background: 'var(--color-card)',
+  prompt: {
+    margin: 0,
     color: 'var(--color-text)',
-    fontSize: '14px',
+    fontSize: '15px',
+    fontWeight: 700,
   },
   textarea: {
     width: '100%',
-    border: '1px solid var(--color-border)',
-    borderRadius: '14px',
-    padding: '14px 16px',
-    background: 'var(--color-card)',
-    color: 'var(--color-text)',
-    fontSize: '14px',
-    resize: 'vertical',
-  },
-  actions: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
-    marginTop: '10px',
-  },
-  primaryButton: {
     border: 'none',
-    borderRadius: '14px',
-    padding: '14px 16px',
-    background: 'var(--color-accent)',
-    color: 'white',
-    fontSize: '15px',
-    cursor: 'pointer',
-  },
-  secondaryButton: {
-    border: '1px solid var(--color-border)',
-    borderRadius: '14px',
-    padding: '14px 16px',
+    borderBottom: '1px solid var(--color-border)',
     background: 'transparent',
     color: 'var(--color-text)',
     fontSize: '15px',
+    lineHeight: 1.8,
+    padding: '8px 0',
+    resize: 'vertical',
+    minHeight: '120px',
+  },
+  actions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '14px',
+    marginTop: '10px',
+  },
+  saveButton: {
+    border: '1px solid var(--color-accent)',
+    borderRadius: '999px',
+    background: 'transparent',
+    color: 'var(--color-accent)',
+    padding: '10px 16px',
+    fontSize: '14px',
+    fontWeight: 700,
     cursor: 'pointer',
   },
-  tip: {
-    marginTop: '16px',
+  closeButton: {
+    border: 'none',
+    background: 'transparent',
     color: 'var(--color-muted)',
-    fontSize: '13px',
-    lineHeight: 1.5,
+    fontSize: '14px',
+    cursor: 'pointer',
   },
 }

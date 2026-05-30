@@ -51,12 +51,42 @@ const initialPlanningState = {
   dailyPlans:       {},
 }
 
+function normalizeDailyPlanEntry(plan) {
+  if (!plan || typeof plan !== 'object') return { mode: null, response: '', updatedAt: plan?.updatedAt ?? null }
+  if ('mode' in plan || 'response' in plan) {
+    return {
+      mode: plan.mode ?? null,
+      response: plan.response ?? '',
+      updatedAt: plan.updatedAt ?? null,
+    }
+  }
+  const response = plan.currentFocus?.trim() || plan.notes?.trim() || (plan.priorities ?? []).find(item => item?.trim()) || ''
+  return {
+    mode: null,
+    response,
+    updatedAt: plan.updatedAt ?? null,
+  }
+}
+
+function normalizeDailyPlans(plans) {
+  if (!plans || typeof plans !== 'object') return {}
+  return Object.fromEntries(
+    Object.entries(plans).map(([date, plan]) => [date, normalizeDailyPlanEntry(plan)])
+  )
+}
+
 function loadPlanningState() {
   try {
     const raw = localStorage.getItem(PLANNING_STORAGE_KEY)
     if (raw) {
       const stored = JSON.parse(raw)
-      if (stored.version === SCHEMA_VERSION) return { ...initialPlanningState, ...stored.data }
+      if (stored.version === SCHEMA_VERSION) {
+        return {
+          ...initialPlanningState,
+          ...stored.data,
+          dailyPlans: normalizeDailyPlans(stored.data.dailyPlans),
+        }
+      }
       return initialPlanningState
     }
     // One-time migration from legacy aiml_state

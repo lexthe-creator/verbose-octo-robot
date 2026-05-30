@@ -1100,30 +1100,31 @@ Plan is not:
 Plan may eventually synthesize Calendar, Tasks, Fitness, Nutrition, Energy, and Morning Check-In into a daily plan, but that synthesis should remain subordinate to the daily execution experience.
 
 V1 fields:
-- Day Status — single-select prompt: `On Track`, `Needs Adjustment`, `Starting Over`
-- Current Focus — short text input for what to move forward with next
-- Top 3 Priorities — three simple text inputs for planning notes, not task records
-- Notes — lightweight textarea for context, obstacles, reminders, or thoughts
+- Re-centering mode — single-select prompt: `Refocus`, `Simplify`, `Continue`
+- Guided prompt — one question shown after mode selection:
+  - Refocus: "What matters most next?"
+  - Simplify: "What can wait?"
+  - Continue: "What's the next step?"
+- Writing area — single lightweight textarea with placeholder "Write it down..."
 - Save & continue — saves Plan state and returns to Home without forcing completion
+- Close — returns to Home without saving changes
 
 State shape in `PlanningContext`:
 
 ```js
 dailyPlans: {
   [YYYY-MM-DD]: {
-    status: 'on_track' | 'needs_adjustment' | 'starting_over' | null,
-    currentFocus: string,
-    priorities: [string, string, string],
-    notes: string,
+    mode: 'refocus' | 'simplify' | 'continue' | null,
+    response: string,
     updatedAt: ISO8601,
   }
 }
 ```
 
 Home Plan tab status rules:
-- `○` no daily plan content exists for today
-- `◐` some daily plan inputs exist for today
-- `☑` day status + current focus + at least one priority exists for today
+- `○` no mode or response exists for today
+- `◐` mode or response exists for today
+- `☑` mode and response saved for today
 
 Plan V1 must remain:
 - calm
@@ -1133,6 +1134,7 @@ Plan V1 must remain:
 - low-pressure
 
 Avoid:
+- worksheets
 - dashboards
 - analytics
 - AI output
@@ -1142,7 +1144,7 @@ Avoid:
 - required fields
 - completion pressure
 
-Plan is a re-centering workspace, not Tasks, Calendar, or Projects. V1 should avoid the placeholder-only pattern and instead deliver the real lightweight Plan fields described above.
+Plan is a re-centering workspace, not Tasks, Calendar, or Projects. V1 should feel like a lightweight planner page and not a worksheet.
 
 ---
 

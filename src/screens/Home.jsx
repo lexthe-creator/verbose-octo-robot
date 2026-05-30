@@ -698,21 +698,15 @@ export default function Home({ onNavigate }) {
       localStorage.getItem('lastReflectionDate') === today
 
     const todayPlan = planningState.dailyPlans?.[today]
-    const hasPlanContent = todayPlan && (
-      !!todayPlan.status ||
-      !!todayPlan.currentFocus?.trim() ||
-      (todayPlan.priorities ?? []).some(p => p?.trim()) ||
-      !!todayPlan.notes?.trim()
-    )
-    const hasPlanCore = todayPlan &&
-      !!todayPlan.status &&
-      !!todayPlan.currentFocus?.trim() &&
-      (todayPlan.priorities ?? []).some(p => p?.trim())
+    const hasMode = !!todayPlan?.mode
+    const hasResponse = !!todayPlan?.response?.trim()
+    const hasAnyPlan = hasMode || hasResponse
+    const isPlanComplete = hasMode && hasResponse
 
     return {
       journalSymbol: reflectedToday ? '☑' : '○',
       nutritionSymbol: getStatusSymbol(completedMeals, meals.length),
-      planSymbol: !hasPlanContent ? '○' : hasPlanCore ? '☑' : '◐',
+      planSymbol: !hasAnyPlan ? '○' : isPlanComplete ? '☑' : '◐',
       taskMarks: buildTaskMarks(completedTasks, tasks.length),
       eventMarks: buildEventMarks(eventsToday),
       morningComplete: !!dayState.dayLockedAt,
