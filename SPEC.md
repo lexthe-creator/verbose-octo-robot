@@ -304,6 +304,24 @@ Morning, Day Flow, and Evening are contextual markers only.
 
 They are not separate planner sections.
 
+### Timeline Phase Visualization
+
+Daily Flow may visually communicate day progression through three subtle phases without adding large section headers, cards, or extra timeline height.
+
+Phase windows:
+- Morning: 6:00 AM - 12:00 PM
+- Day: 12:00 PM - 5:00 PM
+- Evening: 5:00 PM+
+
+Visual behavior:
+- Morning may use a slightly warmer rail tint or extremely subtle background tone.
+- Day should remain neutral.
+- Evening may use a slightly deeper, more grounded rail tint or background tone.
+- Phase styling must remain restrained and secondary to timeline content.
+- Do not convert phases into large sections, cards, headers, or dashboard blocks.
+- Optional small vertical phase labels may be integrated into the left timeline rail if they remain understated and do not increase timeline height.
+- Timeline items, meal window behavior, task/event calculations, Home header layout, and bottom navigation must remain unchanged.
+
 ## Default Planner Window
 
 Default planner hours:

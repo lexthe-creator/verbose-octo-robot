@@ -207,9 +207,9 @@ function getItemTimeLabel(item) {
 }
 
 function getPhaseTone(sectionKey) {
-  if (sectionKey === 'morning') return 'color-mix(in srgb, var(--color-accent-light) 58%, var(--color-faint))'
-  if (sectionKey === 'work') return 'color-mix(in srgb, var(--color-accent) 52%, var(--color-faint))'
-  return 'color-mix(in srgb, var(--color-muted) 72%, var(--color-faint))'
+  if (sectionKey === 'morning') return 'color-mix(in srgb, #D9A279 54%, var(--color-faint))'
+  if (sectionKey === 'work') return 'color-mix(in srgb, var(--color-muted) 34%, var(--color-faint))'
+  return 'color-mix(in srgb, #77735F 54%, var(--color-faint))'
 }
 
 function Timeline({
@@ -373,7 +373,7 @@ const tl = {
   hourGroup: { display: 'flex', flexDirection: 'column' },
   hourRow: { display: 'flex', alignItems: 'stretch', gap: '10px', minHeight: '28px', position: 'relative' },
   hourFill: { flex: 1, borderTop: '0.5px solid color-mix(in srgb, var(--color-border) 28%, transparent)', marginTop: '8px', minWidth: 0 },
-  hourLine: { width: '1px', flex: 1, minHeight: '28px', background: 'color-mix(in srgb, var(--color-faint) 42%, transparent)' },
+  hourLine: { width: '2px', flex: 1, minHeight: '28px', borderRadius: '2px', background: 'color-mix(in srgb, var(--color-faint) 42%, transparent)' },
   row:     { display: 'flex', alignItems: 'flex-start', gap: '10px', minHeight: '26px', position: 'relative' },
   nowRow:  { display: 'flex', alignItems: 'center', gap: '10px', minHeight: '14px', position: 'relative' },
   nowDot:  { width: '8px', height: '8px', marginTop: 0, background: 'var(--color-accent)', boxShadow: '0 0 0 4px var(--color-accent-bg)' },
@@ -383,7 +383,7 @@ const tl = {
   time:    { fontSize: '10px', color: 'var(--color-muted)', width: '48px', flexShrink: 0, paddingTop: '1px', textAlign: 'right' },
   dotCol:  { display: 'flex', flexDirection: 'column', alignItems: 'center', width: '10px', flexShrink: 0 },
   dot:     { width: '7px', height: '7px', borderRadius: '50%', flexShrink: 0, marginTop: '3px' },
-  line:    { width: '1px', flex: 1, minHeight: '18px', background: 'color-mix(in srgb, var(--color-faint) 52%, transparent)', margin: '3px 0' },
+  line:    { width: '2px', flex: 1, minHeight: '18px', borderRadius: '2px', background: 'color-mix(in srgb, var(--color-faint) 52%, transparent)', margin: '3px 0' },
   labelWrap: { flex: 1, display: 'flex', flexDirection: 'column', gap: '1px', paddingBottom: '5px' },
   interactiveItem: { flex: 1, display: 'flex', flexDirection: 'column', gap: '5px', paddingBottom: '5px' },
   label:   { fontSize: '13px', paddingTop: '0', flex: 1, lineHeight: 1.3 },
