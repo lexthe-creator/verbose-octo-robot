@@ -698,10 +698,10 @@ export default function Home({ onNavigate }) {
       localStorage.getItem('lastReflectionDate') === today
 
     const todayPlan = planningState.dailyPlans?.[today]
-    const hasMode = !!todayPlan?.mode
-    const hasResponse = !!todayPlan?.response?.trim()
-    const hasAnyPlan = hasMode || hasResponse
-    const isPlanComplete = hasMode && hasResponse
+    const hasPlanNotes = !!(todayPlan?.notes || todayPlan?.response)?.trim()
+    const hasReviewed = !!todayPlan?.reviewedAt || !!todayPlan?.updatedAt
+    const hasAnyPlan = hasReviewed || hasPlanNotes
+    const isPlanComplete = hasReviewed
 
     return {
       journalSymbol: reflectedToday ? '☑' : '○',

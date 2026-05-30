@@ -1085,9 +1085,7 @@ V1 data mapping:
 **File:** light route owned by `App.jsx` or future `src/screens/Plan.jsx`
 **Nav:** Not a bottom-nav tab. Opened from the Home planner status bar.
 
-Plan is a lightweight daily planning workspace and future AI guidance surface.
-
-Plan is a re-centering tool. Its purpose is to help the user pause, re-evaluate the day, adjust priorities, and continue forward. It should feel lightweight and recoverable.
+Plan is a daily commitment review surface. It presents the user's tasks, events, projects, and fitness commitments for the current day and allows lightweight review and adjustment before returning to execution.
 
 Plan should be accessible anytime in the day and support quick clarity without requiring a system-wide reorganization.
 
@@ -1096,17 +1094,18 @@ Plan is not:
 - a project manager
 - a calendar
 - a task manager
+- an AI-assisted planning flow
 
 Plan may eventually synthesize Calendar, Tasks, Fitness, Nutrition, Energy, and Morning Check-In into a daily plan, but that synthesis should remain subordinate to the daily execution experience.
 
 V1 fields:
-- Re-centering mode — single-select prompt: `Refocus`, `Simplify`, `Continue`
-- Guided prompt — one question shown after mode selection:
-  - Refocus: "What matters most next?"
-  - Simplify: "What can wait?"
-  - Continue: "What's the next step?"
-- Writing area — single lightweight textarea with placeholder "Write it down..."
-- Save & continue — saves Plan state and returns to Home without forcing completion
+- Today holds — compact typography-based summary of today's tasks, events, project, and fitness commitments using existing data only. Use planner marks, not KPI cards, widgets, charts, or dashboards.
+- Tasks — today's task commitments with lightweight completion and schedule adjustment
+- Events — today's calendar items with lightweight time adjustment
+- Project — focus project and next project action
+- Fitness — today's workout commitment and timing
+- Review note — single lightweight textarea with placeholder "anything to adjust before execution?"
+- Reviewed — saves Plan review state and returns to Home without forcing completion
 - Close — returns to Home without saving changes
 
 State shape in `PlanningContext`:
@@ -1114,17 +1113,17 @@ State shape in `PlanningContext`:
 ```js
 dailyPlans: {
   [YYYY-MM-DD]: {
-    mode: 'refocus' | 'simplify' | 'continue' | null,
-    response: string,
+    notes: string,
+    reviewedAt: ISO8601 | null,
     updatedAt: ISO8601,
   }
 }
 ```
 
 Home Plan tab status rules:
-- `○` no mode or response exists for today
-- `◐` mode or response exists for today
-- `☑` mode and response saved for today
+- `○` no review state or note exists for today
+- `◐` review note exists without a saved review
+- `☑` review saved for today
 
 Plan V1 must remain:
 - calm
@@ -1132,6 +1131,18 @@ Plan V1 must remain:
 - planner-like
 - recoverable
 - low-pressure
+
+Plan V1 visual hierarchy:
+1. Today holds summary
+2. Tasks
+3. Events
+4. Project
+5. Fitness
+6. Review note
+
+The Plan page title should be a deterministic daily affirmation based on the current date. It must stay stable for the whole day, use lowercase sentence-style text, and feel planner-like rather than motivational-app-like. It should be visually quieter than a hero title.
+
+Time adjustment controls in Plan should preserve scheduling functionality while reading as low-weight planner text, for example `planned · 6:30 pm`, `unscheduled`, or `45 min · 6:30 pm`. Avoid prominent editable input boxes in the review surface.
 
 Avoid:
 - worksheets
@@ -1144,7 +1155,7 @@ Avoid:
 - required fields
 - completion pressure
 
-Plan is a re-centering workspace, not Tasks, Calendar, or Projects. V1 should feel like a lightweight planner page and not a worksheet.
+Plan is a commitment review workspace, not Tasks, Calendar, Projects, or Fitness. V1 should feel like a lightweight planner page and not a worksheet.
 
 ---
 

@@ -52,18 +52,20 @@ const initialPlanningState = {
 }
 
 function normalizeDailyPlanEntry(plan) {
-  if (!plan || typeof plan !== 'object') return { mode: null, response: '', updatedAt: plan?.updatedAt ?? null }
+  if (!plan || typeof plan !== 'object') return { notes: '', reviewedAt: null, updatedAt: plan?.updatedAt ?? null }
   if ('mode' in plan || 'response' in plan) {
     return {
       mode: plan.mode ?? null,
       response: plan.response ?? '',
+      notes: plan.notes ?? plan.response ?? '',
+      reviewedAt: plan.reviewedAt ?? null,
       updatedAt: plan.updatedAt ?? null,
     }
   }
   const response = plan.currentFocus?.trim() || plan.notes?.trim() || (plan.priorities ?? []).find(item => item?.trim()) || ''
   return {
-    mode: null,
-    response,
+    notes: response,
+    reviewedAt: plan.reviewedAt ?? null,
     updatedAt: plan.updatedAt ?? null,
   }
 }
