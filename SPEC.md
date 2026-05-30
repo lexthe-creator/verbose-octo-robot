@@ -27,7 +27,7 @@
 ## 1. Project Overview
 
 **Name:** App in My Life
-**Purpose:** Dark-themed personal PWA for ADHD daily execution — morning planning, task tracking, focus timer, capture inbox, and read-only finance snapshot.
+**Purpose:** Theme-switchable personal PWA for ADHD daily execution — morning planning, task tracking, focus timer, capture inbox, and read-only finance snapshot. The product launches in a light default theme with dark mode available.
 **Stack:** Vite + React 19, deployed to GitHub Pages. No external UI libraries — custom components only.
 **Target device:** Mobile-first, 393px wide, iPhone 16 Pro safe areas.
 
@@ -72,6 +72,8 @@ Finalized priorities:
 Product direction:
 - Do not build a complex calorie tracker.
 - Nutrition should remain lightweight, low-friction, and easy to maintain during normal life.
+- Avoid macro obsession, calorie-tracker complexity, and MyFitnessPal-style workflows.
+- Favor meal logging, simple food capture, and low-friction tracking.
 - Recovery, fitness, mood, and scheduling should begin connecting so the product can understand daily capacity and rhythm.
 
 ### Phase 3 — Intelligence + Ecosystem
@@ -183,19 +185,19 @@ Modes may influence:
 
 ### 10. Support layer should be user-configurable
 
-The user should be able to choose three permanent support buttons visible on the dashboard. Examples:
+The user should be able to choose three compact planner actions visible on Home. Examples:
 - Journal
 - Nutrition
-- Focus
+- Plan
 - Quick Add
 - Hydration
 - Routine
 - Mood
 - Workout
 
-### 11. Home is both planner and widget board
+### 11. Home is planner-first, not a widget board
 
-Home should feel like the user's all-in-one life planner. It should show the planner/day flow first, while still supporting a widget board for quick access to life systems. The planner should guide daily execution, while widgets should support context and action.
+Home should feel like the user's all-in-one life planner. It should show the planner/day flow first, while supporting a compact row of planner actions for quick access to journal, nutrition, and plan workflows. The planner should guide daily execution, while these actions support context and adjustment without competing with the timeline.
 
 ### 12. Morning Check-In is the first action
 
@@ -227,7 +229,7 @@ SPEC-first development is mandatory:
 ## Phase 1 Product Behavior Rules
 
 - Home must prioritize daily execution and planner flow.
-- The dashboard should include both the planner/timeline and configurable support widgets.
+- The dashboard should include both the planner/timeline and compact planner action controls.
 - Morning Check-In should be the first recommended action.
 - Timeline density should be customizable.
 - Timeline blocks may overlap.
@@ -395,20 +397,20 @@ This is the planner/timeline. It answers: "What is happening today, and what sho
 
 Required elements:
 - Morning Check-In first, until completed
-- Today header with date, mode, energy
-- Current Focus / active block
-- Timeline/day flow
+- Today header with date and planner status
+- Timeline/day flow with the active block expressed inline
 - Unscheduled tasks, hideable
 - Active workout or routine if applicable
 
-**Secondary layer: Support Widget Board**
+**Secondary layer: Planner action row**
 
-This gives quick access to life systems without taking over the screen.
+This gives quick access to planner-related actions without taking over the screen.
 
 Required elements:
-- 3 user-selected permanent support buttons
-- Suggested options: Journal, Nutrition, Focus
-- Optional widget cards below: Hydration, Workout, Mood, Quick Add, Routine
+- 3 planner action tabs: Journal, Nutrition, Plan
+- Task-level status for journal, nutrition, and plan completion
+- Optional contextual support actions may surface on other screens or via overlays
+- Focus is not a permanent Home support widget; it is accessed through the separate Focus workflow
 
 **Utility layer: Capture + Recovery**
 
@@ -422,14 +424,13 @@ Required elements:
 
 ### 2. Interaction hierarchy
 
-Morning Check-In always comes first if incomplete. After check-in, the app should prioritize Current Focus. After Current Focus, the timeline should guide the user. After timeline, support widgets should help the user log, reflect, or adjust.
+Morning Check-In always comes first if incomplete. After check-in, the app should prioritize the timeline and planner action row. After the timeline, planner actions should help the user log, reflect, or adjust.
 
 The interaction order is:
 1. "Check in"
-2. "Here's your current focus"
-3. "Here's your day flow"
-4. "Here are your support tools"
-5. "Capture anything else"
+2. "Here's your day flow"
+3. "Here are your planner actions"
+4. "Capture anything else"
 
 ### 3. Morning Check-In flow
 
@@ -470,7 +471,7 @@ Timeline should allow:
 
 ### 5. Current Focus behavior
 
-Current Focus should not duplicate the timeline. It should summarize the active or next meaningful block and help the user pick back up.
+Current Focus is a conceptual summary expressed through the timeline itself, not a separate Home hero card. The timeline should show the active or next meaningful block and help the user pick back up without duplicating information.
 
 Priority order:
 1. active routine
@@ -494,38 +495,33 @@ Avoid:
 ### 6. Collapse behavior
 
 Default state:
-- Morning Check-In expanded until complete
-- Current Focus visible
+- Morning Check-In expanded until complete when needed
 - Timeline visible
-- Support widgets compact
+- Planner action tabs compact
 - Unscheduled tasks visible but hideable
 
-Collapsed state should show:
-- title
-- status
-- next step
-- small action button
+Collapsed state should preserve the timeline and task visibility while showing only essential labels and actions.
 
 Expanded state should show:
 - details
-- checklist/steps
-- secondary actions
+- task time controls
+- contextual planner actions and guidance
 
-### 7. Support widget behavior
+### 7. Planner action behavior
 
-The user should choose 3 permanent dashboard buttons.
+Home uses a compact planner action row for fast journaling, nutrition logging, and planning. These are quick actions, not full dashboard widgets.
 
 Recommended default:
 - Journal
 - Nutrition
-- Focus
+- Plan
 
 Alternative for fitness-heavy setup:
 - Nutrition
 - Workout
 - Journal
 
-Support buttons should be quick actions, not full cards. Contextual widgets can appear below them based on the day.
+Planner actions should open the relevant workspace or status flow without creating a second dashboard layer. Focus remains a separate workflow, not a Home planner tab.
 
 ### 8. Routine insertion rules
 
@@ -559,8 +555,8 @@ Examples:
 ### 10. Adaptive density behavior
 
 Density options:
-- Minimal: current focus + next 2 blocks + support buttons
-- Balanced: current focus + timeline sections + key widgets
+- Minimal: current timeline + next 2 blocks + planner actions
+- Balanced: current timeline + section markers + compact actions
 - Detailed: full timeline + tasks + routines + cards
 
 Mode can influence density:
@@ -579,32 +575,34 @@ All tokens live in `src/styles/tokens.css` as CSS custom properties. Imported gl
 
 ### Colors
 
+Tokens are defined under both `[data-theme="light"]` and `[data-theme="dark"]` in `src/styles/tokens.css`. The app launches in the light theme by default.
+
 | Token | Value | Usage |
 |---|---|---|
-| `--color-bg` | `#141410` | App background |
-| `--color-card` | `#1E1E18` | Card surfaces |
-| `--color-nav-bg` | `#1A1A14` | Bottom nav background |
-| `--color-chart-bar` | `#252520` | Inactive chart bars |
-| `--color-border` | `#2A2A22` | All borders |
-| `--color-text` | `#F6F3EF` | Primary text |
-| `--color-muted` | `#8C8C7A` | Secondary / label text |
-| `--color-faint` | `#3A3A30` | Placeholder, track backgrounds |
+| `--color-bg` | `#F5F2ED` | App background |
+| `--color-card` | `#FFFFFF` | Card surfaces |
+| `--color-nav-bg` | `#F0EDE8` | Bottom nav background |
+| `--color-chart-bar` | `#E8E4DE` | Inactive chart bars |
+| `--color-border` | `#D8D2CA` | All borders |
+| `--color-text` | `#1A1A14` | Primary text |
+| `--color-muted` | `#706A60` | Secondary / label text |
+| `--color-faint` | `#B8B2A8` | Placeholder, track backgrounds |
 | `--color-accent` | `#C17B56` | Terracotta — active states, CTAs, nav pip |
-| `--color-accent-light` | `#E8A87C` | Timer ring at 40% remaining |
-| `--color-accent-bg` | `#2A1F14` | Accent surface / selected card bg |
+| `--color-accent-light` | `#E8A87C` | Accent highlights |
+| `--color-accent-bg` | `#FDF0E8` | Accent surface / selected card bg |
 | `--color-success` | `#1D9E75` | Completed states |
-| `--color-success-bg` | `#0F2318` | Completed card surface |
-| `--color-danger` | `#E05555` | Overdue, timer ring at 20% remaining |
+| `--color-success-bg` | `#E8F6F1` | Completed card surface |
+| `--color-danger` | `#E05555` | Alerts and warnings |
 
 ### Typography
 
 | Token | Value |
 |---|---|
-| `--font-body` | `'DM Sans', system-ui, sans-serif` |
-| `--font-display` | `'DM Serif Display', Georgia, serif` |
+| `--font-body` | `'Poppins', system-ui, sans-serif` |
+| `--font-display` | `'Lexend', system-ui, sans-serif` |
 
-- Body: DM Sans 400/500/600
-- Headings / large numbers: DM Serif Display
+- Body: Poppins 400/500/600
+- Headings / large numbers: Lexend 400/500/600/700
 - Loaded from Google Fonts in `tokens.css`
 
 ### Border
@@ -639,7 +637,7 @@ All tokens live in `src/styles/tokens.css` as CSS custom properties. Imported gl
 
 | Token | Value |
 |---|---|
-| `--nav-height` | `72px` |
+| `--nav-height` | `60px` |
 | `--max-width` | `393px` |
 
 ### Safe Areas (iPhone 16 Pro)
@@ -1424,7 +1422,7 @@ Used in Home screen fuel gauge slots.
 **Screen values:** `'ignition'` · `'home'` · `'plan'` · `'calendar'` · `'tasks'` · `'fitness'` · `'more'` · `'focus'` · `'inbox'` · `'finance'` · `'projects'` · `'settings'`
 
 **Bottom nav** (`src/App.jsx`):
-- 72px height, `#1A1A14` bg, `0.5px` top border
+- 60px height, `#1A1A14` bg, `0.5px` top border
 - Tabs come from `getEnabledNavTabs(settings.modules)`: Calendar, Tasks, Home, Fitness, More. Home remains centered.
 - Inbox is removed from bottom navigation and remains globally accessible from the Home top-right utility cluster beside Settings.
 - Finance is removed from bottom navigation and routes through More.
@@ -1541,6 +1539,7 @@ File: `.github/workflows/pages.yml`
 | 5 | Focus Timer overlay | ✅ Done | `src/screens/FocusTimer.jsx` |
 | 6 | Inbox | ✅ Done | `src/screens/Inbox.jsx` |
 | 6b | Legacy She Stitches seed project — goal card + roadmap screen | ✅ Superseded | Current code uses `ProjectsContext.jsx`, `Projects.jsx`, and generic focus-project selection. |
+| 6.5 | Plan placeholder + More navigation | ✅ Done | `src/App.jsx`, `src/screens/Home.jsx`, `src/screens/More.jsx` |
 | 7 | Finance (local transaction data) | ✅ Done | `src/screens/Finance.jsx`, `src/context/FinanceContext.jsx` |
 | 8 | PWA manifest + GitHub Pages deploy | ✅ Done | `public/manifest.json`, `public/icons/icon-192.png`, `public/icons/icon-512.png`, `vite.config.js`, `.github/workflows/pages.yml` |
 | 9 | Fitness tab, workout generator, settings, polish | ✅ Done | `src/utils/fitness.js`, `src/screens/Fitness.jsx`, `src/screens/Settings.jsx`, `src/components/WorkoutPlayer.jsx`, `src/components/FuelEditSheet.jsx`, `src/screens/Home.jsx`, `src/screens/Inbox.jsx`, domain contexts in `src/context/`, `src/App.jsx` (5-tab nav, global WorkoutPlayer overlay) |
