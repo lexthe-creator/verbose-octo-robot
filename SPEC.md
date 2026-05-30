@@ -1087,22 +1087,62 @@ V1 data mapping:
 
 Plan is a lightweight daily planning workspace and future AI guidance surface.
 
+Plan is a re-centering tool. Its purpose is to help the user pause, re-evaluate the day, adjust priorities, and continue forward. It should feel lightweight and recoverable.
+
+Plan should be accessible anytime in the day and support quick clarity without requiring a system-wide reorganization.
+
 Plan is not:
 - a duplicate Tasks view
 - a project manager
 - a calendar
+- a task manager
 
-Plan may eventually synthesize Calendar, Tasks, Fitness, Nutrition, Energy, and Morning Check-In into a daily plan.
+Plan may eventually synthesize Calendar, Tasks, Fitness, Nutrition, Energy, and Morning Check-In into a daily plan, but that synthesis should remain subordinate to the daily execution experience.
 
-Initial fields/concepts:
-- Current Focus
-- Top 3 priorities
-- Brain dump / notes
-- Next available time block
-- Suggested next step
-- AI suggestion
+V1 fields:
+- Day Status — single-select prompt: `On Track`, `Needs Adjustment`, `Starting Over`
+- Current Focus — short text input for what to move forward with next
+- Top 3 Priorities — three simple text inputs for planning notes, not task records
+- Notes — lightweight textarea for context, obstacles, reminders, or thoughts
+- Save & continue — saves Plan state and returns to Home without forcing completion
 
-V1 may render the lightest placeholder that communicates the intended workspace without creating a full planner system.
+State shape in `PlanningContext`:
+
+```js
+dailyPlans: {
+  [YYYY-MM-DD]: {
+    status: 'on_track' | 'needs_adjustment' | 'starting_over' | null,
+    currentFocus: string,
+    priorities: [string, string, string],
+    notes: string,
+    updatedAt: ISO8601,
+  }
+}
+```
+
+Home Plan tab status rules:
+- `○` no daily plan content exists for today
+- `◐` some daily plan inputs exist for today
+- `☑` day status + current focus + at least one priority exists for today
+
+Plan V1 must remain:
+- calm
+- compact
+- planner-like
+- recoverable
+- low-pressure
+
+Avoid:
+- dashboards
+- analytics
+- AI output
+- productivity coaching
+- heavy forms
+- task-manager language
+- required fields
+- completion pressure
+
+Plan is a re-centering workspace, not Tasks, Calendar, or Projects. V1 should avoid the placeholder-only pattern and instead deliver the real lightweight Plan fields described above.
 
 ---
 

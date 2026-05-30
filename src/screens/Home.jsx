@@ -697,10 +697,22 @@ export default function Home({ onNavigate }) {
     const reflectedToday = (planningState.reflectionLog ?? []).some(entry => entry.date === today) ||
       localStorage.getItem('lastReflectionDate') === today
 
+    const todayPlan = planningState.dailyPlans?.[today]
+    const hasPlanContent = todayPlan && (
+      !!todayPlan.status ||
+      !!todayPlan.currentFocus?.trim() ||
+      (todayPlan.priorities ?? []).some(p => p?.trim()) ||
+      !!todayPlan.notes?.trim()
+    )
+    const hasPlanCore = todayPlan &&
+      !!todayPlan.status &&
+      !!todayPlan.currentFocus?.trim() &&
+      (todayPlan.priorities ?? []).some(p => p?.trim())
+
     return {
       journalSymbol: reflectedToday ? '☑' : '○',
       nutritionSymbol: getStatusSymbol(completedMeals, meals.length),
-      planSymbol: '○',
+      planSymbol: !hasPlanContent ? '○' : hasPlanCore ? '☑' : '◐',
       taskMarks: buildTaskMarks(completedTasks, tasks.length),
       eventMarks: buildEventMarks(eventsToday),
       morningComplete: !!dayState.dayLockedAt,
@@ -708,7 +720,7 @@ export default function Home({ onNavigate }) {
       onMorningClick: () => onNavigate(SCREENS.IGNITION),
       onEveningClick: () => onNavigate(SCREENS.EOD),
     }
-  }, [dayState, inboxState.calendarItems, onNavigate, planningState.reflectionLog])
+  }, [dayState, inboxState.calendarItems, onNavigate, planningState.reflectionLog, planningState.dailyPlans])
 
   function handleToggleExpand(taskId) {
     setExpandedTask(prev => prev === taskId ? null : taskId)

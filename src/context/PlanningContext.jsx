@@ -1,10 +1,11 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useReducer, useEffect } from 'react'
 
 const PLANNING_STORAGE_KEY = 'aiml_planning'
 const SCHEMA_VERSION       = 1
 
 /* ─── Reducer ─────────────────────────────────────────────────────────────── */
-export function planningReducer(state, action) {
+function planningReducer(state, action) {
   switch (action.type) {
     case 'ADD_REFLECTION':
       return { ...state, reflectionLog: [...state.reflectionLog, action.payload] }
@@ -28,6 +29,15 @@ export function planningReducer(state, action) {
     case 'DELETE_GROCERY_ITEM':
       return { ...state, groceryList: state.groceryList.filter(g => g.id !== action.payload.id) }
 
+    case 'SET_DAILY_PLAN':
+      return {
+        ...state,
+        dailyPlans: {
+          ...state.dailyPlans,
+          [action.payload.date]: action.payload.plan,
+        },
+      }
+
     default:
       return state
   }
@@ -38,6 +48,7 @@ const initialPlanningState = {
   reflectionLog:    [],
   weeklyPriorities: [],
   groceryList:      [],
+  dailyPlans:       {},
 }
 
 function loadPlanningState() {

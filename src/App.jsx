@@ -7,6 +7,7 @@ import { getTodayISO, isThisWeek } from './utils/time.js'
 
 import MorningIgnition from './screens/MorningIgnition.jsx'
 import Home            from './screens/Home.jsx'
+import Plan            from './screens/Plan.jsx'
 import FocusTimer      from './screens/FocusTimer.jsx'
 import Inbox           from './screens/Inbox.jsx'
 import Finance         from './screens/Finance.jsx'
@@ -113,11 +114,7 @@ export default function App() {
           <FocusTimer onClose={goBack} />
         )}
         {screen === SCREENS.PLAN && (
-          <PlannerPlaceholder
-            title="Plan"
-            eyebrow="DAILY GUIDANCE"
-            detail="A lightweight planning workspace for focus, priorities, available time, and suggested next steps."
-          />
+          <Plan onNavigate={navigate} />
         )}
         {screen === SCREENS.CALENDAR && (
           <PlannerPlaceholder
