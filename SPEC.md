@@ -288,6 +288,54 @@ The primary purpose of Home is helping the user understand:
 
 Anything that visually competes with Daily Flow should be simplified, reduced, or removed.
 
+## Planner Surface Responsibilities
+
+Each primary planner surface has a distinct job.
+
+- Inbox = capture anything.
+- Tasks = committed actions.
+- Plan = review today's commitments.
+- Calendar = find capacity.
+- Home = execute today.
+
+These responsibilities should prevent duplicated planner surfaces:
+- Inbox is for unstructured capture and triage.
+- Tasks is for promoted actions with status.
+- Plan is for reviewing what today already holds.
+- Calendar is for identifying room and capacity.
+- Home is for moving through the current day.
+
+Random thoughts, notes, and unprocessed ideas should not enter Tasks directly unless the user is intentionally creating a committed action. Inbox is the default holding area for loose capture.
+
+## Tasks Planner Philosophy
+
+Tasks is an action-management surface, not a capture surface.
+
+Tasks should help the user understand:
+- what actions are committed
+- what is scheduled
+- what is unscheduled
+- what is upcoming
+- what is already complete
+
+Tasks can originate from Inbox, but once promoted they should become actionable records with status, not just notes.
+
+Tasks should preserve the lifecycle:
+- inbox item
+- triaged into task
+- scheduled or unscheduled
+- completed
+
+Tasks should avoid:
+- becoming a random-thought capture area
+- duplicating Inbox
+- duplicating Plan
+- duplicating Home Daily Flow
+- dense project-management workflows
+- productivity KPI framing
+
+Tasks stores work. Plan reviews today's commitments. Home executes today. Calendar finds capacity.
+
 ## Calendar Planner Philosophy
 
 Calendar is a capacity planning surface, not an event management surface.
@@ -1201,7 +1249,60 @@ Plan is a commitment review workspace, not Tasks, Calendar, Projects, or Fitness
 
 ---
 
-### 5.2c Calendar (`'calendar'`)
+### 5.2c Tasks (`'tasks'`)
+
+Tasks V1 is a committed-actions surface.
+
+Tasks V1 is not:
+- a capture inbox
+- a notes list
+- a daily execution timeline
+- a project manager
+- a planning worksheet
+
+Tasks should show promoted actions, not unprocessed thoughts. Inbox remains the place to capture anything. A task may be created directly only when the user is intentionally creating an action.
+
+Primary lifecycle:
+- inbox item -> triaged into task -> scheduled or unscheduled -> completed
+
+V1 sections:
+- Today — scheduled for today
+- Upcoming — scheduled later
+- Unscheduled — actions without a date/time
+- Done — completed actions
+
+Section meanings:
+- Today contains committed actions with today's date or time.
+- Upcoming contains committed actions scheduled beyond today.
+- Unscheduled contains committed actions without a date or time.
+- Done contains completed actions.
+
+Tasks V1 should prioritize:
+- action clarity
+- status clarity
+- light scheduling visibility
+- recoverable organization
+
+Tasks V1 should not prioritize:
+- capture workflows
+- note storage
+- dense task administration
+- project planning
+- analytics
+- productivity scoring
+
+Relationship to other surfaces:
+- Inbox captures and triages.
+- Tasks stores committed actions.
+- Plan reviews today's commitments.
+- Calendar finds capacity for commitments.
+- Home executes the current day.
+
+Do not define Tasks implementation details, data model changes, editing workflows, or scheduling mechanics until a future SPEC pass explicitly approves them.
+
+---
+
+### 5.2d Calendar (`'calendar'`)
 
 Calendar V1 is a week-first capacity planning surface.
 
