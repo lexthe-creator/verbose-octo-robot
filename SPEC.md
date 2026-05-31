@@ -307,8 +307,9 @@ Calendar should avoid event-management density, calendar-admin workflows, KPI-st
 
 Calendar should prioritize:
 - finding free time
-- moving commitments
+- moving commitments when future behavior is approved
 - reviewing routines
+- seeing upcoming commitments
 - planning the week
 
 Calendar should not prioritize:
@@ -326,7 +327,7 @@ Future Calendar and Plan relationship:
 - Plan identifies what should move.
 - Calendar identifies where it should go.
 
-This relationship is architectural only. Do not define Calendar implementation details, drag-and-drop behavior, data model requirements, or event-management workflows until a future SPEC pass explicitly approves them.
+This relationship is architectural only. Calendar V1 may show where commitments could fit, but it must not define or implement drag-and-drop behavior, move workflows, or event-management workflows.
 
 ## Daily Flow Rules
 
@@ -720,6 +721,7 @@ src/
   screens/
     MorningIgnition.jsx   — 3-step ignition flow
     Home.jsx              — main daily screen (clock, training card, timeline, tasks, fuel)
+    Calendar.jsx          — read-only week-first capacity planner + month navigator
     FocusTimer.jsx        — full-screen overlay timer
     Inbox.jsx             — capture + triage
     Finance.jsx           — read-only finance panel
@@ -1205,6 +1207,8 @@ Calendar V1 is a week-first capacity planning surface.
 
 Calendar V1 is not an event management surface, a dense scheduler, an hourly timeline, or a Google Calendar replacement.
 
+Calendar V1 is read-only.
+
 Primary view:
 - Week-first.
 
@@ -1213,9 +1217,32 @@ Secondary view:
 
 Calendar landing priority:
 1. Find free time.
-2. Move commitments.
-3. Review routines.
+2. Review routines.
+3. See upcoming commitments.
 4. Plan the week.
+
+Calendar V1 must not prioritize:
+- event editing
+- task editing
+- drag and drop
+- scheduling workflows
+- dense event management
+
+Calendar V1 should contain less information than Home. Calendar gains value through aggregation, pattern visibility, and capacity visibility, not detail density or event management.
+
+Design direction:
+- match Home and Plan
+- use white space, typography, subtle indicators, and planner-style hierarchy
+- avoid Google Calendar aesthetics, dashboard cards, heavy outlines, and dense scheduling interfaces
+- keep the page introduction simple and planner-like; avoid dashboard titles, marketing copy, or motivational copy
+
+Approved month indicators:
+- `•` events
+- `▲` workouts
+- `■` projects
+- `◦` routines
+
+Indicators should stay subtle. Event titles should not appear inside month day cells.
 
 #### Week Section
 
@@ -1253,12 +1280,23 @@ Information architecture:
 
 Month is not the primary planning surface.
 
+Month rules:
+- planner aesthetic
+- lightweight
+- minimal indicators
+- no event titles inside day cells
+- no dense calendar content
+- no KPI widgets
+- no dashboard cards
+- compact enough that the Week section appears higher on the screen
+- communicates patterns through indicators, not details
+
 #### Capacity Visibility
 
 Calendar should emphasize capacity states such as:
-- busy
-- available
+- open
 - light
+- steady
 - full
 
 Calendar should de-emphasize clock-first labels such as:
@@ -1267,6 +1305,30 @@ Calendar should de-emphasize clock-first labels such as:
 - 11:00
 
 The user should be able to quickly identify where something can move.
+
+#### Calendar V1 Implementation Scope
+
+The first Calendar implementation may include:
+- a month navigator labeled by month and year
+- a planner-style month grid with subtle indicators only
+- a Monday-Sunday weekly capacity view
+- capacity labels: open, light, steady, full
+- meaningful commitments only, with less detail than Home
+- concise availability notes that explain capacity using approved existing sources
+- understated capacity labels that read as planner metadata, not dominant badges
+
+The first Calendar implementation must not include:
+- drag/drop
+- move workflows
+- rescheduling
+- event editing
+- task editing
+- calendar integrations
+- recurring routine editors
+- percentages
+- utilization scores
+- KPI metrics
+- heat maps
 
 #### Calendar V1 Existing Source Mapping
 
@@ -1288,7 +1350,7 @@ This section defines Calendar V1 philosophy and information architecture only.
 Do not create Calendar UI requirements.
 Do not create Calendar data model requirements.
 Do not define drag-and-drop behavior.
-Do not implement Calendar behavior from this section until a future SPEC pass approves implementation details.
+Do not implement Calendar behavior beyond the approved read-only V1 scope until a future SPEC pass approves additional details.
 
 ---
 
@@ -1682,6 +1744,7 @@ File: `.github/workflows/pages.yml`
 
 - Morning Ignition full 3-step flow (Energy → Brief → Locked)
 - Home screen: compact Daily Execution header, top-right Inbox + Settings utilities, daily task/event tally, Morning/Evening check-in status, Daily Flow timeline, inline task scheduling, and meal guidance blocks
+- Calendar screen: read-only week-first capacity planner with lightweight month navigator
 - Focus Timer full implementation (ring, presets, session tracking)
 - Inbox capture + triage; "Task" button dispatches ADD_TASK with green flash confirmation
 - Finance screen with local transaction data, manual add/delete, Plaid connection stub, and read-only summary selectors
@@ -1734,5 +1797,6 @@ File: `.github/workflows/pages.yml`
 | 14b-i | Remove HYROX, fitness program schema v2, selectors, phase config | ✅ Done | `src/constants/fitness.js` (PHASES: base/build/peak/deload; PHASE_LABELS updated), `src/utils/fitness.js` (getPhase 13-week cycle, getPhaseConfig, getDayTypeLabel; hyroxStation removed; hyrox segment field removed), `src/utils/fitnessSelectors.js` (getExerciseHistory, getLastPerformance, getTodayWorkoutType, getWeekStrip), `src/context/FitnessContext.jsx` (schema v2 + v1→v2 migration; program/programConfig state; CONFIGURE_PROGRAM, UPDATE_PROGRAM_CONFIG, LOG_WORKOUT_SETS actions), `src/components/WorkoutPlayer.jsx` (HYROX station badge removed) |
 | 14b-ii | Exercise library data files | ✅ Done | `src/data/exercises.js` (EXERCISES: upper/lower/full_body/push/pull/mobility, 3 equipment tiers, 90+ exercises), `src/data/runSegments.js` (RUN_SEGMENTS: warmup/cooldown/main segments, pure data) |
 | 14b-iii | Workout generator — pure functions, progressive overload, run segments | ✅ Done | `src/utils/workoutGenerator.js` (getExercisePool, selectExercises, getLoadSuggestion, buildStrengthWorkout, buildRunWorkout, buildMobilityWorkout, generateWorkout — new config-based API), `src/utils/fitness.js` (@deprecated on old generateWorkout) |
+| 15 | Calendar V1 read-only capacity planner | ✅ Done | `src/screens/Calendar.jsx`, `src/App.jsx`, `SPEC.md` |
 
 **Live URL:** https://lexthe-creator.github.io/verbose-octo-robot/

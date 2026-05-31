@@ -8,6 +8,7 @@ import { getTodayISO, isThisWeek } from './utils/time.js'
 import MorningIgnition from './screens/MorningIgnition.jsx'
 import Home            from './screens/Home.jsx'
 import Plan            from './screens/Plan.jsx'
+import Calendar        from './screens/Calendar.jsx'
 import FocusTimer      from './screens/FocusTimer.jsx'
 import Inbox           from './screens/Inbox.jsx'
 import Finance         from './screens/Finance.jsx'
@@ -117,11 +118,7 @@ export default function App() {
           <Plan onNavigate={navigate} />
         )}
         {screen === SCREENS.CALENDAR && (
-          <PlannerPlaceholder
-            title="Calendar"
-            eyebrow="PLANNER"
-            detail="Calendar events will sit here once calendar sync is connected."
-          />
+          <Calendar />
         )}
         {screen === SCREENS.TASKS && (
           <PlannerPlaceholder
