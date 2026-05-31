@@ -288,6 +288,20 @@ The primary purpose of Home is helping the user understand:
 
 Anything that visually competes with Daily Flow should be simplified, reduced, or removed.
 
+## Calendar Planner Philosophy
+
+Calendar is a capacity planning surface, not an event management surface.
+
+The primary purpose of Calendar is helping the user understand:
+- where time and energy are already committed
+- what capacity remains
+- where the day or week may need soft adjustment
+- how planned commitments fit together without overwhelming the planner
+
+When Calendar must choose between showing more information and preserving planner readability, preserve planner readability.
+
+Calendar should avoid event-management density, calendar-admin workflows, KPI-style summaries, and overloaded scheduling controls unless a future spec section explicitly introduces them.
+
 ## Daily Flow Rules
 
 Daily Flow is the primary planner surface.
