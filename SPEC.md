@@ -292,6 +292,9 @@ Anything that visually competes with Daily Flow should be simplified, reduced, o
 
 Calendar is a capacity planning surface, not an event management surface.
 
+Calendar exists to help the user answer:
+- Where can this go?
+
 The primary purpose of Calendar is helping the user understand:
 - where time and energy are already committed
 - what capacity remains
@@ -301,6 +304,29 @@ The primary purpose of Calendar is helping the user understand:
 When Calendar must choose between showing more information and preserving planner readability, preserve planner readability.
 
 Calendar should avoid event-management density, calendar-admin workflows, KPI-style summaries, and overloaded scheduling controls unless a future spec section explicitly introduces them.
+
+Calendar should prioritize:
+- finding free time
+- moving commitments
+- reviewing routines
+- planning the week
+
+Calendar should not prioritize:
+- event administration
+- dense scheduling
+- hourly timelines
+- Google Calendar-style event management
+
+Relationship to other planner surfaces:
+- Home = the day organized by time.
+- Plan = the day organized by commitments.
+- Calendar = the week organized by capacity.
+
+Future Calendar and Plan relationship:
+- Plan identifies what should move.
+- Calendar identifies where it should go.
+
+This relationship is architectural only. Do not define Calendar implementation details, drag-and-drop behavior, data model requirements, or event-management workflows until a future SPEC pass explicitly approves them.
 
 ## Daily Flow Rules
 
@@ -1170,6 +1196,99 @@ Avoid:
 - completion pressure
 
 Plan is a commitment review workspace, not Tasks, Calendar, Projects, or Fitness. V1 should feel like a lightweight planner page and not a worksheet.
+
+---
+
+### 5.2c Calendar (`'calendar'`)
+
+Calendar V1 is a week-first capacity planning surface.
+
+Calendar V1 is not an event management surface, a dense scheduler, an hourly timeline, or a Google Calendar replacement.
+
+Primary view:
+- Week-first.
+
+Secondary view:
+- Month navigator.
+
+Calendar landing priority:
+1. Find free time.
+2. Move commitments.
+3. Review routines.
+4. Plan the week.
+
+#### Week Section
+
+The Week section is the primary Calendar surface.
+
+Purpose:
+- Where do I have room?
+
+Information architecture:
+- Monday-Sunday
+- capacity indicators
+- major commitments
+- recurring routines
+- workouts
+- notable events
+
+Avoid:
+- dense event lists
+- hourly schedules
+- task duplication
+
+#### Month Section
+
+The Month section provides navigation and context.
+
+Purpose:
+- What is coming up?
+
+Information architecture:
+- lightweight planner month grid
+- subtle commitment indicators
+- routines
+- workouts
+- notable events
+
+Month is not the primary planning surface.
+
+#### Capacity Visibility
+
+Calendar should emphasize capacity states such as:
+- busy
+- available
+- light
+- full
+
+Calendar should de-emphasize clock-first labels such as:
+- 9:00
+- 10:00
+- 11:00
+
+The user should be able to quickly identify where something can move.
+
+#### Calendar V1 Existing Source Mapping
+
+Calendar V1 should derive its context from existing state only.
+
+Approved sources:
+- Events -> `InboxContext.calendarItems`
+- Tasks -> `DayContext.tasks` with `dueTime` or `scheduledTime` only
+- Fitness -> `DayContext.workout` plus the planned workout from `FitnessContext`
+- Projects -> `ProjectsContext` focus or active project, lightweight only
+- Routines -> deferred unless already represented in existing state
+
+This mapping is a source boundary, not a new data model requirement.
+
+#### Calendar V1 Boundaries
+
+This section defines Calendar V1 philosophy and information architecture only.
+
+Do not create Calendar UI requirements.
+Do not create Calendar data model requirements.
+Do not define drag-and-drop behavior.
+Do not implement Calendar behavior from this section until a future SPEC pass approves implementation details.
 
 ---
 
