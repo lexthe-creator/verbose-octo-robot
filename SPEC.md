@@ -770,6 +770,7 @@ src/
     MorningIgnition.jsx   — 3-step ignition flow
     Home.jsx              — main daily screen (clock, training card, timeline, tasks, fuel)
     Calendar.jsx          — read-only week-first capacity planner + month navigator
+    Tasks.jsx             — committed actions grouped by Today, Upcoming, Unscheduled, Done
     FocusTimer.jsx        — full-screen overlay timer
     Inbox.jsx             — capture + triage
     Finance.jsx           — read-only finance panel
@@ -1283,6 +1284,16 @@ Tasks V1 should prioritize:
 - light scheduling visibility
 - recoverable organization
 
+Tasks V1 implementation may:
+- use existing `DayContext.tasks`
+- toggle done/not done with existing `TOGGLE_TASK`
+- show scheduled time when `scheduledTime` or `dueTime` exists
+- show unscheduled state when no time/date exists
+- preserve existing task casing
+- keep row interaction lightweight
+- use restrained planner typography with subtle section labels and counts
+- collapse empty sections to their header/count without explanatory helper copy
+
 Tasks V1 should not prioritize:
 - capture workflows
 - note storage
@@ -1298,7 +1309,7 @@ Relationship to other surfaces:
 - Calendar finds capacity for commitments.
 - Home executes the current day.
 
-Do not define Tasks implementation details, data model changes, editing workflows, or scheduling mechanics until a future SPEC pass explicitly approves them.
+Do not introduce new Tasks data models, drag/drop, subtasks, priorities UI, recurring tasks, full task editing, project task migration, calendar scheduling workflows, or AI task planning until a future SPEC pass explicitly approves them.
 
 ---
 
@@ -1846,6 +1857,7 @@ File: `.github/workflows/pages.yml`
 - Morning Ignition full 3-step flow (Energy → Brief → Locked)
 - Home screen: compact Daily Execution header, top-right Inbox + Settings utilities, daily task/event tally, Morning/Evening check-in status, Daily Flow timeline, inline task scheduling, and meal guidance blocks
 - Calendar screen: read-only week-first capacity planner with lightweight month navigator
+- Tasks screen: committed actions grouped by Today, Upcoming, Unscheduled, and Done using existing task state
 - Focus Timer full implementation (ring, presets, session tracking)
 - Inbox capture + triage; "Task" button dispatches ADD_TASK with green flash confirmation
 - Finance screen with local transaction data, manual add/delete, Plaid connection stub, and read-only summary selectors
@@ -1899,5 +1911,6 @@ File: `.github/workflows/pages.yml`
 | 14b-ii | Exercise library data files | ✅ Done | `src/data/exercises.js` (EXERCISES: upper/lower/full_body/push/pull/mobility, 3 equipment tiers, 90+ exercises), `src/data/runSegments.js` (RUN_SEGMENTS: warmup/cooldown/main segments, pure data) |
 | 14b-iii | Workout generator — pure functions, progressive overload, run segments | ✅ Done | `src/utils/workoutGenerator.js` (getExercisePool, selectExercises, getLoadSuggestion, buildStrengthWorkout, buildRunWorkout, buildMobilityWorkout, generateWorkout — new config-based API), `src/utils/fitness.js` (@deprecated on old generateWorkout) |
 | 15 | Calendar V1 read-only capacity planner | ✅ Done | `src/screens/Calendar.jsx`, `src/App.jsx`, `SPEC.md` |
+| 16 | Tasks V1 committed-actions surface | ✅ Done | `src/screens/Tasks.jsx`, `src/App.jsx`, `SPEC.md` |
 
 **Live URL:** https://lexthe-creator.github.io/verbose-octo-robot/

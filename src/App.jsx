@@ -9,6 +9,7 @@ import MorningIgnition from './screens/MorningIgnition.jsx'
 import Home            from './screens/Home.jsx'
 import Plan            from './screens/Plan.jsx'
 import Calendar        from './screens/Calendar.jsx'
+import Tasks           from './screens/Tasks.jsx'
 import FocusTimer      from './screens/FocusTimer.jsx'
 import Inbox           from './screens/Inbox.jsx'
 import Finance         from './screens/Finance.jsx'
@@ -121,11 +122,7 @@ export default function App() {
           <Calendar />
         )}
         {screen === SCREENS.TASKS && (
-          <PlannerPlaceholder
-            title="Tasks"
-            eyebrow="DAILY LIST"
-            detail="Tasks stay available in Daily Flow while the dedicated task view comes together."
-          />
+          <Tasks />
         )}
         {screen === SCREENS.MORE && (
           <MoreScreen onNavigate={navigate} />
