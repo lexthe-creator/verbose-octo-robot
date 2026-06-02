@@ -6,6 +6,7 @@ export const SCREENS = {
   FITNESS:       'fitness',
   FITNESS_SETUP: 'fitness-setup',
   MORE:          'more',
+  NUTRITION:     'nutrition',
   INBOX:         'inbox',
   PROJECTS:      'projects',
   FINANCE:       'finance',

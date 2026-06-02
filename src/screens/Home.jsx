@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useUser } from '../context/UserContext.jsx'
 import { useSettings } from '../context/SettingsContext.jsx'
-import { useDay, useInbox, usePlanning } from '../context/index.js'
+import { getNutritionEntriesForDate, getNutritionStatusSymbol, useDay, useInbox, useNutrition, usePlanning } from '../context/index.js'
 import { formatMealTime, parseHHMM, formatMins, getTodayISO } from '../utils/time.js'
 import { SCREENS } from '../constants/navigation.js'
 
@@ -74,12 +74,6 @@ function greeting(now, name) {
   const h = now.getHours()
   const part = h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening'
   return `Good ${part}, ${name}`
-}
-
-function getStatusSymbol(done, total) {
-  if (!total || done === 0) return '○'
-  if (done >= total) return '☑'
-  return '◐'
 }
 
 function buildTaskMarks(done, total) {
@@ -668,6 +662,7 @@ export default function Home({ onNavigate }) {
   const { dayState, dayDispatch, updateTaskTime }       = useDay()
   const { inboxState }                                 = useInbox()
   const { planningState }                              = usePlanning()
+  const { nutritionState }                             = useNutrition()
 
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
@@ -691,8 +686,7 @@ export default function Home({ onNavigate }) {
     const today = getTodayISO()
     const tasks = dayState.tasks ?? []
     const completedTasks = tasks.filter(task => task.done).length
-    const meals = Object.values(dayState.meals ?? {})
-    const completedMeals = meals.filter(meal => meal.eaten).length
+    const nutritionEntries = getNutritionEntriesForDate(nutritionState, today)
     const eventsToday = (inboxState.calendarItems ?? []).filter(item => item.date === today).length
     const reflectedToday = (planningState.reflectionLog ?? []).some(entry => entry.date === today) ||
       localStorage.getItem('lastReflectionDate') === today
@@ -705,7 +699,7 @@ export default function Home({ onNavigate }) {
 
     return {
       journalSymbol: reflectedToday ? '☑' : '○',
-      nutritionSymbol: getStatusSymbol(completedMeals, meals.length),
+      nutritionSymbol: getNutritionStatusSymbol(nutritionEntries),
       planSymbol: !hasAnyPlan ? '○' : isPlanComplete ? '☑' : '◐',
       taskMarks: buildTaskMarks(completedTasks, tasks.length),
       eventMarks: buildEventMarks(eventsToday),
@@ -714,7 +708,7 @@ export default function Home({ onNavigate }) {
       onMorningClick: () => onNavigate(SCREENS.IGNITION),
       onEveningClick: () => onNavigate(SCREENS.EOD),
     }
-  }, [dayState, inboxState.calendarItems, onNavigate, planningState.reflectionLog, planningState.dailyPlans])
+  }, [dayState, inboxState.calendarItems, nutritionState, onNavigate, planningState.reflectionLog, planningState.dailyPlans])
 
   function handleToggleExpand(taskId) {
     setExpandedTask(prev => prev === taskId ? null : taskId)
@@ -743,7 +737,7 @@ export default function Home({ onNavigate }) {
           onOpenSettings={() => onNavigate(SCREENS.SETTINGS)}
           onOpenInbox={() => onNavigate(SCREENS.INBOX)}
           onOpenJournal={() => onNavigate(SCREENS.EOD)}
-          onOpenNutrition={() => onNavigate(SCREENS.MORE)}
+          onOpenNutrition={() => onNavigate(SCREENS.NUTRITION)}
           onOpenPlan={() => onNavigate(SCREENS.PLAN)}
           plannerStatus={plannerStatus}
         />

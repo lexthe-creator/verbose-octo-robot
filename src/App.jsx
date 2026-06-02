@@ -10,6 +10,7 @@ import Home            from './screens/Home.jsx'
 import Plan            from './screens/Plan.jsx'
 import Calendar        from './screens/Calendar.jsx'
 import Tasks           from './screens/Tasks.jsx'
+import Nutrition       from './screens/Nutrition.jsx'
 import FocusTimer      from './screens/FocusTimer.jsx'
 import Inbox           from './screens/Inbox.jsx'
 import Finance         from './screens/Finance.jsx'
@@ -127,6 +128,9 @@ export default function App() {
         {screen === SCREENS.MORE && (
           <MoreScreen onNavigate={navigate} />
         )}
+        {screen === SCREENS.NUTRITION && (
+          <Nutrition />
+        )}
         {screen === SCREENS.INBOX    && <Inbox />}
         {screen === SCREENS.FINANCE  && <Finance />}
       </div>
@@ -135,7 +139,7 @@ export default function App() {
         <nav style={styles.nav}>
           {navTabs.map(tab => {
             const active = screen === tab.screen ||
-              (tab.screen === SCREENS.MORE && [SCREENS.PROJECTS, SCREENS.FINANCE].includes(screen))
+              (tab.screen === SCREENS.MORE && [SCREENS.NUTRITION, SCREENS.PROJECTS, SCREENS.FINANCE].includes(screen))
             return (
               <button
                 key={tab.screen}
@@ -199,7 +203,7 @@ function PlannerPlaceholder({ eyebrow, title, detail }) {
 
 function MoreScreen({ onNavigate }) {
   const items = [
-    { label: 'Nutrition', detail: 'Light logging placeholder' },
+    { label: 'Nutrition', detail: 'Open food log', screen: SCREENS.NUTRITION },
     { label: 'Projects', detail: 'Open project planning', screen: SCREENS.PROJECTS },
     { label: 'Finance', detail: 'Open spending snapshot', screen: SCREENS.FINANCE },
     { label: 'Insights', detail: 'Coming later' },

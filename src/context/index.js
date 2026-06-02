@@ -11,3 +11,10 @@ export { FinanceProvider, useFinance,
          getOddTransaction,
          getTodayTransactions }                from './FinanceContext'
 export { PlanningProvider, usePlanning }       from './PlanningContext'
+export { NutritionProvider, useNutrition,
+         MEAL_SLOTS,
+         getNutritionEntriesForDate,
+         getNutritionTotals,
+         getMealSlotEntries,
+         getLoggedMealSlotCount,
+         getNutritionStatusSymbol }            from './NutritionContext'

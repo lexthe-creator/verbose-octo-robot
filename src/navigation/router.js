@@ -7,6 +7,7 @@ const ROUTES = new Map([
   [SCREENS.TASKS,         { showNav: true,  isOverlay: false }],
   [SCREENS.FITNESS,       { showNav: true,  isOverlay: false }],
   [SCREENS.MORE,          { showNav: true,  isOverlay: false }],
+  [SCREENS.NUTRITION,     { showNav: true,  isOverlay: false }],
   [SCREENS.INBOX,         { showNav: true,  isOverlay: false }],
   [SCREENS.PROJECTS,      { showNav: true,  isOverlay: false }],
   [SCREENS.FINANCE,       { showNav: true,  isOverlay: false }],

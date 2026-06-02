@@ -14,7 +14,6 @@ export default function Tasks() {
     <main style={styles.screen}>
       <header style={styles.header}>
         <p style={styles.eyebrow}>tasks</p>
-        <h1 style={styles.title}>committed actions</h1>
       </header>
 
       <div style={styles.sections}>
@@ -116,38 +115,30 @@ function formatTaskTime(time) {
 
 const styles = {
   screen: {
-    minHeight:  '100dvh',
-    padding:    'max(env(safe-area-inset-top), 22px) 20px calc(var(--safe-bottom) + var(--nav-height) + 24px)',
-    background: 'var(--color-bg)',
-    color:      'var(--color-text)',
+    minHeight:    '100dvh',
+    padding:      'max(env(safe-area-inset-top), 20px) 20px calc(var(--safe-bottom) + var(--nav-height) + 22px)',
+    background:   'var(--color-bg)',
+    color:        'var(--color-text)',
   },
   header: {
-    marginBottom: '16px',
+    marginBottom: '7px',
   },
   eyebrow: {
     margin:        0,
     color:         'var(--color-muted)',
     fontSize:      '10px',
     fontWeight:    700,
-    letterSpacing: '0.08em',
-  },
-  title: {
-    margin:      '5px 0 0',
-    fontFamily: 'var(--font-body)',
-    fontSize:   '17px',
-    fontWeight: 600,
-    lineHeight: 1.1,
-    color:      'var(--color-text)',
+    letterSpacing: '0.1em',
   },
   sections: {
     display:       'flex',
     flexDirection: 'column',
-    gap:           '11px',
+    gap:           '8px',
   },
   section: {
     display:       'flex',
     flexDirection: 'column',
-    gap:           '4px',
+    gap:           0,
   },
   sectionHeader: {
     display:        'flex',
@@ -157,16 +148,19 @@ const styles = {
     paddingBottom:  '5px',
   },
   sectionTitle: {
-    margin:      0,
-    fontFamily: 'var(--font-body)',
-    fontSize:   '13px',
-    fontWeight: 600,
-    lineHeight: 1.25,
+    margin:        0,
+    color:         'var(--color-muted)',
+    fontFamily:    'var(--font-body)',
+    fontSize:      '10px',
+    fontWeight:    700,
+    letterSpacing: '0.1em',
+    lineHeight:    1.25,
   },
   sectionCount: {
-    color:      'var(--color-muted)',
-    fontSize:   '12px',
-    fontWeight: 500,
+    color:         'var(--color-muted)',
+    fontSize:      '10px',
+    fontWeight:    600,
+    letterSpacing: '0.04em',
   },
   taskList: {
     display:       'flex',
@@ -175,10 +169,10 @@ const styles = {
   taskRow: {
     display:             'grid',
     gridTemplateColumns: '24px minmax(0, 1fr)',
-    gap:                 '10px',
+    gap:                 '12px',
     alignItems:          'start',
     padding:             '10px 0',
-    borderBottom:        '0.5px solid color-mix(in srgb, var(--color-border) 62%, transparent)',
+    borderBottom:        'var(--border)',
   },
   checkButton: {
     width:          '18px',
@@ -208,7 +202,7 @@ const styles = {
   taskTitle: {
     margin:     0,
     color:      'var(--color-text)',
-    fontSize:   '13px',
+    fontSize:   '12px',
     fontWeight: 500,
     lineHeight: 1.35,
   },

@@ -74,6 +74,9 @@ Product direction:
 - Nutrition should remain lightweight, low-friction, and easy to maintain during normal life.
 - Avoid macro obsession, calorie-tracker complexity, and MyFitnessPal-style workflows.
 - Favor meal logging, simple food capture, and low-friction tracking.
+- Nutrition V1C is the first foundation for the long-term Nutrition system.
+- The long-term Nutrition destination may include calorie tracking, macro tracking, food database behavior, saved foods, saved meals, barcode/photo/AI support, and trend reporting.
+- Nutrition V1C should move toward that long-term direction through manual, local-first food logging without external database, API, barcode, photo, or AI complexity.
 - Recovery, fitness, mood, and scheduling should begin connecting so the product can understand daily capacity and rhythm.
 
 ### Phase 3 — Intelligence + Ecosystem
@@ -335,6 +338,53 @@ Tasks should avoid:
 - productivity KPI framing
 
 Tasks stores work. Plan reviews today's commitments. Home executes today. Calendar finds capacity.
+
+## Nutrition Planner Philosophy
+
+Nutrition V1C = Food Log Lite.
+
+Nutrition answers:
+- What have I eaten today?
+- How does it compare to my calorie and macro targets?
+
+Nutrition V1C should be manual, local-first, and low-friction. It may track calories and macros, but it should remain calm, planner-oriented, and non-judgmental.
+
+Nutrition V1C should support:
+- meal slots: breakfast, lunch, snack, dinner
+- manual food logging
+- calories
+- protein
+- carbs
+- fat
+- daily totals
+- saved foods or repeat foods
+- saved meals or repeat meals if simple to define
+- edit/delete logged entries
+- Home Nutrition planner tab status based on logged meals
+
+Nutrition V1C defaults:
+- calorie and macro targets should start with editable defaults, not `null`
+- default calories: 1955
+- default protein: 145g
+- default carbs: 150g
+- default fat: 75g
+- V1 should not require a setup step before food logging
+- saved foods are explicit user actions; manually logged foods should not be auto-saved
+- Home completion should be driven by meal-slot logging, not target completion
+
+Nutrition V1C should not include:
+- barcode scanning
+- photo recognition
+- external food database
+- AI food estimates
+- complex goal coaching
+- trend reports
+- meal plan generator
+- grocery generation
+- nutrition recommendations
+- recipe library
+
+Long-term Nutrition may evolve toward a MyFitnessPal-style replacement, including calorie tracking, macro tracking, food database behavior, saved foods, saved meals, barcode/photo/AI support, and trend reporting. V1C is only the manual local foundation for that future direction.
 
 ## Calendar Planner Philosophy
 
@@ -662,6 +712,194 @@ V1 should default to Balanced. Minimal and Detailed should be available later un
 
 All tokens live in `src/styles/tokens.css` as CSS custom properties. Imported globally via `src/index.css`.
 
+### Planner Design System
+
+The Planner Design System is the governing design layer for all future AIML screens.
+
+It sits above individual screen requirements and below product philosophy:
+- Product philosophy defines what each surface is for.
+- Planner Design System defines how surfaces should feel and behave visually.
+- Screen sections define only surface-specific exceptions or additions.
+
+When a future screen is designed or implemented, it should default to the Planner Design System unless a later SPEC section explicitly approves an exception.
+
+#### Core feel
+
+AIML should feel like a paper planner that happens to be digital.
+
+It should not feel like:
+- dashboard software
+- project management software
+- productivity SaaS
+- admin forms
+
+AIML screens should feel like calm planner pages, not software dashboards.
+
+Default screen qualities:
+- quiet
+- structured
+- spacious but not sparse
+- readable at a glance
+- low-pressure
+- planner-first
+- mobile-first
+
+Avoid:
+- dashboard-heavy composition
+- KPI widgets as primary structure
+- dense enterprise-app layouts
+- oversized marketing-style heroes
+- heavy boxed cards as the default page structure
+- productivity-app visual noise
+- motivational copy that competes with planner content
+- stacked forms
+- large buttons as the dominant page structure
+- configuration screens as a default workflow
+- settings-style layouts for ordinary planner tasks
+- card-heavy dashboards
+- empty-state paragraphs
+
+#### Page hierarchy
+
+Default page structure:
+1. small planner label
+2. optional compact page title only when it adds meaning
+3. primary planner content
+4. secondary context or actions
+
+Rules:
+- The small planner label is usually the route name, such as `home`, `calendar`, `tasks`, `fitness`, `nutrition`, or `more`.
+- The planner label should be visually quiet: muted color, small size, strong enough for orientation, never hero-like.
+- Do not add a subtitle by default. Add one only when it clarifies the surface and does not push primary content down.
+- The first meaningful section should appear high on the screen.
+- Primary planner content should not be delayed by decorative headers, large cards, or explanatory copy.
+
+#### Typography hierarchy
+
+Typography should carry hierarchy more than boxes, badges, or color blocks.
+
+Default typography:
+- planner labels: small, muted, letter-spaced, restrained
+- section labels: lowercase or established structural uppercase, never random Title Case
+- item titles: readable, sentence-style, preserving user-created casing
+- metadata: smaller, muted, secondary
+- counts/status: subtle planner metadata, not badges unless the screen specifically needs an affordance
+
+Rules:
+- Preserve user-created content casing.
+- Use lowercase sentence-style text for planner content by default.
+- Use uppercase only for established structural labels.
+- Avoid oversized app-screen headings.
+- Avoid all-caps section headers unless the current surface pattern already establishes them.
+- Do not use typography to create pressure, urgency, or gamified productivity framing.
+
+#### Layout rhythm
+
+Planner pages should use consistent mobile rhythm.
+
+Defaults:
+- screen padding should align with the established Home/Calendar/Tasks rhythm
+- related content should sit close enough to scan as one planner page
+- section gaps should be modest
+- rows should use subtle dividers rather than heavy containers
+- empty sections should collapse to their label/count or be omitted, depending on the surface
+- prefer planner spreads, lists, rows, whitespace, and subtle indicators over app-like containers
+
+Rules:
+- Prefer rows, dividers, and whitespace over nested cards.
+- Avoid page sections styled as floating dashboard cards.
+- Do not put cards inside cards.
+- Keep the first viewport useful; avoid letting low-value context dominate the top of the screen.
+- Dense detail belongs behind a later interaction or future phase, not in the default planner view.
+
+#### Information density
+
+When choosing between form controls and planner readability, preserve planner readability.
+
+Prefer:
+- typography
+- whitespace
+- lists
+- rows
+- planner spreads
+- subtle indicators
+- progressive disclosure
+- inline editing
+
+Avoid:
+- exposing every field at once
+- making configuration the primary experience
+- dense control panels
+- setup-first flows when logging or review can begin immediately
+
+#### Color, borders, and surfaces
+
+Color should support orientation and state without dominating the planner.
+
+Defaults:
+- use `var(--color-bg)` as the page canvas
+- use `var(--color-text)` for primary content
+- use `var(--color-muted)` for labels and metadata
+- use `var(--border)` or softer mixed borders for quiet separation
+- use accent and success colors sparingly for active, selected, or completed states
+
+Rules:
+- Avoid strong badge treatment for ordinary metadata.
+- Avoid heat maps, utilization colors, and KPI color systems unless explicitly approved.
+- Avoid heavy outlines and boxed cells when a divider or spacing can do the work.
+- Do not create one-off palettes that make a screen feel detached from Home, Plan, Calendar, Tasks, Fitness, Nutrition, or More.
+
+#### Components and affordances
+
+Planner controls should feel lightweight and familiar.
+
+Defaults:
+- rows for repeated planner items
+- small icon buttons for utility actions
+- text buttons for clear commands
+- segmented controls for modes
+- check circles for completion
+- subtle inline metadata for time/date/status
+- bottom sheets or focused flows for editing when needed
+
+Data entry should prefer:
+- inline entry
+- bottom sheets
+- contextual actions
+- lightweight overlays
+
+Rules:
+- Do not introduce editing controls into read-only surfaces.
+- Do not duplicate capture UI outside Inbox unless the surface is explicitly approved as a capture flow.
+- Do not make every data point tappable if the screen's purpose is review or context.
+- Use interaction weight that matches the surface responsibility.
+- Avoid dedicated form pages unless explicitly approved.
+- Avoid large create/edit screens unless the workflow cannot remain readable without them.
+- Avoid multi-field setup experiences when editable defaults or progressive setup can work.
+
+#### Empty states and helper copy
+
+Planner pages should rely on structure before explanation.
+
+Rules:
+- Avoid explanatory empty-state copy when the section label already communicates the meaning.
+- Prefer `—`, whitespace, or a collapsed section for empty planner groups.
+- Use helper copy only when the user cannot reasonably infer what to do next.
+- Avoid coaching, judgment, productivity pressure, or motivational filler.
+
+#### Relationship to existing screens
+
+Current screens should be treated as reference surfaces:
+- Home defines the daily planner rhythm.
+- Plan defines calm review.
+- Calendar defines capacity and pattern visibility.
+- Tasks defines committed-action rows.
+- Nutrition defines low-friction logging.
+- Fitness defines guided execution without turning Home into a workout dashboard.
+- More defines lightweight navigation to secondary surfaces.
+
+Future screens should visually belong to this family before adding screen-specific identity.
+
 ### Colors
 
 Tokens are defined under both `[data-theme="light"]` and `[data-theme="dark"]` in `src/styles/tokens.css`. The app launches in the light theme by default.
@@ -765,7 +1003,8 @@ src/
     InboxContext.jsx       — inboxItems, taskPool, calendarItems, notes
     ProjectsContext.jsx    — generic projects array + focus-project selectors
     FinanceContext.jsx     — transactions + read-only finance selectors
-    PlanningContext.jsx    — reflectionLog, weeklyPriorities, groceryList
+  PlanningContext.jsx    — reflectionLog, weeklyPriorities, groceryList
+  NutritionContext.jsx   — targets, food logs, saved foods, saved meals
   screens/
     MorningIgnition.jsx   — 3-step ignition flow
     Home.jsx              — main daily screen (clock, training card, timeline, tasks, fuel)
@@ -795,7 +1034,7 @@ vite.config.js            — base set to repo name for GitHub Pages
 
 **Provider tree** (outermost → innermost):
 ```
-SettingsProvider > UserProvider > FitnessProvider > DayProvider > InboxProvider > ProjectsProvider > FinanceProvider > PlanningProvider > App
+SettingsProvider > UserProvider > FitnessProvider > DayProvider > InboxProvider > ProjectsProvider > FinanceProvider > PlanningProvider > NutritionProvider > App
 ```
 
 There is no `AppContext` in the current architecture. State is split across eight domain contexts and exposed through `src/context/index.js`.
@@ -811,6 +1050,7 @@ There is no `AppContext` in the current architecture. State is split across eigh
 | `aiml_projects` | ProjectsContext | `{ version: 1, data }` | Migrates projects from `aiml_state`; also migrates legacy `sheStitches` into the generic projects array. |
 | `aiml_finance` | FinanceContext | `{ version: 1, data }` | Migrates `transactions` from legacy `aiml_state`. |
 | `aiml_planning` | PlanningContext | `{ version: 1, data }` | Migrates reflection, weekly priorities, and grocery list from legacy `aiml_state`. |
+| `aiml_nutrition` | NutritionContext | `{ version: 1, data }` | Local-first Nutrition V1C food logs, targets, saved foods, and saved meals. |
 | `aiml_state` | Legacy only | Raw JSON, no version wrapper | Read once by domain contexts for migration. Do not write new state here. |
 | `sheStitches` | Legacy only | Raw JSON | Migrated once into `aiml_projects`, then removed if migration succeeds. |
 | `lastReflectionDate` | App.jsx overlay guard | ISO date string | Prevents repeated EOD overlay on the same date. |
@@ -824,7 +1064,7 @@ Each domain context migrates from `aiml_state` on first launch when its own key 
 
 ## 4. Context State Shapes
 
-State is split across eight domain contexts. Each persistent context owns its localStorage key, reducer, migration path, and schema version. Derived values are computed in selectors/utilities, not stored.
+State is split across nine domain contexts. Each persistent context owns its localStorage key, reducer, migration path, and schema version. Derived values are computed in selectors/utilities, not stored.
 
 ---
 
@@ -1045,6 +1285,106 @@ Actions: `ADD_REFLECTION`, `SET_WEEKLY_PRIORITIES`, `ADD_GROCERY_ITEM`, `TOGGLE_
 
 ---
 
+### 4.9 NutritionContext (`aiml_nutrition`, schema v1) — V1C
+
+Nutrition V1C introduces a separate nutrition domain.
+
+```js
+{
+  targets: {
+    calories: 1955,
+    protein:  145,
+    carbs:    150,
+    fat:      75,
+  },
+  dailyLogs: {
+    [YYYY-MM-DD]: {
+      entries: [
+        {
+          id: string,
+          mealSlot: 'breakfast' | 'lunch' | 'snack' | 'dinner',
+          name: string,
+          calories: number,
+          protein: number,
+          carbs: number,
+          fat: number,
+          createdAt: ISO8601,
+          updatedAt: ISO8601,
+        },
+      ],
+    },
+  },
+  savedFoods: [
+    {
+      id: string,
+      name: string,
+      calories: number,
+      protein: number,
+      carbs: number,
+      fat: number,
+      defaultMealSlot?: 'breakfast' | 'lunch' | 'snack' | 'dinner',
+    },
+  ],
+  savedMeals: [
+    {
+      id: string,
+      name: string,
+      entries: [
+        {
+          name: string,
+          calories: number,
+          protein: number,
+          carbs: number,
+          fat: number,
+        },
+      ],
+      defaultMealSlot?: 'breakfast' | 'lunch' | 'snack' | 'dinner',
+    },
+  ],
+}
+```
+
+NutritionContext is separate from `DayContext.meals`.
+
+Responsibilities:
+- `DayContext.meals` controls meal windows and eaten/window state.
+- `NutritionContext` controls food entries, calories, macros, saved foods, and saved meals.
+- Home meal windows may eventually route to Nutrition logging for that meal slot.
+- Home Nutrition planner tab status should eventually use `NutritionContext.dailyLogs`, not only `DayContext.meals`.
+- Nutrition targets should be editable later, but V1C should ship with defaults and allow logging without setup.
+- Manually logged foods should not automatically become saved foods. Saving a food for reuse should be an explicit optional action after logging.
+
+Derived values:
+- daily calories total
+- daily protein total
+- daily carbs total
+- daily fat total
+- meal-slot logged state based on whether at least one entry exists for the slot
+- target comparison against editable default targets
+
+Actions should be defined in the implementation pass, but V1C should support:
+- add manual food entry
+- add from saved food
+- add saved meal
+- update logged entry
+- delete logged entry
+- save food for reuse
+- save meal for reuse
+
+Actions:
+- `ADD_FOOD_ENTRY`
+- `UPDATE_FOOD_ENTRY`
+- `DELETE_FOOD_ENTRY`
+- `SAVE_FOOD`
+- `DELETE_SAVED_FOOD`
+- `SAVE_MEAL`
+- `DELETE_SAVED_MEAL`
+- `ADD_SAVED_FOOD_TO_LOG`
+- `ADD_SAVED_MEAL_TO_LOG`
+- `UPDATE_TARGETS`
+
+---
+
 ### `src/utils/projectUtils.js` — `getProjectPace(project)`
 
 Returns `{ status, projectedFinish, daysOver }`.
@@ -1076,7 +1416,7 @@ Project stats are exposed by `getProjectStats(project)`, not by `useApp()`.
 
 ### Screen Names (state values in App.jsx)
 
-`'ignition'` · `'home'` · `'plan'` · `'calendar'` · `'tasks'` · `'fitness'` · `'more'` · `'focus'` · `'inbox'` · `'finance'` · `'projects'` · `'settings'`
+`'ignition'` · `'home'` · `'plan'` · `'calendar'` · `'tasks'` · `'fitness'` · `'more'` · `'nutrition'` · `'focus'` · `'inbox'` · `'finance'` · `'projects'` · `'settings'`
 
 **Overlay screens** (rendered as `position: fixed, z-index: 200` above all screens):
 
@@ -1165,7 +1505,7 @@ Planner tab status rules:
 
 V1 data mapping:
 - Journal can use today's reflection/EOD completion state when available; otherwise default to not started.
-- Nutrition uses `DayContext.meals[*].eaten`.
+- Nutrition currently may use `DayContext.meals[*].eaten`; after Nutrition V1C, Nutrition tab status should use `NutritionContext.dailyLogs`.
 - Plan may default to `○` until a dedicated daily plan state exists.
 - Events use today's confirmed `InboxContext.calendarItems` count when available. Meal windows are excluded.
 
@@ -1293,6 +1633,11 @@ Tasks V1 implementation may:
 - keep row interaction lightweight
 - use restrained planner typography with subtle section labels and counts
 - collapse empty sections to their header/count without explanatory helper copy
+- use the page label `tasks` without an additional subtitle such as "committed actions"
+- make `today` the first visible content section after the page label
+- align Tasks spacing and dividers with Calendar's quiet planner rhythm
+- keep section labels lowercase: `today`, `upcoming`, `unscheduled`, `done`
+- render section counts as subtle planner metadata, not badges or KPI values
 
 Tasks V1 should not prioritize:
 - capture workflows
@@ -1572,12 +1917,83 @@ Do not implement Calendar behavior beyond the approved read-only V1 scope until 
 V1 may be a lightweight placeholder list. It should use existing routes when available and avoid building full new systems.
 
 List entries:
-- Nutrition — placeholder until a Nutrition screen exists.
+- Nutrition — routes to `nutrition` when available.
 - Projects — routes to `projects` when available.
 - Finance — routes to `finance` when available.
 - Insights — placeholder until analytics/insights exist.
 
 Settings does not need to appear in More while it remains available in the Home top-right utility cluster beside Inbox.
+
+---
+
+### 5.8c Nutrition (`'nutrition'`) — V1C Definition
+
+Nutrition V1C is Food Log Lite.
+
+Purpose:
+- What have I eaten today, and how does it compare to my calorie and macro targets?
+
+Nutrition V1C should include:
+- daily totals
+- simple targets display
+- meal slot sections: breakfast, lunch, snack, dinner
+- add food manually
+- saved foods / recent foods
+- saved meals / repeat meals if simple
+- edit/delete food entries
+
+Nutrition V1C should remain:
+- planner-style
+- calm
+- low-friction
+- local-first
+- manual
+- non-judgmental
+
+Nutrition V1C should avoid:
+- dashboard-heavy design
+- dense MyFitnessPal clone UI
+- excessive charts
+- coaching language
+- judgment language
+- barcode scanning
+- photo recognition
+- external food databases
+- AI food estimates
+- recipe library
+- grocery generation
+
+V1C information hierarchy:
+1. Today totals
+2. Meal slots
+3. Saved/recent foods
+4. Add food manually through contextual meal actions
+5. Logged entries
+6. Simple targets
+
+Planner design alignment:
+- Nutrition should render as a planner food log, not an admin form, settings page, SaaS screen, or MyFitnessPal clone.
+- The main page should use the structure `nutrition` / `today` / daily totals / breakfast / lunch / snack / dinner / saved or recent.
+- Daily totals should be compact rows such as `calories 0 / 1955`, not cards, charts, KPI blocks, or progress bars.
+- Meal slots are the primary interaction surface and should use lowercase labels, subtle dividers, inline logged foods, and small contextual `add` actions.
+- The manual food form should not be persistently visible on the main page. Tapping a meal's `add` action should open a focused bottom sheet, compact overlay, or inline expansion with that meal preselected.
+- Saved foods and saved meals are secondary and should appear as compact or collapsed planner lists with lightweight add-again behavior.
+- Empty states should be short planner text such as `nothing logged`, `no saved foods`, and `no saved meals`.
+- Targets remain editable but should not turn the main Nutrition page into a configuration surface.
+
+Home integration:
+- Home Nutrition planner tab status should eventually derive from `NutritionContext.dailyLogs`.
+- `○` = no logged nutrition today.
+- `◐` = at least one meal slot logged.
+- `☑` = all expected meal slots logged.
+- Target completion should not drive Home Nutrition completion in V1C.
+- Meal windows in Daily Flow should remain guidance blocks.
+- Future: tapping a meal window can open Nutrition logging for that slot.
+
+Navigation:
+- Nutrition remains accessible from More in V1 unless product direction changes later.
+- Home Nutrition planner tab routes to the Nutrition screen.
+- Nutrition is not a bottom-nav tab in current V1.
 
 ---
 
@@ -1773,13 +2189,26 @@ Used in Home screen fuel gauge slots.
 - Late state: triggered when `currentTime > meals[slot].lateAfter` AND `meals[slot].eaten === false` — slot renders in terracotta
 - DayContext action: `UPDATE_MEAL_WINDOW` — see §4.
 
+### Nutrition V1C food logging
+Used in the future Nutrition screen or logging flow.
+- Add manual food entry: choose meal slot, enter food name, calories, protein, carbs, and fat.
+- Add from saved food: choose a saved/recent food, optionally choose meal slot, then add it to today's log.
+- Add saved meal: choose a saved/repeat meal, optionally choose meal slot, then add its entries to today's log.
+- Edit logged entry: update name, meal slot, calories, protein, carbs, or fat.
+- Delete logged entry: remove the entry from today's log.
+- Save food for reuse: after logging a food, offer an optional explicit save action.
+- Meal slot logging: a meal slot counts as logged when at least one nutrition entry exists for that slot on the current date.
+- Manual food logging should not auto-save foods to the saved list.
+- Nutrition logging should not alter `DayContext.meals` meal windows directly.
+- Home meal windows may later route into this flow with the slot preselected.
+
 ---
 
 ## 7. Navigation & Routing
 
 **Pattern:** `useState`-based screen switcher in `App.jsx` — no router library.
 
-**Screen values:** `'ignition'` · `'home'` · `'plan'` · `'calendar'` · `'tasks'` · `'fitness'` · `'more'` · `'focus'` · `'inbox'` · `'finance'` · `'projects'` · `'settings'`
+**Screen values:** `'ignition'` · `'home'` · `'plan'` · `'calendar'` · `'tasks'` · `'fitness'` · `'more'` · `'nutrition'` · `'focus'` · `'inbox'` · `'finance'` · `'projects'` · `'settings'`
 
 **Bottom nav** (`src/App.jsx`):
 - 60px height, `#1A1A14` bg, `0.5px` top border
@@ -1807,6 +2236,8 @@ Used in Home screen fuel gauge slots.
 | `focus` | `home` | `onClose()` prop |
 | `projects` | `home` | `onBack()` prop |
 | `more` | `projects` / `finance` | More list row tap when the screen exists |
+| `home` | `nutrition` | Nutrition tab in the Home planner status bar |
+| `more` | `nutrition` / `projects` / `finance` | More list row tap when the screen exists |
 | `home` or `fitness` | WorkoutPlayer overlay | "Start →" button → `onStartWorkout(workout)` in App.jsx |
 | Any nav tab | target screen | Bottom nav tab tap |
 
@@ -1863,6 +2294,7 @@ File: `.github/workflows/pages.yml`
 - Finance screen with local transaction data, manual add/delete, Plaid connection stub, and read-only summary selectors
 - Settings screen: profile name, equipment toggle, Plaid/Calendar connection stubs
 - Fitness tab: Today's Training card, weekly strip, recent workout log
+- Nutrition V1C: local-first manual food log with targets, meal-slot entries, saved foods, and simple saved meals
 - WorkoutPlayer: full segment flow + post-workout log (feel, notes, saves to fitness.workoutLog)
 - 26-week training block: generateWorkout utility with phase-aware exercise selection
 - Fuel slot time editing via FuelEditSheet bottom sheet (iOS-safe native time inputs)
@@ -1877,6 +2309,15 @@ File: `.github/workflows/pages.yml`
 - **V2 Twilio SMS pipeline** — finance spend alerts via SMS (stub comment in Finance.jsx)
 - **Runna API** integration (live workout data instead of mock)
 - **Google Calendar** integration (inbox "→ Calendar" action)
+- **Nutrition barcode scanning**
+- **Nutrition photo logging / photo recognition**
+- **Nutrition AI food recognition or estimates**
+- **External nutrition food database**
+- **Macro trend reports**
+- **Nutrition meal plan generator**
+- **Nutrition recommendations / coaching**
+- **Nutrition recipe library**
+- **Nutrition grocery generation**
 - **Task editing** — add/edit/delete tasks from the app
 - **Meal customization** — edit meal labels and time windows
 - **Notifications / reminders** — push or local alerts for commitments

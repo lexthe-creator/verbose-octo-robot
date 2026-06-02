@@ -6,6 +6,7 @@ import {
   SettingsProvider, UserProvider, FitnessProvider,
   DayProvider, InboxProvider,
   ProjectsProvider, FinanceProvider, PlanningProvider,
+  NutritionProvider,
 } from './context/index.js'
 
 createRoot(document.getElementById('root')).render(
@@ -18,7 +19,9 @@ createRoot(document.getElementById('root')).render(
               <ProjectsProvider>
                 <FinanceProvider>
                   <PlanningProvider>
-                    <App />
+                    <NutritionProvider>
+                      <App />
+                    </NutritionProvider>
                   </PlanningProvider>
                 </FinanceProvider>
               </ProjectsProvider>
