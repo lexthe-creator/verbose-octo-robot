@@ -5,6 +5,7 @@ const ROUTES = new Map([
   [SCREENS.PLAN,          { showNav: true,  isOverlay: false }],
   [SCREENS.CALENDAR,      { showNav: true,  isOverlay: false }],
   [SCREENS.TASKS,         { showNav: true,  isOverlay: false }],
+  [SCREENS.HEALTH,        { showNav: true,  isOverlay: false }],
   [SCREENS.FITNESS,       { showNav: true,  isOverlay: false }],
   [SCREENS.MORE,          { showNav: true,  isOverlay: false }],
   [SCREENS.NUTRITION,     { showNav: true,  isOverlay: false }],

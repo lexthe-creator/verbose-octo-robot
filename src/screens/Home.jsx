@@ -737,7 +737,7 @@ export default function Home({ onNavigate }) {
           onOpenSettings={() => onNavigate(SCREENS.SETTINGS)}
           onOpenInbox={() => onNavigate(SCREENS.INBOX)}
           onOpenJournal={() => onNavigate(SCREENS.EOD)}
-          onOpenNutrition={() => onNavigate(SCREENS.NUTRITION)}
+          onOpenNutrition={() => onNavigate(SCREENS.HEALTH)}
           onOpenPlan={() => onNavigate(SCREENS.PLAN)}
           plannerStatus={plannerStatus}
         />

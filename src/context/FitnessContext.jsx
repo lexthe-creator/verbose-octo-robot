@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useReducer, useEffect } from 'react'
 import { getTodayISO } from '../utils/time.js'
 
@@ -9,6 +10,7 @@ const initialFitnessState = {
   programStartDate: null,
   programEndDate:   null,
   workoutLog:       [],
+  workoutDayStatus: {},
   todayComplete:    false,
   focusSessions:    0,
   program: {
@@ -26,10 +28,13 @@ const initialFitnessState = {
 
 /* ─── Day reset ───────────────────────────────────────────────────────────── */
 function resolveTodayComplete(saved) {
+  const todayStatus = saved.workoutDayStatus?.[getTodayISO()]?.status
+  if (todayStatus === 'completed') return true
+  if (todayStatus === 'skipped') return false
   if (!saved.todayComplete) return false
   const log = saved.workoutLog ?? []
   if (log.length === 0) return false
-  return log[log.length - 1].date === getTodayISO()
+  return String(log[log.length - 1].date).slice(0, 10) === getTodayISO()
 }
 
 /* ─── Migration ───────────────────────────────────────────────────────────── */
@@ -48,6 +53,7 @@ function migrateV1ToV2(data) {
       ...entry,
       sets: entry.sets ?? [],
     })),
+    workoutDayStatus: {},
   }
 }
 
@@ -65,6 +71,7 @@ function migrateFitnessFromLegacy(legacyRaw) {
       programStartDate: fitness.programStartDate ?? null,
       programEndDate:   fitness.programEndDate   ?? null,
       workoutLog,
+      workoutDayStatus: {},
       focusSessions,
     }
     return { ...candidate, todayComplete: resolveTodayComplete(candidate) }
@@ -123,12 +130,42 @@ export function fitnessReducer(state, action) {
   switch (action.type) {
 
     case 'LOG_WORKOUT': {
-      const { date, type, title, duration, feel, notes, exercises } = action.payload
-      const entry = { date, type, title, duration, feel, notes, exercises: exercises ?? [], sets: [] }
+      const { date, type, title, duration, feel, effort, notes, exercises, status = 'completed', source = 'planned' } = action.payload
+      const entryDate = String(date ?? getTodayISO()).slice(0, 10)
+      const entry = {
+        date: date ?? entryDate,
+        type,
+        title,
+        duration,
+        feel,
+        effort,
+        notes,
+        status,
+        source,
+        exercises: exercises ?? [],
+        sets: [],
+      }
       return {
         ...state,
         workoutLog:    [...state.workoutLog, entry],
-        todayComplete: true,
+        workoutDayStatus: {
+          ...state.workoutDayStatus,
+          [entryDate]: { status, updatedAt: new Date().toISOString() },
+        },
+        todayComplete: entryDate === getTodayISO() ? status === 'completed' : state.todayComplete,
+      }
+    }
+
+    case 'SET_WORKOUT_DAY_STATUS': {
+      const date = action.payload.date ?? getTodayISO()
+      const status = action.payload.status
+      return {
+        ...state,
+        workoutDayStatus: {
+          ...state.workoutDayStatus,
+          [date]: { status, updatedAt: new Date().toISOString() },
+        },
+        todayComplete: date === getTodayISO() ? status === 'completed' : state.todayComplete,
       }
     }
 

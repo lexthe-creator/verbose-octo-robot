@@ -10,6 +10,7 @@ import Home            from './screens/Home.jsx'
 import Plan            from './screens/Plan.jsx'
 import Calendar        from './screens/Calendar.jsx'
 import Tasks           from './screens/Tasks.jsx'
+import Health          from './screens/Health.jsx'
 import Nutrition       from './screens/Nutrition.jsx'
 import FocusTimer      from './screens/FocusTimer.jsx'
 import Inbox           from './screens/Inbox.jsx'
@@ -59,10 +60,9 @@ export default function App() {
   function navigate(target) {
     if (target === SCREENS.EOD)    { setShowReflection(true); return }
     if (target === SCREENS.WEEKLY) { setShowWeeklyPlan(true); return }
-    // First-launch: redirect to setup wizard (nav hidden by route config)
+    // Legacy direct Fitness route: keep unconfigured users in Health, not setup.
     if (target === SCREENS.FITNESS && !fitnessState.program.configured) {
-      setIsEditingProgram(false)
-      navigateTo(SCREENS.FITNESS_SETUP)
+      navigateTo(SCREENS.HEALTH)
       return
     }
     // Settings → "Edit training program": open wizard in editing mode
@@ -97,12 +97,17 @@ export default function App() {
             onNavigate={navigate}
           />
         )}
+        {screen === SCREENS.HEALTH && (
+          <Health
+            onStartWorkout={handleStartWorkout}
+          />
+        )}
         {screen === SCREENS.FITNESS && (
           <Fitness onStartWorkout={handleStartWorkout} />
         )}
         {screen === SCREENS.FITNESS_SETUP && (
           <FitnessSetup
-            onComplete={() => navigate(SCREENS.FITNESS)}
+            onComplete={() => navigate(SCREENS.HEALTH)}
             onBack={goBack}
             isEditing={isEditingProgram}
           />
@@ -139,7 +144,7 @@ export default function App() {
         <nav style={styles.nav}>
           {navTabs.map(tab => {
             const active = screen === tab.screen ||
-              (tab.screen === SCREENS.MORE && [SCREENS.NUTRITION, SCREENS.PROJECTS, SCREENS.FINANCE].includes(screen))
+              (tab.screen === SCREENS.HEALTH && [SCREENS.FITNESS, SCREENS.NUTRITION].includes(screen))
             return (
               <button
                 key={tab.screen}
