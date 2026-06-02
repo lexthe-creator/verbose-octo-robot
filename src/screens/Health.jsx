@@ -93,11 +93,6 @@ const STATUS_LABELS = {
   skipped:     'Skipped',
 }
 
-function safePercent(value, target) {
-  if (!target) return 0
-  return Math.min(100, Math.round((value / target) * 100))
-}
-
 function makeDailyHealthKey(date) {
   return `aiml_health_today_${date}`
 }
@@ -185,6 +180,17 @@ function CheckInButtons({ label, value, onChange }) {
   )
 }
 
+function PlannerGroup({ label, children }) {
+  return (
+    <div style={s.plannerGroup}>
+      <p style={s.groupLabel}>{label}</p>
+      <div style={s.groupRows}>
+        {children}
+      </div>
+    </div>
+  )
+}
+
 function getTodayTrainingPlan(fitnessState, settingsState) {
   if (!fitnessState.program.configured) {
     return { scheduled: false, workout: null, status: 'none' }
@@ -224,7 +230,7 @@ function effortToFeel(effort) {
 
 function statusDetail(status) {
   if (status === 'in_progress') return 'open'
-  if (status === 'completed') return 'completed today'
+  if (status === 'completed') return 'done'
   if (status === 'skipped') return 'moved'
   return 'open day'
 }
@@ -284,7 +290,6 @@ function DailyWorkoutActions({ status, workout, onStartWorkout, onLogWorkout }) 
   if (status === 'completed') {
     return (
       <div style={s.actions}>
-        <ActionButton disabled>completed today</ActionButton>
         <ActionButton secondary onClick={onLogWorkout}>edit log</ActionButton>
       </div>
     )
@@ -322,10 +327,7 @@ function HealthToday({
 
   const nutritionEntries = getNutritionEntriesForDate(nutritionState, today)
   const totals = getNutritionTotals(nutritionEntries)
-  const proteinPercent = safePercent(totals.protein, nutritionState.targets.protein)
-  const caloriePercent = safePercent(totals.calories, nutritionState.targets.calories)
   const hydrationTarget = 8
-  const hydrationPercent = safePercent(daily.water, hydrationTarget)
 
   const trainingPlan = getTodayTrainingPlan(fitnessState, settingsState)
   const workout = trainingPlan.workout
@@ -348,77 +350,72 @@ function HealthToday({
     <main style={s.today}>
       <header style={s.header}>
         <p style={s.eyebrow}>health</p>
-        <h1 style={s.title}>today</h1>
-        <p style={s.subtitle}>a quick read on training, fuel, and recovery</p>
+        <h1 style={s.title}>Today</h1>
       </header>
 
-      <section style={s.block}>
-        <SectionHeader eyebrow="morning state" title="Morning state" />
-        <PlannerRow label="sleep" value="add later" />
-        <PlannerRow label="energy" value={energy ? `${energy}/5` : 'check in'} />
-        <PlannerRow label="readiness" value={readiness === 'check in' ? 'pending' : readiness} detail={recoveryStatus === 'not checked' ? '' : recoveryStatus} />
-      </section>
+      <section style={s.plannerCard}>
+        <p style={s.plannerTitle}>TODAY'S HEALTH PLAN</p>
 
-      <section style={s.block}>
-        <SectionHeader eyebrow="training" title="Training" />
-        {fitnessState.program.configured ? (
-          trainingPlan.scheduled ? (
-            <>
-              <PlannerRow label="today" value={workout.title} detail={workout.subtitle.split('·')[0].trim()} />
-              <PlannerRow label="status" value={STATUS_LABELS[trainingPlan.status]} detail={statusDetail(trainingPlan.status)} />
-              <DailyWorkoutActions
-                status={trainingPlan.status}
-                workout={workout}
-                onStartWorkout={onStartWorkout}
-                onLogWorkout={onLogWorkout}
-              />
-            </>
+        <PlannerGroup label="Morning">
+          <PlannerRow label="sleep" value="add later" />
+          <PlannerRow label="energy" value={energy ? `${energy}/5` : 'check in'} />
+          <PlannerRow label="readiness" value={readiness === 'check in' ? 'pending' : readiness} detail={recoveryStatus === 'not checked' ? '' : recoveryStatus} />
+        </PlannerGroup>
+
+        <PlannerGroup label="Training">
+          {fitnessState.program.configured ? (
+            trainingPlan.scheduled ? (
+              <>
+                <PlannerRow label="workout" value={workout.title.toLowerCase()} />
+                <PlannerRow label="focus" value={workout.subtitle.split('·')[0].trim().toLowerCase()} detail={`~${workout.durationEst} min`} />
+                <PlannerRow label="status" value={STATUS_LABELS[trainingPlan.status].toLowerCase()} />
+                <DailyWorkoutActions
+                  status={trainingPlan.status}
+                  workout={workout}
+                  onStartWorkout={onStartWorkout}
+                  onLogWorkout={onLogWorkout}
+                />
+              </>
+            ) : (
+              <>
+                <PlannerRow label="today" value="open day" />
+                <PlannerRow label="status" value="unscheduled" />
+                <InlineActions>
+                  <ActionButton secondary onClick={onLogWorkout}>log workout</ActionButton>
+                  <ActionButton secondary onClick={() => onSectionChange('training')}>view plan</ActionButton>
+                </InlineActions>
+              </>
+            )
           ) : (
             <>
               <PlannerRow label="today" value="open day" />
-              <PlannerRow label="status" value="unscheduled" detail="log if needed" />
+              <PlannerRow label="plan" value="add from Training" />
               <InlineActions>
-                <ActionButton secondary onClick={onLogWorkout}>log workout</ActionButton>
-                <ActionButton secondary onClick={() => onSectionChange('training')}>view plan</ActionButton>
+                <ActionButton secondary onClick={() => onSectionChange('training')}>
+                  view plan
+                </ActionButton>
               </InlineActions>
             </>
-          )
-        ) : (
-          <>
-            <PlannerRow label="today" value="open day" />
-            <PlannerRow label="plan" value="add from Training" />
-            <InlineActions>
-              <ActionButton secondary onClick={() => onSectionChange('training')}>
-                view plan
-              </ActionButton>
-            </InlineActions>
-          </>
-        )}
-      </section>
+          )}
+        </PlannerGroup>
 
-      <section style={s.block}>
-        <SectionHeader eyebrow="fuel" title="Fuel" />
-        <PlannerRow label="protein" value={`${Math.round(totals.protein)}g`} detail={`${proteinPercent}%`} percent={proteinPercent} />
-        <PlannerRow label="calories" value={`${Math.round(totals.calories)}`} detail={`${caloriePercent}%`} percent={caloriePercent} />
-        <PlannerRow label="water" value={`${daily.water}/${hydrationTarget}`} percent={hydrationPercent} />
-        <InlineActions>
-          <ActionButton secondary onClick={() => onSectionChange('nutrition')}>log meal</ActionButton>
-          <ActionButton secondary onClick={() => updateDaily({ water: Math.min(hydrationTarget, daily.water + 1) })}>
-            water
-          </ActionButton>
-        </InlineActions>
-      </section>
+        <PlannerGroup label="Fuel">
+          <PlannerRow label="protein" value={`${Math.round(totals.protein)}g`} />
+          <PlannerRow label="calories" value={`${Math.round(totals.calories)}`} />
+          <PlannerRow label="water" value={`${daily.water}/${hydrationTarget}`} />
+          <InlineActions>
+            <ActionButton secondary onClick={() => onSectionChange('nutrition')}>log meal</ActionButton>
+            <ActionButton secondary onClick={() => updateDaily({ water: Math.min(hydrationTarget, daily.water + 1) })}>
+              water
+            </ActionButton>
+          </InlineActions>
+        </PlannerGroup>
 
-      <section style={s.block}>
-        <SectionHeader eyebrow="check-in" title="Check-in" />
-        <CheckInButtons label="energy" value={energy} onChange={updateEnergy} />
-        <CheckInButtons label="soreness" value={daily.soreness} onChange={value => updateDaily({ soreness: value })} />
-        <CheckInButtons label="motivation" value={daily.motivation} onChange={value => updateDaily({ motivation: value })} />
-        <InlineActions>
-          <ActionButton secondary onClick={() => updateDaily({ checkedAt: new Date().toISOString() })}>
-            check in
-          </ActionButton>
-        </InlineActions>
+        <PlannerGroup label="Check-in">
+          <CheckInButtons label="energy" value={energy} onChange={updateEnergy} />
+          <CheckInButtons label="soreness" value={daily.soreness} onChange={value => updateDaily({ soreness: value })} />
+          <CheckInButtons label="motivation" value={daily.motivation} onChange={value => updateDaily({ motivation: value })} />
+        </PlannerGroup>
       </section>
     </main>
   )
@@ -474,9 +471,6 @@ function DailyTrainingCard({ onStartWorkout, onLogWorkout }) {
             onStartWorkout={onStartWorkout}
             onLogWorkout={onLogWorkout}
           />
-          <div style={s.actions}>
-            <ActionButton secondary onClick={onLogWorkout}>log workout</ActionButton>
-          </div>
         </>
       ) : (
         <>
@@ -792,25 +786,25 @@ const s = {
     position:   'sticky',
     top:        0,
     zIndex:     20,
-    padding:    'max(env(safe-area-inset-top), 10px) 20px 5px',
+    padding:    'max(env(safe-area-inset-top), 9px) 20px 4px',
     background: 'color-mix(in srgb, var(--color-bg) 98%, transparent)',
   },
   tabs: {
     display:    'flex',
     alignItems: 'center',
-    gap:        '5px',
+    gap:        '4px',
     padding:    0,
     background: 'transparent',
   },
   tab: {
-    minHeight:    '22px',
+    minHeight:    '21px',
     border:       'var(--border)',
     borderRadius: '999px',
     background:   'transparent',
     color:        'var(--color-muted)',
     fontSize:     '10px',
     fontWeight:   650,
-    padding:      '3px 8px',
+    padding:      '3px 7px',
   },
   tabActive: {
     borderColor: 'color-mix(in srgb, var(--color-accent) 34%, var(--color-border))',
@@ -826,10 +820,10 @@ const s = {
     textTransform: 'uppercase',
   },
   today: {
-    padding:       '6px 20px 0',
+    padding:       '5px 20px 0',
     display:       'flex',
     flexDirection: 'column',
-    gap:           '7px',
+    gap:           '6px',
   },
   simpleScreen: {
     minHeight:     '100dvh',
@@ -856,7 +850,7 @@ const s = {
   title: {
     margin:      0,
     fontFamily: 'var(--font-display)',
-    fontSize:   '17px',
+    fontSize:   '16px',
     fontWeight: 500,
     lineHeight: 1.08,
   },
@@ -874,6 +868,39 @@ const s = {
     border:        'var(--border)',
     borderRadius:  '10px',
     background:    'var(--color-card)',
+  },
+  plannerCard: {
+    display:       'flex',
+    flexDirection: 'column',
+    padding:       '10px 11px',
+    border:        'var(--border)',
+    borderRadius:  '10px',
+    background:    'var(--color-card)',
+  },
+  plannerTitle: {
+    margin:        '0 0 4px',
+    color:         'var(--color-muted)',
+    fontSize:      '10px',
+    fontWeight:    680,
+    letterSpacing: '0.02em',
+  },
+  plannerGroup: {
+    display:       'flex',
+    flexDirection: 'column',
+    gap:           '1px',
+    padding:       '7px 0 6px',
+    borderTop:     '0.5px solid color-mix(in srgb, var(--color-border) 44%, transparent)',
+  },
+  groupLabel: {
+    margin:     '0 0 2px',
+    color:      'var(--color-muted)',
+    fontSize:   '11px',
+    fontWeight: 640,
+  },
+  groupRows: {
+    display:       'flex',
+    flexDirection: 'column',
+    gap:           '1px',
   },
   trainingBlock: {
     margin:  '0 20px 7px',
@@ -911,9 +938,9 @@ const s = {
     gridTemplateColumns: '76px minmax(0, 1fr) auto',
     alignItems:          'center',
     gap:                 '7px',
-    minHeight:           '21px',
-    padding:             '2px 0',
-    borderTop:           '0.5px solid color-mix(in srgb, var(--color-border) 34%, transparent)',
+    minHeight:           '19px',
+    padding:             '1px 0',
+    borderTop:           'none',
   },
   rowLabel: {
     color:      'var(--color-muted)',
@@ -958,23 +985,23 @@ const s = {
     display:   'flex',
     flexWrap:  'wrap',
     gap:       '5px',
-    marginTop: '2px',
+    marginTop: '1px',
   },
   inlineActions: {
     display:   'flex',
     flexWrap:  'wrap',
     gap:       '5px',
-    marginTop: '1px',
+    marginTop: '2px',
   },
   action: {
-    minHeight:    '24px',
+    minHeight:    '22px',
     border:       'none',
     borderRadius: '999px',
     background:   'var(--color-accent)',
     color:        '#fff',
     fontSize:     '10px',
     fontWeight:   650,
-    padding:      '4px 8px',
+    padding:      '3px 8px',
   },
   secondaryAction: {
     border:     'var(--border)',
@@ -986,8 +1013,8 @@ const s = {
     gridTemplateColumns: '76px minmax(0, 1fr)',
     alignItems:          'center',
     gap:                 '7px',
-    padding:             '2px 0',
-    borderTop:           '0.5px solid color-mix(in srgb, var(--color-border) 34%, transparent)',
+    padding:             '1px 0',
+    borderTop:           'none',
   },
   checkLabel: {
     color:      'var(--color-muted)',
@@ -997,17 +1024,17 @@ const s = {
   segment: {
     display:             'grid',
     gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-    gap:                 '5px',
+    gap:                 '4px',
   },
   segmentButton: {
-    minHeight:    '27px',
+    minHeight:    '23px',
     border:       'var(--border)',
-    borderRadius: '7px',
+    borderRadius: '999px',
     background:   'transparent',
     color:        'var(--color-muted)',
     fontSize:     '10px',
-    fontWeight:   700,
-    padding:      '4px',
+    fontWeight:   620,
+    padding:      '3px 4px',
   },
   segmentActive: {
     borderColor: 'var(--color-accent)',
