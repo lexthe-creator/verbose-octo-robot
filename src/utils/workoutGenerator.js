@@ -5,6 +5,30 @@ import { getLastPerformance } from './fitnessSelectors.js'
 import { getTodayISO } from './time.js'
 import { getEquipmentNeededForSegment, isSideBasedSegment } from './workoutDisplay.js'
 
+const PROGRAM_TYPES = {
+  STRENGTH:          'strength',
+  HYBRID:            'hybrid',
+  RUNNING:           'running',
+  MOBILITY_RECOVERY: 'mobility_recovery',
+}
+
+const EQUIPMENT_PROFILE = {
+  BODYWEIGHT: 'bodyweight',
+  DUMBBELLS:  'dumbbells',
+  HOME_GYM:   'home_gym',
+  FULL_GYM:   'full_gym',
+  GYM:        'gym',
+}
+
+export function normalizeEquipmentProfile(equipment = EQUIPMENT_PROFILE.BODYWEIGHT) {
+  if (equipment === EQUIPMENT_PROFILE.HOME_GYM || equipment === EQUIPMENT_PROFILE.FULL_GYM) return EQUIPMENT_PROFILE.GYM
+  return equipment || EQUIPMENT_PROFILE.BODYWEIGHT
+}
+
+function isGymProfile(equipment) {
+  return normalizeEquipmentProfile(equipment) === EQUIPMENT_PROFILE.GYM
+}
+
 // ─── Internal PRNG ────────────────────────────────────────────────────────────
 // Deterministic shuffle: same date string → same seed → same workout all day.
 // Seed changes daily so exercise selection rotates without Math.random().
@@ -40,7 +64,8 @@ function shuffleWithSeed(arr, seed) {
 export function getExercisePool(dayType, equipment) {
   const category = EXERCISES[dayType]
   if (!category) return []
-  return category[equipment] ?? category.bodyweight ?? []
+  const normalized = normalizeEquipmentProfile(equipment)
+  return category[normalized] ?? category.bodyweight ?? []
 }
 
 // ─── 2. selectExercises ───────────────────────────────────────────────────────
@@ -143,6 +168,7 @@ function uniqueById(exercises) {
 }
 
 function getTemplatePool(dayType, equipment) {
+  const normalized = normalizeEquipmentProfile(equipment)
   const poolsByType = {
     upper:     ['upper', 'push', 'pull', 'core'],
     push:      ['push', 'upper', 'core'],
@@ -150,7 +176,7 @@ function getTemplatePool(dayType, equipment) {
     pull:      ['pull', 'core'],
     full_body: ['full_body', 'lower', 'push', 'pull', 'core'],
   }
-  const equipmentOptions = equipment === 'bodyweight' ? ['bodyweight'] : [equipment, 'bodyweight']
+  const equipmentOptions = normalized === 'bodyweight' ? ['bodyweight'] : [normalized, 'bodyweight']
   return uniqueById((poolsByType[dayType] ?? [dayType])
     .flatMap(type => equipmentOptions.flatMap(option => getExercisePool(type, option))))
 }
@@ -244,30 +270,32 @@ function selectForSlot(pool, slot, history, usedIds, equipment) {
 }
 
 function getSlotPrescription(slot, exercise, phase, phaseConfig) {
+  const duration = slot.durationMinutes ?? 45
   const deload = phase === 'deload'
+  const short = duration <= 30
   const primaryReps = phase === 'peak' ? 5 : phase === 'build' ? 6 : 8
   const secondaryReps = phase === 'peak' ? 6 : phase === 'build' ? 8 : 10
 
   if (slot.role === 'primary_compound') {
-    return { sets: deload ? 2 : Math.max(4, phaseConfig.sets), reps: primaryReps, repRange: primaryReps <= 5 ? '5' : `${primaryReps - 2}-${primaryReps}` }
+    return { sets: deload ? 2 : short ? 3 : Math.max(4, phaseConfig.sets), reps: primaryReps, repRange: primaryReps <= 5 ? '5' : `${primaryReps - 2}-${primaryReps}` }
   }
   if (slot.role === 'secondary_compound') {
-    return { sets: deload ? 2 : 3, reps: secondaryReps, repRange: `${secondaryReps}-${secondaryReps + 2}` }
+    return { sets: deload || short ? 2 : 3, reps: secondaryReps, repRange: `${secondaryReps}-${secondaryReps + 2}` }
   }
   if (slot.role === 'isolation') {
-    return { sets: deload ? 2 : 3, reps: 15, repRange: '12-15' }
+    return { sets: deload || short ? 2 : 3, reps: 15, repRange: '12-15' }
   }
   if (slot.role === 'accessory') {
-    return { sets: deload ? 2 : 3, reps: 12, repRange: '10-12' }
+    return { sets: deload || short ? 2 : 3, reps: 12, repRange: '10-12' }
   }
   if (slot.role === 'carry_timed') {
-    return { sets: deload ? 2 : 3, reps: 45, repUnit: 'sec' }
+    return { sets: deload || short ? 2 : 3, reps: short ? 30 : 45, repUnit: 'sec' }
   }
   if (slot.role === 'core_timed') {
-    return { sets: deload ? 2 : 3, reps: exercise.id === 'side_plank' ? 30 : 45, repUnit: 'sec' }
+    return { sets: deload || short ? 2 : 3, reps: exercise.id === 'side_plank' || short ? 30 : 45, repUnit: 'sec' }
   }
   if (slot.role === 'core') {
-    return { sets: deload ? 2 : 3, reps: exercise.baseReps ?? 12 }
+    return { sets: deload || short ? 2 : 3, reps: exercise.baseReps ?? 12 }
   }
   return { sets: phaseConfig.sets, reps: phaseConfig.reps }
 }
@@ -366,21 +394,22 @@ const STRENGTH_COOLDOWNS = {
 const REST_SECONDS = { peak: 180, build: 120 }
 const DEFAULT_REST = 90
 
-export function buildStrengthWorkout(dayType, equipment, phase, weekInPhase, history) {
+export function buildStrengthWorkout(dayType, equipment, phase, weekInPhase, history, durationMinutes = 45) {
   const phaseConfig = getPhaseConfig(phase, weekInPhase)
-  const pool        = getTemplatePool(dayType, equipment)
+  const normalizedEquipment = normalizeEquipmentProfile(equipment)
+  const pool        = getTemplatePool(dayType, normalizedEquipment)
   const warmup      = STRENGTH_WARMUPS[dayType]   ?? UPPER_WARMUP
   const cooldown    = STRENGTH_COOLDOWNS[dayType] ?? UPPER_COOLDOWN
   const restSeconds = REST_SECONDS[phase] ?? DEFAULT_REST
-  const template    = STRENGTH_TEMPLATES[dayType] ?? STRENGTH_TEMPLATES.upper
+  const template    = getDurationTemplate(STRENGTH_TEMPLATES[dayType] ?? STRENGTH_TEMPLATES.upper, durationMinutes)
   const usedIds     = new Set()
 
   const mainSegments = template
     .map(slot => {
-      const exercise = selectForSlot(pool, slot, history ?? [], usedIds, equipment)
+      const exercise = selectForSlot(pool, { ...slot, durationMinutes }, history ?? [], usedIds, normalizedEquipment)
       if (!exercise) return null
       usedIds.add(exercise.id)
-      return makeExerciseSegment(exercise, slot, phase, phaseConfig, history ?? [], restSeconds)
+      return makeExerciseSegment(exercise, { ...slot, durationMinutes }, phase, phaseConfig, history ?? [], restSeconds)
     })
     .filter(Boolean)
 
@@ -389,6 +418,19 @@ export function buildStrengthWorkout(dayType, equipment, phase, weekInPhase, his
     ...mainSegments,
     ...cooldown.map(withDisplayMeta),
   ]
+}
+
+function getDurationTemplate(template, durationMinutes) {
+  if (durationMinutes <= 30) {
+    const firstCoreIndex = template.findIndex(slot => slot.role?.startsWith('core'))
+    const nonCore = template.filter(slot => !slot.role?.startsWith('core') && !slot.optional).slice(0, 4)
+    const core = firstCoreIndex >= 0 ? [template[firstCoreIndex]] : []
+    return [...nonCore, ...core]
+  }
+  if (durationMinutes >= 60) return template
+
+  const withoutOptional = template.filter(slot => !slot.optional)
+  return withoutOptional.length >= 5 ? withoutOptional : template
 }
 
 // ─── Run duration tables (seconds) ───────────────────────────────────────────
@@ -412,6 +454,18 @@ const RUN_DURATIONS = {
     build:  [2700, 3000, 3300, 3600],
     peak:   [3600, 3900, 4200, 4500],
     deload: [1800, 1800, 1800, 1800],
+  },
+  run_intervals: {
+    base:   [240,  300,  300,  360 ],
+    build:  [360,  420,  420,  480 ],
+    peak:   [480,  540,  540,  600 ],
+    deload: [240,  240,  240,  240 ],
+  },
+  run_recovery: {
+    base:   [900,  900,  1200, 1200],
+    build:  [1200, 1200, 1500, 1500],
+    peak:   [1500, 1500, 1800, 1800],
+    deload: [900,  900,  900,  900 ],
   },
 }
 
@@ -468,9 +522,64 @@ export function buildRunWorkout(runType, phase, weekInPhase) {
         makeRunSegment(RUN_SEGMENTS.cooldown.walk,  'cooldown', 'cooldown_walk'),
       ]
 
+    case 'run_intervals':
+      return [
+        makeRunSegment(RUN_SEGMENTS.warmup.easy_jog,   'warmup', 'warmup_jog'),
+        { ...makeRunSegment(RUN_SEGMENTS.main.interval, 'main', 'main_interval_1'), duration: mainDur },
+        { ...makeRunSegment(RUN_SEGMENTS.main.recovery, 'main', 'main_recovery_1'), duration: 120 },
+        { ...makeRunSegment(RUN_SEGMENTS.main.interval, 'main', 'main_interval_2'), duration: mainDur },
+        { ...makeRunSegment(RUN_SEGMENTS.main.recovery, 'main', 'main_recovery_2'), duration: 120 },
+        { ...makeRunSegment(RUN_SEGMENTS.main.interval, 'main', 'main_interval_3'), duration: mainDur },
+        runCore,
+        makeRunSegment(RUN_SEGMENTS.cooldown.walk,     'cooldown', 'cooldown_walk'),
+      ]
+
+    case 'run_recovery':
+      return [
+        makeRunSegment(RUN_SEGMENTS.warmup.walk,        'warmup', 'warmup_walk'),
+        { ...makeRunSegment(RUN_SEGMENTS.main.easy,      'main', 'main_recovery_run'), duration: mainDur, effort: 'Easy — 3/10', name: 'Recovery Run' },
+        runCore,
+        makeRunSegment(RUN_SEGMENTS.cooldown.walk,      'cooldown', 'cooldown_walk'),
+      ]
+
     default:
       return []
   }
+}
+
+function makeConditioningSegment(name, duration, instruction, equipment = 'bodyweight') {
+  return withDisplayMeta({
+    section: 'finisher',
+    type: 'timed',
+    name,
+    duration,
+    instruction,
+    effort: 'Moderate — 6/10',
+    equipment,
+  })
+}
+
+export function buildHybridConditioningWorkout(equipment, phase, weekInPhase, history, durationMinutes = 45) {
+  const normalizedEquipment = normalizeEquipmentProfile(equipment)
+  const strength = buildStrengthWorkout('full_body', normalizedEquipment, phase, weekInPhase, history, 30)
+  const mainStrength = strength
+    .filter(segment => segment.section === 'main' && segment.type === 'sets_reps')
+    .slice(0, durationMinutes <= 30 ? 2 : 3)
+  const conditioningDuration = durationMinutes <= 30 ? 480 : durationMinutes >= 60 ? 1200 : 900
+  const conditioningName = isGymProfile(normalizedEquipment) ? 'Bike / Row Intervals' : normalizedEquipment === 'dumbbells' ? 'DB Conditioning Complex' : 'Bodyweight Conditioning Circuit'
+  const conditioningInstruction = isGymProfile(normalizedEquipment)
+    ? 'Alternate 60 seconds steady work with 60 seconds easy recovery.'
+    : normalizedEquipment === 'dumbbells'
+      ? 'Cycle through thrusters, carries, and mountain climbers without rushing.'
+      : 'Cycle through step-ups, mountain climbers, bear crawls, and easy walk breaks.'
+
+  return [
+    ...strength.filter(segment => segment.section === 'warmup').slice(0, 3),
+    ...mainStrength,
+    makeConditioningSegment(conditioningName, conditioningDuration, conditioningInstruction, normalizedEquipment),
+    ...strength.filter(segment => segment.muscleGroup === 'core').slice(0, 1),
+    ...strength.filter(segment => segment.section === 'cooldown').slice(0, 2),
+  ]
 }
 
 // ─── Mobility fixed structure ─────────────────────────────────────────────────
@@ -551,32 +660,223 @@ export function generateWorkout(config) {
     weekInPhase      = 1,
     history          = [],
     mobilityDuration = 30,
+    durationMinutes,
   } = config ?? {}
 
+  const normalizedDayType = normalizeDayType(dayType)
+  const normalizedEquipment = normalizeEquipmentProfile(equipment)
+  const targetDuration = durationMinutes ?? (normalizedDayType === 'mobility' ? mobilityDuration : 45)
   const date  = getTodayISO()
-  const id    = `${date}_${dayType ?? 'rest'}`
-  const title = getDayTypeLabel(dayType ?? 'rest')
-  const base  = { id, date, dayType, title, phase, weekInPhase }
+  const id    = `${date}_${normalizedDayType ?? 'rest'}`
+  const title = getDayTypeLabel(normalizedDayType ?? 'rest')
+  const base  = { id, date, dayType: normalizedDayType, type: normalizedDayType, title, phase, weekInPhase, status: 'planned' }
 
-  if (!dayType || dayType === 'rest') {
-    return { ...base, title: 'Rest Day', estimatedMinutes: 0, segments: [] }
+  if (!normalizedDayType || normalizedDayType === 'rest') {
+    return { ...base, title: 'Rest Day', focus: 'recovery', durationEstimate: 0, estimatedMinutes: 0, segments: [] }
   }
 
   let segments
 
-  if (dayType === 'run_easy' || dayType === 'run_tempo' || dayType === 'run_long') {
-    segments = buildRunWorkout(dayType, phase, weekInPhase)
-  } else if (['upper', 'lower', 'full_body', 'push', 'pull'].includes(dayType)) {
-    segments = buildStrengthWorkout(dayType, equipment, phase, weekInPhase, history)
-  } else if (dayType === 'mobility') {
+  if (['run_easy', 'run_tempo', 'run_long', 'run_intervals', 'run_recovery'].includes(normalizedDayType)) {
+    segments = buildRunWorkout(normalizedDayType, phase, weekInPhase)
+  } else if (['upper', 'lower', 'full_body', 'push', 'pull'].includes(normalizedDayType)) {
+    segments = buildStrengthWorkout(normalizedDayType, normalizedEquipment, phase, weekInPhase, history, targetDuration)
+  } else if (normalizedDayType === 'hybrid_conditioning') {
+    segments = buildHybridConditioningWorkout(normalizedEquipment, phase, weekInPhase, history, targetDuration)
+  } else if (normalizedDayType === 'mobility') {
     segments = buildMobilityWorkout(mobilityDuration)
   } else {
-    return { ...base, title: 'Rest Day', estimatedMinutes: 0, segments: [] }
+    return { ...base, title: 'Rest Day', focus: 'recovery', durationEstimate: 0, estimatedMinutes: 0, segments: [] }
   }
 
-  const coreTitle = ['push', 'lower', 'run_easy', 'run_tempo', 'run_long'].includes(dayType)
+  const coreTitle = ['push', 'lower', 'run_easy', 'run_tempo', 'run_long', 'run_intervals', 'run_recovery'].includes(normalizedDayType)
     ? `${title} + Core`
     : title
+  const estimatedMinutes = computeEstimatedMinutes(segments)
+  const workout = {
+    ...base,
+    title: coreTitle,
+    focus: getWorkoutFocus(normalizedDayType),
+    durationEstimate: estimatedMinutes,
+    estimatedMinutes,
+    segments: validateWorkoutSegments(segments, normalizedDayType),
+  }
 
-  return { ...base, title: coreTitle, estimatedMinutes: computeEstimatedMinutes(segments), segments }
+  return workout
+}
+
+function normalizeDayType(dayType) {
+  if (dayType === 'strength' || dayType === 'strength_a' || dayType === 'strength_b') return 'full_body'
+  if (dayType === 'stretch' || dayType === 'recovery' || dayType === 'mobility_recovery') return 'mobility'
+  if (dayType === 'intervals' || dayType === 'run_interval') return 'run_intervals'
+  if (dayType === 'recovery_run') return 'run_recovery'
+  return dayType
+}
+
+function getWorkoutFocus(dayType) {
+  if (dayType?.startsWith('run')) return 'running'
+  if (dayType === 'mobility') return 'recovery'
+  if (dayType === 'hybrid_conditioning') return 'hybrid conditioning'
+  if (dayType === 'upper' || dayType === 'push' || dayType === 'pull') return 'upper strength'
+  if (dayType === 'lower') return 'lower strength'
+  if (dayType === 'full_body') return 'full body strength'
+  return 'training'
+}
+
+function validateWorkoutSegments(segments, dayType) {
+  const used = new Set()
+  const deduped = []
+  for (const segment of segments) {
+    const key = segment.exerciseId ?? `${segment.section}_${segment.name}_${segment.type}`
+    if (segment.type === 'sets_reps' && used.has(key)) continue
+    if (segment.type === 'sets_reps') used.add(key)
+    deduped.push(segment)
+  }
+
+  const needsCore = ['upper', 'push', 'pull', 'lower', 'full_body', 'hybrid_conditioning'].includes(dayType)
+  const hasCore = deduped.some(segment => segment.muscleGroup === 'core' || (segment.muscles ?? []).includes('core'))
+  if (needsCore && !hasCore) {
+    const core = makeExerciseSegment(
+      EXERCISES.core.bodyweight[0],
+      { slot: 'core_anti_extension', role: 'core', match: SLOT_MATCHERS.core, durationMinutes: 30 },
+      'base',
+      getPhaseConfig('base', 1),
+      [],
+      DEFAULT_REST,
+    )
+    const cooldownIndex = deduped.findIndex(segment => segment.section === 'cooldown')
+    if (cooldownIndex >= 0) deduped.splice(cooldownIndex, 0, core)
+    else deduped.push(core)
+  }
+  return deduped
+}
+
+const PROGRAM_STRUCTURES = {
+  [PROGRAM_TYPES.STRENGTH]: {
+    3: [
+      { title: 'Full Body A', dayType: 'full_body', purpose: 'squat, horizontal push, horizontal pull, accessory, core' },
+      { title: 'Full Body B', dayType: 'full_body', purpose: 'hinge, vertical push, vertical pull, unilateral, core' },
+      { title: 'Full Body C', dayType: 'full_body', purpose: 'squat variation, hinge variation, push, pull, carry, core' },
+    ],
+    4: [
+      { title: 'Upper A', dayType: 'upper', purpose: 'horizontal push, horizontal pull, shoulders, arms, core' },
+      { title: 'Lower A', dayType: 'lower', purpose: 'squat, hinge, unilateral, glute, core' },
+      { title: 'Upper B', dayType: 'pull', purpose: 'vertical push/pull balance, shoulders, arms, core' },
+      { title: 'Lower B', dayType: 'lower', purpose: 'squat variation, hinge or glute, unilateral, carry or core' },
+    ],
+    5: [
+      { title: 'Upper A', dayType: 'upper', purpose: 'upper strength' },
+      { title: 'Lower A', dayType: 'lower', purpose: 'lower strength' },
+      { title: 'Conditioning + Core', dayType: 'hybrid_conditioning', purpose: 'conditioning, carries, core' },
+      { title: 'Upper B', dayType: 'pull', purpose: 'upper pull and accessory strength' },
+      { title: 'Lower B', dayType: 'lower', purpose: 'lower variation and core' },
+    ],
+  },
+  [PROGRAM_TYPES.HYBRID]: {
+    3: [
+      { title: 'Strength', dayType: 'full_body', purpose: 'full body strength' },
+      { title: 'Hybrid Conditioning', dayType: 'hybrid_conditioning', purpose: 'conditioning, carries, core' },
+      { title: 'Strength', dayType: 'full_body', purpose: 'full body strength' },
+    ],
+    4: [
+      { title: 'Upper Strength', dayType: 'upper', purpose: 'upper strength' },
+      { title: 'Lower Strength', dayType: 'lower', purpose: 'lower strength' },
+      { title: 'Hybrid Conditioning', dayType: 'hybrid_conditioning', purpose: 'conditioning' },
+      { title: 'Full Body Hybrid', dayType: 'full_body', purpose: 'full body strength with carry/core' },
+    ],
+    5: [
+      { title: 'Upper Strength', dayType: 'upper', purpose: 'upper strength' },
+      { title: 'Lower Strength', dayType: 'lower', purpose: 'lower strength' },
+      { title: 'Hybrid Conditioning', dayType: 'hybrid_conditioning', purpose: 'conditioning' },
+      { title: 'Full Body Strength', dayType: 'full_body', purpose: 'full body strength' },
+      { title: 'Hybrid Conditioning', dayType: 'hybrid_conditioning', purpose: 'conditioning' },
+    ],
+  },
+  [PROGRAM_TYPES.RUNNING]: {
+    3: [
+      { title: 'Easy Run', dayType: 'run_easy', purpose: 'aerobic base' },
+      { title: 'Intervals', dayType: 'run_intervals', purpose: 'speed and running economy' },
+      { title: 'Long Run', dayType: 'run_long', purpose: 'endurance base' },
+    ],
+    4: [
+      { title: 'Easy Run', dayType: 'run_easy', purpose: 'aerobic base' },
+      { title: 'Intervals', dayType: 'run_intervals', purpose: 'speed and running economy' },
+      { title: 'Tempo Run', dayType: 'run_tempo', purpose: 'threshold control' },
+      { title: 'Long Run', dayType: 'run_long', purpose: 'endurance base' },
+    ],
+    5: [
+      { title: 'Easy Run', dayType: 'run_easy', purpose: 'aerobic base' },
+      { title: 'Intervals', dayType: 'run_intervals', purpose: 'speed and running economy' },
+      { title: 'Recovery Run', dayType: 'run_recovery', purpose: 'easy recovery volume' },
+      { title: 'Tempo Run', dayType: 'run_tempo', purpose: 'threshold control' },
+      { title: 'Long Run', dayType: 'run_long', purpose: 'endurance base' },
+    ],
+  },
+  [PROGRAM_TYPES.MOBILITY_RECOVERY]: {
+    3: [
+      { title: 'Recovery Walk', dayType: 'mobility', purpose: 'low-intensity movement' },
+      { title: 'Mobility Flow', dayType: 'mobility', purpose: 'movement quality' },
+      { title: 'Core + Mobility', dayType: 'mobility', purpose: 'trunk stability and recovery' },
+    ],
+    4: [
+      { title: 'Recovery Walk', dayType: 'mobility', purpose: 'low-intensity movement' },
+      { title: 'Mobility Flow', dayType: 'mobility', purpose: 'movement quality' },
+      { title: 'Core + Mobility', dayType: 'mobility', purpose: 'trunk stability' },
+      { title: 'Stretch / Downshift', dayType: 'mobility', purpose: 'downshift' },
+    ],
+    5: [
+      { title: 'Recovery Walk', dayType: 'mobility', purpose: 'low-intensity movement' },
+      { title: 'Mobility Flow', dayType: 'mobility', purpose: 'movement quality' },
+      { title: 'Core + Mobility', dayType: 'mobility', purpose: 'trunk stability' },
+      { title: 'Recovery Walk', dayType: 'mobility', purpose: 'circulation' },
+      { title: 'Stretch / Downshift', dayType: 'mobility', purpose: 'downshift' },
+    ],
+  },
+}
+
+export function getProgramStructure(programType, daysPerWeek) {
+  const type = normalizeProgramType(programType)
+  const days = Math.max(3, Math.min(5, Number(daysPerWeek) || 3))
+  return PROGRAM_STRUCTURES[type]?.[days] ?? PROGRAM_STRUCTURES[PROGRAM_TYPES.STRENGTH][days]
+}
+
+export function generateTrainingProgram(config = {}) {
+  const {
+    programType = PROGRAM_TYPES.STRENGTH,
+    daysPerWeek = 3,
+    equipment = EQUIPMENT_PROFILE.BODYWEIGHT,
+    durationMinutes = 45,
+    phase = 'base',
+    weekInPhase = 1,
+    history = [],
+  } = config
+
+  return getProgramStructure(programType, daysPerWeek).map((session, index) => {
+    const workout = generateWorkout({
+      dayType: session.dayType,
+      equipment,
+      phase,
+      weekInPhase,
+      history,
+      durationMinutes: session.dayType === 'mobility' ? undefined : durationMinutes,
+      mobilityDuration: durationMinutes,
+    })
+    return {
+      dayNumber: index + 1,
+      title: session.title,
+      purpose: session.purpose,
+      workout: {
+        ...workout,
+        title: session.title,
+        focus: session.purpose,
+      },
+    }
+  })
+}
+
+function normalizeProgramType(programType) {
+  if (programType === 'endurance') return PROGRAM_TYPES.RUNNING
+  if (programType === 'general' || programType === 'fat_loss') return PROGRAM_TYPES.HYBRID
+  if (programType === 'mobility' || programType === 'recovery') return PROGRAM_TYPES.MOBILITY_RECOVERY
+  return programType || PROGRAM_TYPES.STRENGTH
 }

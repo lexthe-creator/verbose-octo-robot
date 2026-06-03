@@ -16,12 +16,15 @@ const TYPE_ABBR = {
   run_easy:  'R',
   run_tempo: 'R',
   run_long:  'R',
+  run_intervals: 'IN',
+  run_recovery: 'RR',
   upper:     'UP',
   lower:     'LO',
   full_body: 'FB',
   push:      'PS',
   pull:      'PL',
   strength:  'FB',
+  hybrid_conditioning: 'HC',
   mobility:  'MO',
   rest:      '—',
 }
@@ -69,7 +72,7 @@ function TodayCard({ workout, todayComplete, isToday, onStart }) {
   const abbr        = TYPE_ABBR[workoutType] || '?'
 
   const warmupSegs = workout.segments.filter(s => s.section === 'warmup')
-  const mainSegs   = workout.segments.filter(s => s.section === 'main' || !s.section)
+  const mainSegs   = workout.segments.filter(s => s.section === 'main' || s.section === 'finisher' || !s.section)
   const coolSegs   = workout.segments.filter(s => s.section === 'cooldown')
 
   return (

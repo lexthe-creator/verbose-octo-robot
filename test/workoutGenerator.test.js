@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { generateWorkout } from '../src/utils/workoutGenerator.js'
+import { generateTrainingProgram, generateWorkout, getProgramStructure } from '../src/utils/workoutGenerator.js'
 import {
   getEquipmentNeededForWorkout,
   getJournalRow,
@@ -29,6 +29,10 @@ function workoutFor(dayType) {
 
 function mainSegments(workout) {
   return workout.segments.filter(segment => segment.section === 'main' && segment.type === 'sets_reps')
+}
+
+function allExerciseSegments(workout) {
+  return workout.segments.filter(segment => segment.type === 'sets_reps')
 }
 
 function mainText(workout) {
@@ -68,7 +72,7 @@ test('full body uses full-body activation and recovery', () => {
 })
 
 test('run workouts use running prep and walking or jogging cooldown', () => {
-  for (const dayType of ['run_easy', 'run_tempo', 'run_long']) {
+  for (const dayType of ['run_easy', 'run_tempo', 'run_long', 'run_intervals', 'run_recovery']) {
     const workout = workoutFor(dayType)
     const warmup = segmentNames(workout, 'warmup').join(' ')
     const cooldown = segmentNames(workout, 'cooldown').join(' ')
@@ -76,6 +80,45 @@ test('run workouts use running prep and walking or jogging cooldown', () => {
     assert.match(warmup, /walk|jog/)
     assert.match(cooldown, /walk|jog/)
   }
+})
+
+test('training generator supports strength 3/4/5-day split structures', () => {
+  assert.deepEqual(getProgramStructure('strength', 3).map(day => day.title), ['Full Body A', 'Full Body B', 'Full Body C'])
+  assert.deepEqual(getProgramStructure('strength', 4).map(day => day.title), ['Upper A', 'Lower A', 'Upper B', 'Lower B'])
+  assert.deepEqual(getProgramStructure('strength', 5).map(day => day.title), ['Upper A', 'Lower A', 'Conditioning + Core', 'Upper B', 'Lower B'])
+})
+
+test('training generator supports hybrid 3/4/5-day split structures', () => {
+  for (const days of [3, 4, 5]) {
+    const plan = generateTrainingProgram({
+      programType: 'hybrid',
+      daysPerWeek: days,
+      equipment: 'dumbbells',
+      durationMinutes: 45,
+    })
+    assert.equal(plan.length, days)
+    assert.ok(plan.some(day => day.workout.dayType === 'hybrid_conditioning'))
+    assert.ok(plan.some(day => day.workout.segments.some(segment => segment.section === 'finisher')))
+  }
+})
+
+test('training generator supports running 3/4/5-day split structures', () => {
+  assert.deepEqual(getProgramStructure('running', 3).map(day => day.dayType), ['run_easy', 'run_intervals', 'run_long'])
+  assert.deepEqual(getProgramStructure('running', 4).map(day => day.dayType), ['run_easy', 'run_intervals', 'run_tempo', 'run_long'])
+  assert.deepEqual(getProgramStructure('running', 5).map(day => day.dayType), ['run_easy', 'run_intervals', 'run_recovery', 'run_tempo', 'run_long'])
+})
+
+test('training generator supports mobility/recovery session generation', () => {
+  const plan = generateTrainingProgram({
+    programType: 'mobility_recovery',
+    daysPerWeek: 4,
+    durationMinutes: 30,
+  })
+
+  assert.equal(plan.length, 4)
+  assert.ok(plan.every(day => day.workout.dayType === 'mobility' || day.workout.dayType === 'run_recovery'))
+  assert.ok(plan.every(day => day.workout.segments.every(segment => segment.type !== 'sets_reps')))
+  assert.ok(plan.flatMap(day => day.workout.segments).some(segment => /breath|child|mobility/i.test(segment.name)))
 })
 
 test('+ Core workout titles include explicit core segments', () => {
@@ -163,6 +206,61 @@ test('full body workouts follow squat hinge push pull carry core template', () =
   assert.ok(slots.includes('carry'))
   assert.ok(slots.includes('core'))
   assert.ok(mainSegments(workout).length >= 5)
+})
+
+test('home gym profile prioritizes barbell and cable programming', () => {
+  const workout = generateWorkout({
+    dayType: 'upper',
+    equipment: 'home_gym',
+    phase: 'base',
+    weekInPhase: 1,
+    history: [],
+    durationMinutes: 60,
+  })
+  const names = allExerciseSegments(workout).map(segment => segment.name.toLowerCase()).join(' ')
+  const equipment = getEquipmentNeededForWorkout(workout)
+
+  assert.match(names, /barbell|cable|overhead press|bench press/)
+  assert.ok(equipment.includes('barbell') || equipment.includes('cable machine'))
+})
+
+test('duration adjusts strength volume without dropping core', () => {
+  const short = generateWorkout({
+    dayType: 'full_body',
+    equipment: 'dumbbells',
+    phase: 'base',
+    weekInPhase: 1,
+    history: [],
+    durationMinutes: 30,
+  })
+  const full = generateWorkout({
+    dayType: 'full_body',
+    equipment: 'dumbbells',
+    phase: 'base',
+    weekInPhase: 1,
+    history: [],
+    durationMinutes: 60,
+  })
+
+  assert.ok(allExerciseSegments(short).length <= 5)
+  assert.ok(allExerciseSegments(full).length >= 6)
+  assert.equal(hasExplicitCore(short), true)
+  assert.equal(hasExplicitCore(full), true)
+})
+
+test('generated workouts avoid duplicate exercises', () => {
+  for (const dayType of ['upper', 'lower', 'full_body', 'push', 'pull', 'hybrid_conditioning']) {
+    const workout = generateWorkout({
+      dayType,
+      equipment: 'full_gym',
+      phase: 'base',
+      weekInPhase: 1,
+      history: [],
+      durationMinutes: 60,
+    })
+    const ids = allExerciseSegments(workout).map(segment => segment.exerciseId)
+    assert.equal(ids.length, new Set(ids).size)
+  }
 })
 
 test('equipment preview derives expected equipment from generated workouts', () => {

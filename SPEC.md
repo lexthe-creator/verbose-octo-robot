@@ -2106,17 +2106,109 @@ Returns `{ type, title, subtitle, durationEst, segments[] }`.
 
 ---
 
+### AIML Training Generator V1
+
+AIML's V1 training generator is a planner-first coaching system, not a generic exercise picker.
+
+It should generate workouts from:
+- program type
+- days per week
+- equipment profile
+- movement patterns
+- session purpose
+- duration
+- recovery needs
+- exercise mapping
+
+Supported V1 training lanes:
+- `strength` — strength, muscle, body composition, joint health; roughly 80% strength and 20% conditioning/recovery.
+- `hybrid` — strength, conditioning, athleticism, and work capacity; roughly 60% strength and 40% conditioning.
+- `running` — aerobic capacity, running performance, and injury-risk reduction; roughly 70% running and 30% strength/mobility.
+- `mobility_recovery` — movement quality, low-intensity movement, core stability, and downshift work.
+
+Equipment profiles:
+- `bodyweight` — bodyweight movement, walking/running, mobility; progression through reps, tempo, range, and unilateral work.
+- `dumbbells` — dumbbells and bodyweight; bench only when enabled by mapped exercise metadata.
+- `home_gym` — squat rack, barbell, bench, cable machine, dumbbells, and bodyweight. Treat as close to full gym, not dumbbell-only.
+- `full_gym` / legacy `gym` — home gym plus machines/cardio/specialty items when mapped.
+
+Movement-pattern selection must happen before exercise selection. Primary patterns include horizontal push, vertical push, horizontal pull, vertical pull, squat, and hinge. Secondary patterns include unilateral, glute dominant, carry, conditioning, and core. Strength, hybrid, and mobility/recovery sessions must include actual core work, prioritizing anti-extension, anti-rotation, and lateral-stability core before flexion.
+
+Program structures:
+- Strength 3 days: Full Body A, Full Body B, Full Body C.
+- Strength 4 days: Upper A, Lower A, Upper B, Lower B.
+- Strength 5 days: Upper A, Lower A, Conditioning + Core, Upper B, Lower B. This is the preferred strength split for 5 days per week.
+- Hybrid 3 days: Strength, Hybrid Conditioning, Strength.
+- Hybrid 4 days: Upper Strength, Lower Strength, Hybrid Conditioning, Full Body Hybrid.
+- Hybrid 5 days: Upper Strength, Lower Strength, Hybrid Conditioning, Upper or Full Body Strength, Hybrid Conditioning.
+- Running 3 days: Easy Run, Intervals, Long Run.
+- Running 4 days: Easy Run, Intervals, Tempo Run, Long Run.
+- Running 5 days: Easy Run, Intervals, Recovery Run, Tempo Run, Long Run.
+
+Duration rules:
+- 30 minutes: 4-5 movements, 2-3 sets, one core movement, minimal accessories.
+- 45 minutes: 5-7 movements, 3-4 working sets on main lifts, 1-2 core/accessory movements.
+- 60 minutes: 6-8 movements, full structure, 1-2 core movements, optional finisher.
+
+Mobility/recovery sessions may be standalone, used inside other lanes, or recommended when recovery is poor. Mobility sessions should stay easy (`RPE 2-4/10`) and should not feel like workouts.
+
+Generated workout output should expose:
+- `id`, `title`, `type`/`dayType`, `focus`, `durationEstimate`/`estimatedMinutes`, `status`, and `segments[]`.
+- Segment sections: `warmup`, `main`, `core`, `finisher`, and `cooldown` where relevant.
+- Exercise metadata: `exerciseId`, `name`, `tier`, `movementPattern`, `muscleGroup`, `equipment`, `sets`, `reps` or `duration`, side instruction when unilateral, `cues`, and notes/load guidance.
+
+Quality rules:
+- Strength workouts include a primary movement, secondary movement, accessory, and core.
+- Upper days include push and pull unless specifically labeled push-only.
+- Lower days include squat, hinge, unilateral, glute, and core.
+- Full-body days include squat, hinge, push, pull, and core.
+- Hybrid days include strength and conditioning.
+- Running days include warm-up, main run segment, and cool-down.
+- Mobility days remain low intensity.
+- Avoid duplicate exercises and avoid stacking too many similar movements in short sessions.
+- Default strength days should not be only four main movements unless duration is 30 minutes or less.
+- Home Gym should use barbell/cable options where appropriate.
+
+Acceptance criteria:
+- A 45-60 minute strength workout feels like a real training session.
+- Most strength workouts generate 5-8 total movements.
+- Warm-up and cool-down are secondary.
+- The main workout has hierarchy.
+- Core appears intentionally, not randomly.
+- Home Gym users get barbell/cable/dumbbell programming.
+- Running workouts use structured run segments.
+- Hybrid workouts combine strength and conditioning.
+- Recovery workouts are easy, restorative, and not mislabeled workouts.
+- Training preview answers: "What am I doing today?"
+- WorkoutPlayer answers: "What am I doing right now?"
+
+Do not make AIML a generic fitness app. Build it as a planner-first training system with enough coaching structure to feel intentional, safe, and useful.
+
 ### `generateWorkout(config)` — `src/utils/workoutGenerator.js`
 
 **Config shape:**
 ```js
 {
   dayType:          string,  // from programConfig.dayTypes
-  equipment:        string,  // 'bodyweight' | 'dumbbells' | 'gym' (default: 'bodyweight')
+  equipment:        string,  // 'bodyweight' | 'dumbbells' | 'home_gym' | 'full_gym' | legacy 'gym'
   phase:            string,  // from getPhase() (default: 'base')
   weekInPhase:      number,  // 1–4 (default: 1)
   history:          object,  // raw fitnessState.workoutLog[] (default: [])
   mobilityDuration: number,  // 20 | 30 | 40 (default: 30)
+  durationMinutes:  number,  // 30 | 45 | 60 (default: lane/session fallback)
+}
+```
+
+`generateTrainingProgram(config)` may be used when a weekly structure is needed:
+```js
+{
+  programType: 'strength' | 'hybrid' | 'running' | 'mobility_recovery',
+  daysPerWeek: 3 | 4 | 5,
+  equipment: string,
+  durationMinutes: 30 | 45 | 60,
+  phase: string,
+  weekInPhase: number,
+  history: object[],
 }
 ```
 

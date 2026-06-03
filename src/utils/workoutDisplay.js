@@ -99,11 +99,13 @@ export function getNextUp(workout, currentIndex) {
 const PREVIEW_SECTION_LABELS = {
   warmup:   'warm up',
   main:     'main',
+  core:     'core',
+  finisher: 'finisher',
   cooldown: 'cool down',
 }
 
 export function getWorkoutPreviewSections(workout) {
-  return ['warmup', 'main', 'cooldown']
+  return ['warmup', 'main', 'core', 'finisher', 'cooldown']
     .map(section => ({
       section,
       title: PREVIEW_SECTION_LABELS[section],

@@ -12,31 +12,31 @@ const TOTAL_STEPS = 7
 const PROGRAM_OPTIONS = [
   {
     id:    'strength',
-    title: 'Build Strength',
-    lines: ['Progressive resistance training.', 'Get stronger every week.'],
+    title: 'Strength',
+    lines: ['Strength, muscle, and joint health.', 'Most days are lifting-focused.'],
     tags:  ['Upper', 'Lower', 'Full Body'],
   },
   {
-    id:    'endurance',
-    title: 'Build Endurance',
-    lines: ['Aerobic base and running volume.', 'Go further, feel better.'],
-    tags:  ['Easy Run', 'Tempo', 'Long Run'],
+    id:    'hybrid',
+    title: 'Hybrid',
+    lines: ['Strength plus conditioning.', 'For athletic, usable work capacity.'],
+    tags:  ['Strength', 'Conditioning', 'Carry'],
   },
   {
-    id:    'general',
-    title: 'General Fitness',
-    lines: ['Balanced strength and cardio.', 'The all-rounder program.'],
-    tags:  ['Run', 'Strength', 'Mobility'],
+    id:    'running',
+    title: 'Running',
+    lines: ['Aerobic base and run structure.', 'Strength support stays simple.'],
+    tags:  ['Easy', 'Intervals', 'Long'],
   },
   {
-    id:    'fat_loss',
-    title: 'Fat Loss',
-    lines: ['High volume metabolic training.', 'Move more, recover well.'],
-    tags:  ['Run', 'Full Body', 'HIIT'],
+    id:    'mobility_recovery',
+    title: 'Mobility / Recovery',
+    lines: ['Movement quality and downshift work.', 'Easy sessions for low-energy days.'],
+    tags:  ['Mobility', 'Core', 'Walk'],
   },
 ]
 
-const WEEKLY_DAY_COUNTS = [3, 4, 5, 6, 7]
+const WEEKLY_DAY_COUNTS = [3, 4, 5]
 
 const DAYS_OF_WEEK = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 
@@ -59,47 +59,71 @@ const PROGRAM_DAY_TYPES = {
     { id: 'pull',      label: 'Pull'      },
     { id: 'mobility',  label: 'Mobility'  },
   ],
-  endurance: [
+  hybrid: [
+    { id: 'upper',       label: 'Upper Strength' },
+    { id: 'lower',       label: 'Lower Strength' },
+    { id: 'full_body',   label: 'Full Body'      },
+    { id: 'hybrid_conditioning', label: 'Hybrid Conditioning' },
+    { id: 'mobility',    label: 'Mobility'       },
+  ],
+  running: [
     { id: 'run_easy',  label: 'Easy Run'  },
+    { id: 'run_intervals', label: 'Intervals' },
     { id: 'run_tempo', label: 'Tempo Run' },
     { id: 'run_long',  label: 'Long Run'  },
-    { id: 'strength',  label: 'Strength'  },
+    { id: 'run_recovery', label: 'Recovery Run' },
     { id: 'mobility',  label: 'Mobility'  },
   ],
-  general: [
-    { id: 'run_easy',  label: 'Easy Run'  },
-    { id: 'upper',     label: 'Upper'     },
-    { id: 'lower',     label: 'Lower'     },
-    { id: 'full_body', label: 'Full Body' },
+  mobility_recovery: [
     { id: 'mobility',  label: 'Mobility'  },
-  ],
-  fat_loss: [
-    { id: 'run_easy',  label: 'Easy Run'  },
-    { id: 'full_body', label: 'Full Body' },
-    { id: 'upper',     label: 'Upper'     },
-    { id: 'lower',     label: 'Lower'     },
-    { id: 'mobility',  label: 'Mobility'  },
+    { id: 'run_recovery', label: 'Recovery Run' },
   ],
 }
 
-// First N entries of each sequence are applied as smart defaults for N training days.
 const SMART_DEFAULTS = {
-  strength: ['upper', 'lower', 'upper', 'lower', 'full_body', 'push', 'pull'],
-  endurance: ['run_easy', 'strength', 'run_tempo', 'run_long', 'mobility', 'run_easy', 'strength'],
-  general:  ['run_easy', 'upper', 'lower', 'full_body', 'mobility', 'run_easy', 'upper'],
-  fat_loss: ['run_easy', 'full_body', 'upper', 'lower', 'mobility', 'run_easy', 'full_body'],
+  strength: {
+    3: ['full_body', 'full_body', 'full_body'],
+    4: ['upper', 'lower', 'pull', 'lower'],
+    5: ['upper', 'lower', 'hybrid_conditioning', 'pull', 'lower'],
+  },
+  hybrid: {
+    3: ['full_body', 'hybrid_conditioning', 'full_body'],
+    4: ['upper', 'lower', 'hybrid_conditioning', 'full_body'],
+    5: ['upper', 'lower', 'hybrid_conditioning', 'full_body', 'hybrid_conditioning'],
+  },
+  running: {
+    3: ['run_easy', 'run_intervals', 'run_long'],
+    4: ['run_easy', 'run_intervals', 'run_tempo', 'run_long'],
+    5: ['run_easy', 'run_intervals', 'run_recovery', 'run_tempo', 'run_long'],
+  },
+  mobility_recovery: {
+    3: ['mobility', 'mobility', 'mobility'],
+    4: ['mobility', 'mobility', 'mobility', 'mobility'],
+    5: ['mobility', 'mobility', 'mobility', 'run_recovery', 'mobility'],
+  },
 }
 
 const TYPE_LABEL = {
   upper:     'Upper',    lower:     'Lower',    full_body: 'Full Body',
   push:      'Push',     pull:      'Pull',     mobility:  'Mobility',
-  run_easy:  'Easy Run', run_tempo: 'Tempo Run', run_long:  'Long Run',
+  run_easy:  'Easy Run', run_intervals: 'Intervals', run_recovery: 'Recovery Run',
+  run_tempo: 'Tempo Run', run_long:  'Long Run',
   strength:  'Strength',
+  hybrid_conditioning: 'Hybrid Conditioning',
 }
 
 const PROGRAM_LABEL = {
-  strength: 'Build Strength', endurance: 'Build Endurance',
-  general:  'General Fitness', fat_loss:  'Fat Loss',
+  strength: 'Strength',
+  hybrid: 'Hybrid',
+  running: 'Running',
+  mobility_recovery: 'Mobility / Recovery',
+}
+
+function normalizeProgramType(type) {
+  if (type === 'endurance') return 'running'
+  if (type === 'general' || type === 'fat_loss') return 'hybrid'
+  if (type === 'mobility' || type === 'recovery') return 'mobility_recovery'
+  return type
 }
 
 const EQUIPMENT_OPTIONS = [
@@ -439,14 +463,17 @@ export default function FitnessSetup({ onComplete, onBack, isEditing = false }) 
   const { settingsState, settingsDispatch } = useSettings()
 
   const existing    = fitnessState.programConfig
-  const initialProg = fitnessState.program.type
+  const initialProg = normalizeProgramType(fitnessState.program.type)
 
   // Track initial program to know when the user changes it (clears day types).
   const initialProgramRef = useRef(initialProg)
 
   const [step, setStep]                   = useState(1)
   const [selectedProgram, setSelectedProgram] = useState(() => initialProg)
-  const [weeklyDays, setWeeklyDays]       = useState(() => (existing.weeklyDays > 0 ? existing.weeklyDays : 4))
+  const [weeklyDays, setWeeklyDays]       = useState(() => {
+    const savedDays = existing.weeklyDays > 0 ? existing.weeklyDays : 4
+    return Math.max(3, Math.min(5, savedDays))
+  })
   const [selectedDays, setSelectedDays]   = useState(() => existing.trainingDays ?? [])
   const [dayTypes, setDayTypes]           = useState(() => existing.dayTypes ?? {})
   const [equipment, setEquipment]         = useState(() => settingsState.gymAccess || GYM_ACCESS.BODYWEIGHT)
@@ -462,8 +489,7 @@ export default function FitnessSetup({ onComplete, onBack, isEditing = false }) 
 
   // Recommended split shown on step 2 (first N smart-default type labels for current weeklyDays).
   const recommendedSplit = selectedProgram
-    ? (SMART_DEFAULTS[selectedProgram] ?? [])
-        .slice(0, weeklyDays)
+    ? (SMART_DEFAULTS[selectedProgram]?.[weeklyDays] ?? [])
         .map(t => TYPE_LABEL[t] ?? t)
         .join(' / ')
     : ''
@@ -511,7 +537,7 @@ export default function FitnessSetup({ onComplete, onBack, isEditing = false }) 
 
     if (step === 3) {
       // Apply smart defaults for each selected day; preserve any type already chosen.
-      const defaults    = SMART_DEFAULTS[selectedProgram] ?? []
+      const defaults    = SMART_DEFAULTS[selectedProgram]?.[weeklyDays] ?? []
       const fallback    = PROGRAM_DAY_TYPES[selectedProgram]?.[0]?.id ?? 'upper'
       const sorted      = [...selectedDays].sort(
         (a, b) => DAYS_OF_WEEK.indexOf(a) - DAYS_OF_WEEK.indexOf(b)
