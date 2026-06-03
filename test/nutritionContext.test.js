@@ -4,7 +4,7 @@ import {
   getLoggedMealSlotCount,
   getNutritionProgress,
   getNutritionStatusSymbol,
-} from '../src/context/NutritionContext.jsx'
+} from '../src/utils/nutrition.js'
 
 const entry = mealSlot => ({
   id:        mealSlot,
