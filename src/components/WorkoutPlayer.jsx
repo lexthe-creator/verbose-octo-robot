@@ -1,4 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import {
+  formatSegmentPrescription,
+  getEquipmentNeededForSegment,
+  getNextUp,
+  getSegmentType,
+  getSideInstruction,
+} from '../utils/workoutDisplay.js'
 
 const FEEL_OPTIONS = [
   { value: 1, emoji: '😴' },
@@ -16,12 +23,6 @@ function fmtMMSS(totalSec) {
 
 function getWorkoutType(workout) {
   return workout.dayType ?? workout.type
-}
-
-function getSegmentType(segment) {
-  if (segment.type === 'sets_reps') return 'exercise'
-  if (segment.type) return segment.type
-  return segment.kind
 }
 
 function getSegmentInstruction(segment) {
@@ -90,7 +91,7 @@ export default function WorkoutPlayer({ workout, onComplete, onClose }) {
     setShowPost(true)
   }
 
-  function handleSave({ feel, notes }) {
+  function handleSave({ feel, rpe, notes }) {
     const startedAt = workout.startedAt ?? Date.now()
     const durationMin = Math.max(1, Math.round((Date.now() - startedAt) / 60000))
     onComplete({
@@ -99,6 +100,7 @@ export default function WorkoutPlayer({ workout, onComplete, onClose }) {
       title:     workout.title,
       duration:  durationMin,
       feel,
+      rpe,
       notes,
       exercises: buildExerciseSummary(workout, journal),
       sets:      buildSetLog(journal),
@@ -108,6 +110,8 @@ export default function WorkoutPlayer({ workout, onComplete, onClose }) {
   const handleJournalChange = useCallback((rows) => {
     setJournal(current => ({ ...current, [segIndex]: rows }))
   }, [segIndex])
+
+  const nextUp = getNextUp(workout, segIndex)
 
   if (showPost) {
     return (
@@ -133,6 +137,8 @@ export default function WorkoutPlayer({ workout, onComplete, onClose }) {
             : `Segment ${segIndex + 1} of ${workout.segments.length}`}
         </div>
       </div>
+
+      <NextUp nextUp={nextUp} />
 
       {/* Segment body */}
       <div style={{ ...s.body, justifyContent: segmentType === 'exercise' ? 'flex-start' : 'center' }}>
@@ -226,6 +232,37 @@ function TextSegment({ segment }) {
   )
 }
 
+function EquipmentLine({ items }) {
+  if (!items?.length) return null
+  return (
+    <div style={s.equipmentLine}>
+      <span style={s.equipmentLabel}>equipment</span>
+      <span style={s.equipmentItems}>{items.join(' · ')}</span>
+    </div>
+  )
+}
+
+function NextUp({ nextUp }) {
+  return (
+    <div style={s.nextUp}>
+      <span style={s.nextLabel}>{nextUp.label}</span>
+      <span style={s.nextName}>{nextUp.name}</span>
+      {nextUp.detail && <span style={s.nextDetail}>{nextUp.detail}</span>}
+      <EquipmentLine items={nextUp.equipment} />
+    </div>
+  )
+}
+
+function RestTimer({ restLeft, onSkip }) {
+  return (
+    <div style={s.restTimer}>
+      <p style={s.restKicker}>rest</p>
+      <p style={s.restTime}>{fmtMMSS(restLeft)}</p>
+      <button style={s.restSkip} onClick={onSkip}>skip rest</button>
+    </div>
+  )
+}
+
 // ─── Exercise segment (sets × reps with rest timer) ──────────────────────────
 
 function makeSetRows(segment, savedRows) {
@@ -286,11 +323,20 @@ function ExerciseSegment({ segment, savedRows, onJournalChange }) {
   }
 
   const allDone = setRows.every(row => row.done)
+  const sideInstruction = getSideInstruction(segment)
+  const equipment = getEquipmentNeededForSegment(segment)
 
   return (
     <div style={s.exWrap}>
+      {restLeft > 0 && !allDone && (
+        <RestTimer restLeft={restLeft} onSkip={skipRest} />
+      )}
       <p style={s.exName}>{segment.name}</p>
-      <p style={s.exReps}>{segment.sets} × {segment.reps}</p>
+      <p style={s.exReps}>
+        {formatSegmentPrescription(segment)}
+      </p>
+      {sideInstruction && <p style={s.sideHint}>{sideInstruction}</p>}
+      <EquipmentLine items={equipment} />
       {segment.loadSuggestion?.suggestion && (
         <p style={s.loadHint}>{segment.loadSuggestion.suggestion}</p>
       )}
@@ -308,7 +354,7 @@ function ExerciseSegment({ segment, savedRows, onJournalChange }) {
           >
             <div style={s.setTop}>
               <span style={s.setName}>Set {i + 1}</span>
-              <span style={s.setPlanned}>planned {row.plannedReps}</span>
+              <span style={s.setPlanned}>planned {row.plannedReps}{sideInstruction ? ` ${sideInstruction}` : ''}</span>
               <span style={s.setDone}>{row.done ? 'done' : 'open'}</span>
             </div>
             <div style={s.setInputs}>
@@ -348,13 +394,6 @@ function ExerciseSegment({ segment, savedRows, onJournalChange }) {
         ))}
       </div>
 
-      {restLeft > 0 && !allDone && (
-        <div style={s.restBox}>
-          <span style={s.restLabel}>Rest · {fmtMMSS(restLeft)}</span>
-          <button style={s.skipBtn} onClick={skipRest}>Skip</button>
-        </div>
-      )}
-
       {allDone && (
         <p style={s.allDoneMsg}>All sets done — tap "Next exercise →"</p>
       )}
@@ -366,6 +405,7 @@ function ExerciseSegment({ segment, savedRows, onJournalChange }) {
 
 function PostWorkoutLog({ startedAt, onSave, onCancel }) {
   const [feel,  setFeel]  = useState(3)
+  const [rpe, setRpe] = useState(6)
   const [notes, setNotes] = useState('')
   const [elapsedSec, setElapsedSec] = useState(0)
 
@@ -403,6 +443,26 @@ function PostWorkoutLog({ startedAt, onSave, onCancel }) {
       </div>
 
       <div style={post.field}>
+        <label style={post.label}>Workout RPE</label>
+        <div style={post.rpeRow}>
+          {Array.from({ length: 10 }, (_, index) => index + 1).map(value => (
+            <button
+              key={value}
+              onClick={() => setRpe(value)}
+              style={{
+                ...post.rpeBtn,
+                background:  rpe === value ? 'var(--color-accent-bg)' : 'transparent',
+                borderColor: rpe === value ? 'var(--color-accent)' : 'var(--color-border)',
+                color:       rpe === value ? 'var(--color-accent)' : 'var(--color-muted)',
+              }}
+            >
+              {value}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={post.field}>
         <label style={post.label}>Notes</label>
         <textarea
           style={post.notes}
@@ -413,7 +473,7 @@ function PostWorkoutLog({ startedAt, onSave, onCancel }) {
         />
       </div>
 
-      <button style={post.saveBtn} onClick={() => onSave({ feel, notes: notes.trim() })}>
+      <button style={post.saveBtn} onClick={() => onSave({ feel, rpe, notes: notes.trim() })}>
         Save workout
       </button>
       <button style={post.cancelBtn} onClick={onCancel}>Discard</button>
@@ -454,17 +514,69 @@ const s = {
     textTransform: 'uppercase', fontWeight: 600,
   },
 
-	  body: {
-	    flex:           1,
-	    display:        'flex',
-	    flexDirection:  'column',
-	    justifyContent: 'center',
-	    alignItems:     'center',
-	    textAlign:      'center',
-	    gap:            '20px',
-	    overflowY:      'auto',
-	    paddingTop:     '4px',
-	  },
+  nextUp: {
+    display:             'grid',
+    gridTemplateColumns: 'auto minmax(0, 1fr) auto',
+    alignItems:          'baseline',
+    gap:                 '6px 10px',
+    padding:             '10px 0 12px',
+    borderTop:           '0.5px solid color-mix(in srgb, var(--color-border) 48%, transparent)',
+    borderBottom:        '0.5px solid color-mix(in srgb, var(--color-border) 48%, transparent)',
+    marginBottom:        '12px',
+  },
+  nextLabel: {
+    color:         'var(--color-muted)',
+    fontSize:      '10px',
+    fontWeight:    700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+  },
+  nextName: {
+    minWidth:     0,
+    color:        'var(--color-text)',
+    fontSize:     '13px',
+    fontWeight:   650,
+    overflow:     'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace:   'nowrap',
+  },
+  nextDetail: {
+    color:      'var(--color-accent)',
+    fontSize:   '12px',
+    fontWeight: 650,
+  },
+  equipmentLine: {
+    gridColumn:          '1 / 4',
+    display:             'grid',
+    gridTemplateColumns: 'auto minmax(0, 1fr)',
+    gap:                 '7px',
+    alignItems:          'baseline',
+  },
+  equipmentLabel: {
+    color:      'var(--color-muted)',
+    fontSize:   '10px',
+    fontWeight: 650,
+  },
+  equipmentItems: {
+    minWidth:     0,
+    color:        'var(--color-muted)',
+    fontSize:     '11px',
+    overflow:     'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace:   'nowrap',
+  },
+
+  body: {
+    flex:           1,
+    display:        'flex',
+    flexDirection:  'column',
+    justifyContent: 'center',
+    alignItems:     'center',
+    textAlign:      'center',
+    gap:            '20px',
+    overflowY:      'auto',
+    paddingTop:     '4px',
+  },
 
   // Timed
   timedWrap: {
@@ -494,6 +606,7 @@ const s = {
   },
   exName: { fontFamily: 'var(--font-display)', fontSize: '22px', color: 'var(--color-text)', textAlign: 'center' },
   exReps: { fontSize: '18px', color: 'var(--color-accent)', fontWeight: 600, textAlign: 'center', marginTop: '-4px' },
+  sideHint: { fontSize: '12px', color: 'var(--color-muted)', fontWeight: 650, textAlign: 'center', marginTop: '-6px' },
   loadHint: { fontSize: '12px', color: 'var(--color-muted)', textAlign: 'center', lineHeight: 1.35, marginTop: '-2px' },
   setList: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' },
   setRow: {
@@ -526,15 +639,35 @@ const s = {
     outline: 'none', color: 'var(--color-text)', fontFamily: 'var(--font-body)', fontSize: '12px',
     padding: '4px 0',
   },
-  restBox: {
-    marginTop: '10px', padding: '10px 14px', borderRadius: 'var(--radius-sm)',
-    background: 'var(--color-accent-bg)', border: '0.5px solid var(--color-accent)',
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+  restTimer: {
+    display:       'flex',
+    flexDirection: 'column',
+    alignItems:    'center',
+    gap:           '4px',
+    padding:       '14px 0 16px',
   },
-  restLabel: { fontSize: '13px', fontWeight: 600, color: 'var(--color-accent)' },
-  skipBtn: {
-    background: 'none', border: 'none', color: 'var(--color-accent)',
-    fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+  restKicker: {
+    margin:        0,
+    color:         'var(--color-muted)',
+    fontSize:      '11px',
+    fontWeight:    700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+  },
+  restTime: {
+    margin:      0,
+    fontFamily: 'var(--font-display)',
+    fontSize:   '64px',
+    lineHeight: 1,
+    color:      'var(--color-accent)',
+  },
+  restSkip: {
+    background: 'none',
+    border:     'none',
+    color:      'var(--color-muted)',
+    fontSize:   '12px',
+    fontWeight: 650,
+    cursor:     'pointer',
   },
   allDoneMsg: { fontSize: '12px', color: 'var(--color-success)', textAlign: 'center', marginTop: '6px' },
 
@@ -549,9 +682,14 @@ const s = {
     display: 'flex', flexDirection: 'column', gap: '8px',
   },
   nextBtn: {
-    padding: '16px', borderRadius: 'var(--radius-card)',
-    background: 'var(--color-accent)', color: '#fff',
-    fontSize: '16px', fontWeight: 600, border: 'none', cursor: 'pointer',
+    padding: '12px',
+    borderRadius: 'var(--radius-sm)',
+    background: 'transparent',
+    color: 'var(--color-text)',
+    fontSize: '14px',
+    fontWeight: 650,
+    border: 'var(--border)',
+    cursor: 'pointer',
   },
   endBtn: {
     padding: '12px', borderRadius: 'var(--radius-card)',
@@ -582,6 +720,20 @@ const post = {
     flex: 1, height: '52px', borderRadius: 'var(--radius-sm)',
     fontSize: '24px', cursor: 'pointer',
     border: '0.5px solid', transition: 'background 0.15s, border-color 0.15s',
+  },
+  rpeRow: {
+    display:             'grid',
+    gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+    gap:                 '6px',
+  },
+  rpeBtn: {
+    minHeight:    '34px',
+    borderRadius: 'var(--radius-sm)',
+    border:       '0.5px solid',
+    background:   'transparent',
+    fontSize:     '12px',
+    fontWeight:   700,
+    cursor:       'pointer',
   },
   notes: {
     background: 'var(--color-card)', border: 'var(--border)',

@@ -39,6 +39,7 @@ test('LOG_WORKOUT preserves completed set journal rows', () => {
     title:     'Push',
     duration:  42,
     feel:      3,
+    rpe:       6,
     notes:     'solid',
     exercises: [{ name: 'Push-ups', sets: 3, reps: 12, completed: 1 }],
     sets,
@@ -47,4 +48,5 @@ test('LOG_WORKOUT preserves completed set journal rows', () => {
   assert.deepEqual(next.workoutLog[0].sets, sets)
   assert.equal(next.workoutLog[0].sets[0].reps, 10)
   assert.equal(next.workoutLog[0].sets[0].plannedReps, 12)
+  assert.equal(next.workoutLog[0].rpe, 6)
 })

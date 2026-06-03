@@ -8,7 +8,8 @@ import {
 } from '../context/index.js'
 import { useSettings } from '../context/SettingsContext.jsx'
 import { GYM_ACCESS, WORKOUT_TYPES } from '../constants/fitness.js'
-import { getTypeForDay, getWeekDates, getWeekNumber, generateWorkout } from '../utils/fitness.js'
+import { getPhase, getTypeForDay, getWeekDates, getWeekNumber } from '../utils/fitness.js'
+import { generateWorkout } from '../utils/workoutGenerator.js'
 import { getTodayISO } from '../utils/time.js'
 import Nutrition from './Nutrition.jsx'
 
@@ -208,8 +209,8 @@ function getTodayTrainingPlan(fitnessState, settingsState) {
   }
 
   const configuredDayType = fitnessState.programConfig.dayTypes?.[todayKey]
-  const workoutType = DAY_TYPE_TO_WORKOUT_TYPE[configuredDayType] ?? getTypeForDay(new Date().getDay())
-  const workout = generateWorkout(workoutType, settingsState.gymAccess, getWeekNumber(fitnessState.programStartDate))
+  const workoutType = normalizeWorkoutDayType(configuredDayType) ?? normalizeWorkoutDayType(DAY_TYPE_TO_WORKOUT_TYPE[configuredDayType]) ?? normalizeWorkoutDayType(getTypeForDay(new Date().getDay()))
+  const workout = buildHealthWorkout(workoutType, fitnessState, settingsState)
   const storedStatus = fitnessState.workoutDayStatus?.[today]?.status
   const status = storedStatus || (fitnessState.todayComplete ? 'completed' : 'planned')
   return { scheduled: true, workout, status }
@@ -230,6 +231,41 @@ function toLocalISO(date) {
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+function normalizeWorkoutDayType(type) {
+  if (!type || type === WORKOUT_TYPES.REST) return null
+  if (type === WORKOUT_TYPES.EASY_RUN) return 'run_easy'
+  if (type === WORKOUT_TYPES.TEMPO_RUN) return 'run_tempo'
+  if (type === WORKOUT_TYPES.LONG_RUN) return 'run_long'
+  if (type === WORKOUT_TYPES.STRENGTH_A) return 'upper'
+  if (type === WORKOUT_TYPES.STRENGTH_B) return 'lower'
+  if (type === WORKOUT_TYPES.STRETCH) return 'mobility'
+  if (type === 'strength') return 'full_body'
+  return type
+}
+
+function weekInPhase(programStartDate) {
+  const week = getWeekNumber(programStartDate)
+  const position = ((week - 1) % 13) + 1
+  if (position === 13) return 1
+  return ((position - 1) % 4) + 1
+}
+
+function buildHealthWorkout(dayType, fitnessState, settingsState) {
+  const workout = generateWorkout({
+    dayType,
+    equipment:   settingsState.gymAccess,
+    phase:       getPhase(fitnessState.programStartDate),
+    weekInPhase: weekInPhase(fitnessState.programStartDate),
+    history:     fitnessState.workoutLog,
+  })
+  return {
+    ...workout,
+    type:        workout.dayType,
+    subtitle:    `${workout.title} · ~${workout.estimatedMinutes} min`,
+    durationEst: workout.estimatedMinutes,
+  }
 }
 
 function effortToFeel(effort) {
@@ -351,7 +387,7 @@ function HealthToday({
 }) {
   const today = getTodayISO()
   const { dayState, dayDispatch } = useDay()
-  const { fitnessState } = useFitness()
+  const { fitnessState, fitnessDispatch } = useFitness()
   const { settingsState } = useSettings()
   const { nutritionState } = useNutrition()
   const [daily, setDaily] = useState(() => loadDailyHealth(today))
@@ -377,6 +413,11 @@ function HealthToday({
     updateDaily({ energy: value })
   }
 
+  function startMirroredWorkout(workout) {
+    fitnessDispatch({ type: 'SET_WORKOUT_DAY_STATUS', payload: { date: today, status: 'in_progress' } })
+    onStartWorkout?.(workout)
+  }
+
   return (
     <main style={s.today}>
       <section style={s.plannerCard}>
@@ -386,6 +427,11 @@ function HealthToday({
           <PlannerRow label="sleep" value="add later" />
           <PlannerRow label="energy" value={energy ? `${energy}/5` : 'check in'} />
           <PlannerRow label="readiness" value={readiness === 'check in' ? 'pending' : readiness} detail={recoveryStatus === 'not checked' ? '' : recoveryStatus} />
+          <PlannerRow label="motivation" value={daily.motivation ? `${daily.motivation}/5` : 'check in'} />
+          <PlannerRow label="soreness" value={daily.soreness ? `${daily.soreness}/5` : 'check in'} />
+          <CheckInButtons label="energy" value={energy} onChange={updateEnergy} />
+          <CheckInButtons label="soreness" value={daily.soreness} onChange={value => updateDaily({ soreness: value })} />
+          <CheckInButtons label="motivation" value={daily.motivation} onChange={value => updateDaily({ motivation: value })} />
         </PlannerGroup>
 
         <PlannerGroup label="Training">
@@ -393,14 +439,13 @@ function HealthToday({
             trainingPlan.scheduled ? (
               <>
                 <PlannerRow label="workout" value={workout.title.toLowerCase()} />
-                <PlannerRow label="focus" value={workout.subtitle.split('·')[0].trim().toLowerCase()} detail={`~${workout.durationEst} min`} />
-                <PlannerRow label="status" value={STATUS_LABELS[trainingPlan.status].toLowerCase()} />
-                <DailyWorkoutActions
-                  status={trainingPlan.status}
-                  workout={workout}
-                  onStartWorkout={onStartWorkout}
-                  onLogWorkout={onLogWorkout}
-                />
+                <PlannerRow label="status" value={STATUS_LABELS[trainingPlan.status].toLowerCase()} detail={`~${workout.durationEst} min`} />
+                <InlineActions>
+                  {trainingPlan.status !== 'completed' && (
+                    <ActionButton onClick={() => startMirroredWorkout(workout)}>start workout</ActionButton>
+                  )}
+                  <ActionButton secondary onClick={() => onSectionChange('training')}>view training</ActionButton>
+                </InlineActions>
               </>
             ) : (
               <>
@@ -435,12 +480,6 @@ function HealthToday({
               water
             </ActionButton>
           </InlineActions>
-        </PlannerGroup>
-
-        <PlannerGroup label="Check-in">
-          <CheckInButtons label="energy" value={energy} onChange={updateEnergy} />
-          <CheckInButtons label="soreness" value={daily.soreness} onChange={value => updateDaily({ soreness: value })} />
-          <CheckInButtons label="motivation" value={daily.motivation} onChange={value => updateDaily({ motivation: value })} />
         </PlannerGroup>
       </section>
     </main>
@@ -492,8 +531,8 @@ function getTrainingDayPlan(fitnessState, settingsState, date) {
   }
 
   const configuredDayType = fitnessState.programConfig.dayTypes?.[dayKey]
-  const workoutType = DAY_TYPE_TO_WORKOUT_TYPE[configuredDayType] ?? getTypeForDay(date.getDay())
-  const workout = generateWorkout(workoutType, settingsState.gymAccess, getWeekNumber(fitnessState.programStartDate))
+  const workoutType = normalizeWorkoutDayType(configuredDayType) ?? normalizeWorkoutDayType(DAY_TYPE_TO_WORKOUT_TYPE[configuredDayType]) ?? normalizeWorkoutDayType(getTypeForDay(date.getDay()))
+  const workout = buildHealthWorkout(workoutType, fitnessState, settingsState)
   const storedStatus = fitnessState.workoutDayStatus?.[iso]?.status
   const isToday = iso === getTodayISO()
   const status = storedStatus || (isToday && fitnessState.todayComplete ? 'completed' : 'planned')

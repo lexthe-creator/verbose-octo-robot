@@ -3,6 +3,7 @@ import { RUN_SEGMENTS } from '../data/runSegments.js'
 import { getPhaseConfig, getDayTypeLabel } from './fitness.js'
 import { getLastPerformance } from './fitnessSelectors.js'
 import { getTodayISO } from './time.js'
+import { getEquipmentNeededForSegment, isSideBasedSegment } from './workoutDisplay.js'
 
 // ─── Internal PRNG ────────────────────────────────────────────────────────────
 // Deterministic shuffle: same date string → same seed → same workout all day.
@@ -121,6 +122,41 @@ export function getLoadSuggestion(exercise, lastPerformance, phaseConfig) {
   }
 }
 
+function withDisplayMeta(segment) {
+  const next = {
+    ...segment,
+    equipmentNeeded: getEquipmentNeededForSegment(segment),
+  }
+  if (isSideBasedSegment(next)) {
+    next.perSide = true
+  }
+  return next
+}
+
+function makeCoreSegment(dayType, phaseConfig, restSeconds) {
+  const base = {
+    section:        'main',
+    type:           'sets_reps',
+    exerciseId:     `${dayType}_core_finisher`,
+    name:           dayType?.startsWith('run') ? 'Dead Bug' : 'Plank Shoulder Tap',
+    sets:           2,
+    reps:           dayType?.startsWith('run') ? 10 : 12,
+    rpeTarget:      Math.max(5, Math.round((phaseConfig.rpeTarget ?? 6) - 1)),
+    intensity:      'controlled',
+    cues:           dayType?.startsWith('run')
+      ? ['Move opposite arm and leg together', 'Keep your lower back gently pressed down', 'Go slow enough to stay braced']
+      : ['Keep hips square to the floor', 'Tap each shoulder without rocking', 'Slow reps count more than speed'],
+    loadSuggestion: { suggestion: 'Bodyweight — smooth and braced', basis: 'core finisher' },
+    restSeconds,
+    muscleGroup:    'core',
+    muscles:        ['core', 'shoulders'],
+    equipment:      'bodyweight',
+    category:       'core',
+    perSide:        true,
+  }
+  return withDisplayMeta(base)
+}
+
 // ─── Warmup / cooldown data for strength workouts ─────────────────────────────
 
 const UPPER_WARMUP = [
@@ -192,7 +228,7 @@ export function buildStrengthWorkout(dayType, equipment, phase, weekInPhase, his
   const cooldown    = STRENGTH_COOLDOWNS[dayType] ?? UPPER_COOLDOWN
   const restSeconds = REST_SECONDS[phase] ?? DEFAULT_REST
 
-  const mainSegments = exercises.map(exercise => ({
+  const mainSegments = exercises.map(exercise => withDisplayMeta({
     section:        'main',
     type:           'sets_reps',
     exerciseId:     exercise.id,
@@ -209,9 +245,21 @@ export function buildStrengthWorkout(dayType, equipment, phase, weekInPhase, his
     ),
     restSeconds,
     muscleGroup:    exercise.muscleGroup,
+    muscles:        exercise.muscles,
+    equipment:      exercise.equipment,
+    category:       exercise.category,
   }))
 
-  return [...warmup, ...mainSegments, ...cooldown]
+  const coreSegment = ['push', 'lower'].includes(dayType)
+    ? [makeCoreSegment(dayType, phaseConfig, restSeconds)]
+    : []
+
+  return [
+    ...warmup.map(withDisplayMeta),
+    ...mainSegments,
+    ...coreSegment,
+    ...cooldown.map(withDisplayMeta),
+  ]
 }
 
 // ─── Run duration tables (seconds) ───────────────────────────────────────────
@@ -247,19 +295,22 @@ function runDuration(runType, phase, weekInPhase) {
 // Spreads RUN_SEGMENTS data into the new segment shape.
 // Explicit section/type/audioId always win over anything in segmentData.
 function makeRunSegment(segmentData, section, audioId) {
-  return { ...segmentData, section, type: 'timed', audioId }
+  return withDisplayMeta({ ...segmentData, section, type: 'timed', audioId })
 }
 
 // ─── 5. buildRunWorkout ───────────────────────────────────────────────────────
 
 export function buildRunWorkout(runType, phase, weekInPhase) {
   const mainDur = runDuration(runType, phase, weekInPhase)
+  const phaseConfig = getPhaseConfig(phase, weekInPhase)
+  const coreSegment = makeCoreSegment(runType, phaseConfig, DEFAULT_REST)
 
   switch (runType) {
     case 'run_easy':
       return [
         makeRunSegment(RUN_SEGMENTS.warmup.walk,    'warmup',   'warmup_walk'),
         { ...makeRunSegment(RUN_SEGMENTS.main.easy,  'main',    'main_easy'),  duration: mainDur },
+        coreSegment,
         makeRunSegment(RUN_SEGMENTS.cooldown.walk,  'cooldown', 'cooldown_walk'),
       ]
 
@@ -269,6 +320,7 @@ export function buildRunWorkout(runType, phase, weekInPhase) {
         { ...makeRunSegment(RUN_SEGMENTS.main.tempo,     'main',    'main_tempo'),    duration: mainDur },
         { ...makeRunSegment(RUN_SEGMENTS.main.recovery,  'main',    'main_recovery'), duration: 120 },
         { ...makeRunSegment(RUN_SEGMENTS.main.tempo,     'main',    'main_tempo'),    duration: mainDur },
+        coreSegment,
         makeRunSegment(RUN_SEGMENTS.cooldown.walk,       'cooldown', 'cooldown_walk'),
       ]
 
@@ -276,6 +328,7 @@ export function buildRunWorkout(runType, phase, weekInPhase) {
       return [
         makeRunSegment(RUN_SEGMENTS.warmup.walk,    'warmup',   'warmup_walk'),
         { ...makeRunSegment(RUN_SEGMENTS.main.long,  'main',    'main_long'),  duration: mainDur },
+        coreSegment,
         makeRunSegment(RUN_SEGMENTS.cooldown.walk,  'cooldown', 'cooldown_walk'),
       ]
 
@@ -334,6 +387,7 @@ export function buildMobilityWorkout(durationMinutes) {
   }
 
   return [...MOBILITY_FIXED, ...filler, MOBILITY_CLOSING]
+    .map(withDisplayMeta)
 }
 
 // ─── Internal duration estimator ─────────────────────────────────────────────
@@ -384,5 +438,9 @@ export function generateWorkout(config) {
     return { ...base, title: 'Rest Day', estimatedMinutes: 0, segments: [] }
   }
 
-  return { ...base, estimatedMinutes: computeEstimatedMinutes(segments), segments }
+  const coreTitle = ['push', 'lower', 'run_easy', 'run_tempo', 'run_long'].includes(dayType)
+    ? `${title} + Core`
+    : title
+
+  return { ...base, title: coreTitle, estimatedMinutes: computeEstimatedMinutes(segments), segments }
 }

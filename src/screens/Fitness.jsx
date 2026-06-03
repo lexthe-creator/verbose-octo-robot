@@ -5,6 +5,7 @@ import FitnessSetup    from './FitnessSetup.jsx'
 import { getPhase, getWeekNumber } from '../utils/fitness.js'
 import { generateWorkout } from '../utils/workoutGenerator.js'
 import { getWeekStrip } from '../utils/fitnessSelectors.js'
+import { getJournalRow } from '../utils/workoutDisplay.js'
 import { PHASE_LABELS } from '../constants/fitness.js'
 
 const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
@@ -24,8 +25,6 @@ const TYPE_ABBR = {
   mobility:  'MO',
   rest:      '—',
 }
-
-const FEEL_LABELS = ['', 'drained', 'flat', 'good', 'great', 'charged']
 
 function todayWeekIndex() {
   return (new Date().getDay() + 6) % 7
@@ -340,38 +339,33 @@ const ws = {
 // ─── Log row ──────────────────────────────────────────────────────────────────
 
 function LogRow({ entry }) {
-  const dateStr  = new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  const feelText = FEEL_LABELS[entry.feel] || ''
+  const row = getJournalRow(entry)
 
   return (
     <div style={lr.wrap}>
-      <div style={lr.left}>
-        <p style={lr.title}>{entry.title}</p>
-        <p style={lr.meta}>{dateStr} · {entry.duration} min</p>
-      </div>
-      {feelText && <span style={lr.feel}>{feelText}</span>}
+      <span style={lr.date}>{row.date}</span>
+      <span style={lr.focus}>{row.focus}</span>
+      <span style={lr.duration}>{row.duration}</span>
+      <span style={lr.marker}>{row.marker}</span>
+      <span style={lr.rpe}>{row.rpe}</span>
     </div>
   )
 }
 
 const lr = {
   wrap: {
-    display:        'flex',
-    alignItems:     'center',
-    justifyContent: 'space-between',
-    padding:        '12px 14px',
-    background:     'var(--color-card)',
-    border:         'var(--border)',
-    borderRadius:   'var(--radius-sm)',
+    display:             'grid',
+    gridTemplateColumns: '48px minmax(0, 1fr) 54px 14px 70px',
+    alignItems:          'baseline',
+    gap:                 '8px',
+    padding:             '9px 0',
+    borderTop:           '0.5px solid color-mix(in srgb, var(--color-border) 54%, transparent)',
   },
-  left: {
-    display:       'flex',
-    flexDirection: 'column',
-    gap:           '2px',
-  },
-  title: { fontSize: '14px', fontWeight: 500, color: 'var(--color-text)' },
-  meta:  { fontSize: '11px', color: 'var(--color-muted)' },
-  feel:  { fontSize: '11px', color: 'var(--color-muted)', fontStyle: 'italic' },
+  date:     { fontSize: '11px', color: 'var(--color-muted)', fontWeight: 650 },
+  focus:    { fontSize: '12px', color: 'var(--color-text)', fontWeight: 650, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  duration: { fontSize: '11px', color: 'var(--color-muted)', whiteSpace: 'nowrap' },
+  marker:   { fontSize: '12px', color: 'var(--color-success)', textAlign: 'center' },
+  rpe:      { fontSize: '11px', color: 'var(--color-muted)', whiteSpace: 'nowrap', textAlign: 'right' },
 }
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
@@ -500,10 +494,10 @@ export default function Fitness({ onStartWorkout }) {
         />
       </section>
 
-      {/* Recent log */}
+      {/* Journal */}
       {recentLog.length > 0 && (
         <section style={s.section}>
-          <p style={s.sectionLabel}>Recent</p>
+          <p style={s.sectionLabel}>Journal</p>
           <div style={s.logList}>
             {recentLog.map((entry, i) => (
               <LogRow key={i} entry={entry} />

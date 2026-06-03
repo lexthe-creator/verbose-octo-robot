@@ -1158,7 +1158,7 @@ Helpers exposed via `useDay()`: `updateTaskTime(taskId, time)`, `updateMealWindo
   workoutLog: [
     {
       date: ISO8601, type: string, title: string, duration: number,
-      feel: number, notes: string, exercises: [],
+      feel: number, rpe?: number, notes: string, exercises: [],
       sets: [
         {
           exercise: string,
@@ -1915,8 +1915,9 @@ Do not implement Calendar behavior beyond the approved read-only V1 scope until 
 
 - **Header** — phase label (terracotta, small caps) + "Training" title + "Week N" badge. When `programEndDate` is set: accent "X weeks to race" line below (or "Race week!" when 0).
 - **Today card** — generated via `generateWorkout(getTodayType(), gymAccess, weekNum)` where `weekNum = getWeekNumber(programStartDate)`. Card header is tappable: toggles full workout preview with 300ms max-height animation. Preview shows WARM UP / MAIN / COOL DOWN sections; each row: name left + `3×10` or `2:00` right in accent. Footer: `~Xmin` + "Start Workout" button. Collapsed state shows original Start/Completed button.
-- **Weekly strip** — 7-column grid (Mon–Sun). Each cell shows day initial + workout type abbr. Today's cell: accent bg + accent border.
-- **Recent log** — last 5 entries from `fitness.workoutLog` (reverse order). Each row: title, date + duration, feel label.
+- **Weekly strip** — 7-column grid (Mon–Sun) labeled `M T W T F S S`. Selecting a day updates the workout details below using the configured program and the new `workoutGenerator` path.
+- **Journal** — last 5 entries from `fitness.workoutLog` (reverse order). Rows render date, workout focus, duration, completion marker, and RPE when present, e.g. `Jun 2 | Push | 40 min | ● | RPE 6/10`. Use `Journal`, not History or Recent, for logged workout rows.
+- Fitness owns full workout detail. Health Today may mirror compact training status only and must not duplicate the full workout preview, weekly planner, or exercise details.
 
 ---
 
@@ -2062,9 +2063,17 @@ Full-screen `position: fixed` overlay (`z-index: 150`). Flows through `workout.s
 | `text` | `TextSegment` | Static card with name + instruction detail |
 | `exercise` | `ExerciseSegment` | Set rows (tap to mark done); 60s rest countdown (skippable) between sets |
 
+**Next Up:** during execution, show the upcoming segment/exercise beneath the header or current timer. It should include the next name, sets/reps or duration, and equipment needed. If there is no upcoming segment, show a quiet finish-state label.
+
+**Equipment preview:** workout segments may expose `equipmentNeeded[]`, derived from exercise metadata and helper mappings. Examples include `bench`, `dumbbells`, `cable machine`, `rack`, `barbell`, `pull-up bar`, `bodyweight`, and `running shoes`. The preview should remain compact planner metadata, not a large checklist.
+
 **Workout journal:** exercise segments render one row per planned set. Each row shows planned reps, allows actual reps and weight entry, and toggles complete/incomplete when tapped. Toggling a completed set off preserves entered reps, weight, and notes. Actual reps may differ from planned reps and should default to the planned reps when first completed.
 
-**Post-workout log:** (`PostWorkoutLog`) — elapsed timer, 5-emoji feel selector, notes textarea, "Save workout" → calls `onComplete({ date, type, title, duration, feel, notes, exercises[], sets[] })`. App.jsx dispatches `LOG_WORKOUT` and clears `activeWorkout`.
+**Rest timer:** rest is a full timer state, not a small pill. When rest is active, render a large countdown above exercise details with a secondary skip control. The next-exercise action remains available but visually quieter than the timer.
+
+**Side-based movements:** unilateral movements should clearly communicate side behavior. For reps, show explicit `each side` instructions when applicable. Timed side-based work may use separate left/right timers or clearly labeled per-side timing.
+
+**Post-workout log:** (`PostWorkoutLog`) — elapsed timer, 5-emoji feel selector, workout-level RPE 1-10 selector, notes textarea, "Save workout" → calls `onComplete({ date, type, title, duration, feel, rpe, notes, exercises[], sets[] })`. App.jsx dispatches `LOG_WORKOUT` and clears `activeWorkout`.
 
 Saved `sets[]` entries include `{ exercise, exerciseId, setNumber, plannedReps, reps, weight, rpe, note }`. `reps` is the actual completed rep count. Blank weight saves as `0`. Existing older set entries without `exerciseId`, `setNumber`, or `plannedReps` remain valid history.
 
@@ -2137,6 +2146,10 @@ Sets/reps segment (strength main):
 ```
 
 WorkoutPlayer accepts these new `type` values as the primary shape. It may defensively tolerate the deprecated `kind: 'timed' | 'exercise' | 'text'` segments until all older call sites are removed.
+
+Workout quality rules:
+- If a workout title or focus includes `Core`, the generated workout must include at least one explicit core segment.
+- Push + Core, Lower + Core, and Run + Core variants should add a core accessory/finisher instead of relying only on compound lifts that happen to involve core stabilization.
 
 Warm-up and cool-down selection must match workout type:
 - `push` and `upper` use upper-body activation/recovery.

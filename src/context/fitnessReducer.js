@@ -1,7 +1,7 @@
 import { getTodayISO } from '../utils/time.js'
 
 export function logWorkout(state, payload) {
-  const { date, type, title, duration, feel, effort, notes, exercises, sets, status = 'completed', source = 'planned' } = payload
+  const { date, type, title, duration, feel, rpe, effort, notes, exercises, sets, status = 'completed', source = 'planned' } = payload
   const entryDate = String(date ?? getTodayISO()).slice(0, 10)
   const entry = {
     date: date ?? entryDate,
@@ -9,6 +9,7 @@ export function logWorkout(state, payload) {
     title,
     duration,
     feel,
+    rpe,
     effort,
     notes,
     status,
