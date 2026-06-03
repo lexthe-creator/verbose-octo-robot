@@ -2,24 +2,27 @@ import { useState } from 'react'
 import { useFitness }  from '../context/index.js'
 import { useSettings } from '../context/SettingsContext.jsx'
 import FitnessSetup    from './FitnessSetup.jsx'
-import {
-  getPhase, getWeekNumber,
-  getWeekDates, getTypeForDay,
-  generateWorkout,
-} from '../utils/fitness.js'
-import { WORKOUT_TYPES, PHASE_LABELS } from '../constants/fitness.js'
+import { getPhase, getWeekNumber } from '../utils/fitness.js'
+import { generateWorkout } from '../utils/workoutGenerator.js'
+import { getWeekStrip } from '../utils/fitnessSelectors.js'
+import { PHASE_LABELS } from '../constants/fitness.js'
 
 const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 const DAY_NAMES  = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+const DAY_KEYS   = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 
 const TYPE_ABBR = {
-  [WORKOUT_TYPES.EASY_RUN]:   'R',
-  [WORKOUT_TYPES.TEMPO_RUN]:  'R',
-  [WORKOUT_TYPES.LONG_RUN]:   'R',
-  [WORKOUT_TYPES.STRENGTH_A]: 'US',
-  [WORKOUT_TYPES.STRENGTH_B]: 'LS',
-  [WORKOUT_TYPES.STRETCH]:    'ST',
-  [WORKOUT_TYPES.REST]:       '—',
+  run_easy:  'R',
+  run_tempo: 'R',
+  run_long:  'R',
+  upper:     'UP',
+  lower:     'LO',
+  full_body: 'FB',
+  push:      'PS',
+  pull:      'PL',
+  strength:  'FB',
+  mobility:  'MO',
+  rest:      '—',
 }
 
 const FEEL_LABELS = ['', 'drained', 'flat', 'good', 'great', 'charged']
@@ -31,6 +34,7 @@ function todayWeekIndex() {
 // ─── Workout preview helpers ──────────────────────────────────────────────────
 
 function fmtSegDetail(seg) {
+  if (seg.type === 'sets_reps' || seg.kind === 'exercise') return `${seg.sets}×${seg.reps}`
   if (seg.sets && seg.reps) return `${seg.sets}×${seg.reps}`
   if (seg.duration) {
     const m = Math.floor(seg.duration / 60)
@@ -60,9 +64,10 @@ function PreviewSection({ title, segs }) {
 function TodayCard({ workout, todayComplete, isToday, onStart }) {
   const [expanded, setExpanded] = useState(false)
 
-  const canStart    = isToday && workout.type !== 'rest' && !todayComplete
-  const hasPreview  = workout.type !== 'rest' && workout.segments.length > 0
-  const abbr        = TYPE_ABBR[workout.type] || '?'
+  const workoutType = workout.dayType ?? workout.type
+  const canStart    = isToday && workoutType !== 'rest' && !todayComplete
+  const hasPreview  = workoutType !== 'rest' && workout.segments.length > 0
+  const abbr        = TYPE_ABBR[workoutType] || '?'
 
   const warmupSegs = workout.segments.filter(s => s.section === 'warmup')
   const mainSegs   = workout.segments.filter(s => s.section === 'main' || !s.section)
@@ -103,7 +108,7 @@ function TodayCard({ workout, todayComplete, isToday, onStart }) {
           {coolSegs.length   > 0 && <PreviewSection title="COOL DOWN" segs={coolSegs}   />}
 
           <div style={tc.prevFooter}>
-            <span style={tc.prevTotal}>~{workout.durationEst} min</span>
+            <span style={tc.prevTotal}>~{workout.estimatedMinutes ?? workout.durationEst} min</span>
             {canStart && (
               <button style={tc.startInPreview} onClick={onStart}>
                 Start Workout
@@ -117,7 +122,7 @@ function TodayCard({ workout, todayComplete, isToday, onStart }) {
       </div>
 
       {/* Collapsed-state start / completed button */}
-      {isToday && workout.type !== 'rest' && !expanded && (
+      {isToday && workoutType !== 'rest' && !expanded && (
         <button
           style={{
             ...tc.startBtn,
@@ -267,15 +272,15 @@ const tc = {
 
 // ─── Weekly strip ─────────────────────────────────────────────────────────────
 
-function WeekStrip({ weekDates, selectedIndex, onSelect }) {
+function WeekStrip({ weekItems, selectedIndex, onSelect }) {
   const todayIndex = todayWeekIndex()
 
   return (
     <div style={ws.scroll}>
-      {weekDates.map((date, i) => {
+      {weekItems.map((item, i) => {
         const isToday    = i === todayIndex
         const isSelected = i === selectedIndex
-        const type       = getTypeForDay(date.getDay())
+        const type       = normalizeDayType(item.type)
         const abbr       = TYPE_ABBR[type] || '—'
 
         let bg, borderColor, labelColor, abbrColor
@@ -381,6 +386,36 @@ function getWeeksToRace(programEndDate) {
   return Math.ceil(msLeft / (7 * 24 * 60 * 60 * 1000))
 }
 
+function normalizeDayType(type) {
+  if (!type || type === 'rest') return 'rest'
+  if (type === 'strength') return 'full_body'
+  return type
+}
+
+function getWeekInPhase(weekNum) {
+  const position = ((weekNum - 1) % 13) + 1
+  if (position === 13) return 1
+  return ((position - 1) % 4) + 1
+}
+
+function buildWorkout(dayType, fitnessState, settingsState, weekNum, phaseKey) {
+  const normalizedDayType = normalizeDayType(dayType)
+  const workout = generateWorkout({
+    dayType:     normalizedDayType,
+    equipment:   settingsState.gymAccess,
+    phase:       phaseKey,
+    weekInPhase: getWeekInPhase(weekNum),
+    history:     fitnessState.workoutLog,
+  })
+
+  return {
+    ...workout,
+    type:        workout.dayType,
+    subtitle:    normalizedDayType === 'rest' ? 'Recovery — no session today' : `${workout.title} · ~${workout.estimatedMinutes} min`,
+    durationEst: workout.estimatedMinutes,
+  }
+}
+
 export default function Fitness({ onStartWorkout }) {
   const { fitnessState }  = useFitness()
   const { settingsState } = useSettings()
@@ -401,19 +436,20 @@ export default function Fitness({ onStartWorkout }) {
     )
   }
 
-  const { programStartDate, programEndDate, workoutLog, todayComplete } = fitnessState
-  const gymAccess = settingsState.gymAccess
+  const { programStartDate, programEndDate, workoutLog, todayComplete, programConfig } = fitnessState
 
   const weekNum     = getWeekNumber(programStartDate)
-  const weekDates   = getWeekDates()
   const phaseKey    = getPhase(programStartDate, programEndDate)
+  const weekItems   = getWeekStrip(programConfig)
   const weeksToRace = getWeeksToRace(programEndDate)
   const todayIdx    = todayWeekIndex()
 
   const viewingIndex   = selectedIndex ?? todayIdx
-  const viewingDate    = weekDates[viewingIndex]
-  const viewingType    = getTypeForDay(viewingDate.getDay())
-  const viewedWorkout  = generateWorkout(viewingType, gymAccess, weekNum)
+  const viewingDayKey  = DAY_KEYS[viewingIndex]
+  const viewingType    = programConfig.trainingDays?.includes(viewingDayKey)
+    ? programConfig.dayTypes?.[viewingDayKey] ?? 'rest'
+    : 'rest'
+  const viewedWorkout  = buildWorkout(viewingType, fitnessState, settingsState, weekNum, phaseKey)
   const isViewingToday = selectedIndex === null || selectedIndex === todayIdx
 
   const recentLog = [...workoutLog].reverse().slice(0, 5)
@@ -440,7 +476,7 @@ export default function Fitness({ onStartWorkout }) {
       <section style={s.section}>
         <p style={s.sectionLabel}>This week</p>
         <WeekStrip
-          weekDates={weekDates}
+          weekItems={weekItems}
           selectedIndex={selectedIndex}
           onSelect={setSelectedIndex}
         />

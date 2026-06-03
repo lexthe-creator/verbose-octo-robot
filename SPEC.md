@@ -1159,7 +1159,18 @@ Helpers exposed via `useDay()`: `updateTaskTime(taskId, time)`, `updateMealWindo
     {
       date: ISO8601, type: string, title: string, duration: number,
       feel: number, notes: string, exercises: [],
-      sets: [{ exercise: string, reps: number, weight: number, rpe: number, note: string }],
+      sets: [
+        {
+          exercise: string,
+          exerciseId?: string,
+          setNumber: number,
+          plannedReps: number,
+          reps: number,
+          weight: number,
+          rpe: number,
+          note: string,
+        },
+      ],
     }
   ],
   todayComplete:  false,   // true only if workoutLog[last].date === today; resets automatically on new day
@@ -2051,7 +2062,11 @@ Full-screen `position: fixed` overlay (`z-index: 150`). Flows through `workout.s
 | `text` | `TextSegment` | Static card with name + instruction detail |
 | `exercise` | `ExerciseSegment` | Set rows (tap to mark done); 60s rest countdown (skippable) between sets |
 
-**Post-workout log:** (`PostWorkoutLog`) — elapsed timer, 5-emoji feel selector, notes textarea, "Save workout" → calls `onComplete({ date, type, title, duration, feel, notes, exercises[] })`. App.jsx dispatches `LOG_WORKOUT` and clears `activeWorkout`.
+**Workout journal:** exercise segments render one row per planned set. Each row shows planned reps, allows actual reps and weight entry, and toggles complete/incomplete when tapped. Toggling a completed set off preserves entered reps, weight, and notes. Actual reps may differ from planned reps and should default to the planned reps when first completed.
+
+**Post-workout log:** (`PostWorkoutLog`) — elapsed timer, 5-emoji feel selector, notes textarea, "Save workout" → calls `onComplete({ date, type, title, duration, feel, notes, exercises[], sets[] })`. App.jsx dispatches `LOG_WORKOUT` and clears `activeWorkout`.
+
+Saved `sets[]` entries include `{ exercise, exerciseId, setNumber, plannedReps, reps, weight, rpe, note }`. `reps` is the actual completed rep count. Blank weight saves as `0`. Existing older set entries without `exerciseId`, `setNumber`, or `plannedReps` remain valid history.
 
 ---
 
@@ -2120,6 +2135,14 @@ Sets/reps segment (strength main):
 ```js
 { section: 'main', type: 'sets_reps', exerciseId, name, sets, reps, rpeTarget, intensity, cues[], loadSuggestion, restSeconds, muscleGroup }
 ```
+
+WorkoutPlayer accepts these new `type` values as the primary shape. It may defensively tolerate the deprecated `kind: 'timed' | 'exercise' | 'text'` segments until all older call sites are removed.
+
+Warm-up and cool-down selection must match workout type:
+- `push` and `upper` use upper-body activation/recovery.
+- `lower` uses lower-body activation/recovery.
+- `full_body` uses full-body activation/recovery.
+- `run_easy`, `run_tempo`, and `run_long` use running prep and walking/jogging cool-down.
 
 **Routing by dayType:**
 - `run_easy | run_tempo | run_long` → `buildRunWorkout`

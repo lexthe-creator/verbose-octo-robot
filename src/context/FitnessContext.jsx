@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useReducer, useEffect } from 'react'
 import { getTodayISO } from '../utils/time.js'
+import { logWorkout } from './fitnessReducer.js'
 
 const FITNESS_STORAGE_KEY = 'aiml_fitness'
 const SCHEMA_VERSION      = 2
@@ -130,30 +131,7 @@ export function fitnessReducer(state, action) {
   switch (action.type) {
 
     case 'LOG_WORKOUT': {
-      const { date, type, title, duration, feel, effort, notes, exercises, status = 'completed', source = 'planned' } = action.payload
-      const entryDate = String(date ?? getTodayISO()).slice(0, 10)
-      const entry = {
-        date: date ?? entryDate,
-        type,
-        title,
-        duration,
-        feel,
-        effort,
-        notes,
-        status,
-        source,
-        exercises: exercises ?? [],
-        sets: [],
-      }
-      return {
-        ...state,
-        workoutLog:    [...state.workoutLog, entry],
-        workoutDayStatus: {
-          ...state.workoutDayStatus,
-          [entryDate]: { status, updatedAt: new Date().toISOString() },
-        },
-        todayComplete: entryDate === getTodayISO() ? status === 'completed' : state.todayComplete,
-      }
+      return logWorkout(state, action.payload)
     }
 
     case 'SET_WORKOUT_DAY_STATUS': {

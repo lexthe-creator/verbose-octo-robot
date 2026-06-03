@@ -75,7 +75,7 @@ export default function App() {
   }
 
   function handleStartWorkout(workout) {
-    setActiveWorkout(workout)
+    setActiveWorkout({ ...workout, startedAt: Date.now() })
   }
 
   function handleWorkoutComplete(log) {

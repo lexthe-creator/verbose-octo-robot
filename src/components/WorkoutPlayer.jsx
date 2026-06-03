@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 
 const FEEL_OPTIONS = [
   { value: 1, emoji: '😴' },
@@ -14,23 +14,69 @@ function fmtMMSS(totalSec) {
   return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
 }
 
+function getWorkoutType(workout) {
+  return workout.dayType ?? workout.type
+}
+
+function getSegmentType(segment) {
+  if (segment.type === 'sets_reps') return 'exercise'
+  if (segment.type) return segment.type
+  return segment.kind
+}
+
+function getSegmentInstruction(segment) {
+  return segment.instruction ?? segment.detail ?? ''
+}
+
+function readNumber(value, fallback = 0) {
+  if (value === '' || value === null || value === undefined) return fallback
+  const n = Number(value)
+  return Number.isFinite(n) ? n : fallback
+}
+
+function buildExerciseSummary(workout, journal) {
+  return workout.segments
+    .map((segment, index) => ({ segment, index }))
+    .filter(({ segment }) => getSegmentType(segment) === 'exercise')
+    .map(({ segment, index }) => {
+      const rows = journal[index] ?? []
+      return {
+        name:        segment.name,
+        exerciseId:  segment.exerciseId,
+        sets:        segment.sets,
+        reps:        segment.reps,
+        completed:   rows.filter(row => row.done).length,
+        plannedReps: segment.reps,
+      }
+    })
+}
+
+function buildSetLog(journal) {
+  return Object.values(journal)
+    .flat()
+    .filter(row => row.done)
+    .map(row => ({
+      exercise:    row.exercise,
+      exerciseId:  row.exerciseId,
+      setNumber:   row.setNumber,
+      plannedReps: readNumber(row.plannedReps),
+      reps:        readNumber(row.reps, readNumber(row.plannedReps)),
+      weight:      readNumber(row.weight, 0),
+      rpe:         readNumber(row.rpe, 0),
+      note:        row.note?.trim() ?? '',
+    }))
+}
+
 // ─── Main player ─────────────────────────────────────────────────────────────
 
 export default function WorkoutPlayer({ workout, onComplete, onClose }) {
   const [segIndex, setSegIndex]     = useState(0)
-  const [showPost, setShowPost]     = useState(false)
-  const startRef                     = useRef(Date.now())
-
-  // Rest day short-circuits — nothing to play. Parent should guard, but
-  // if opened anyway, show the post-workout log straight away.
-  useEffect(() => {
-    if (workout.type === 'rest' || workout.segments.length === 0) {
-      setShowPost(true)
-    }
-  }, [workout.type, workout.segments.length])
+  const [showPost, setShowPost]     = useState(() => getWorkoutType(workout) === 'rest' || workout.segments.length === 0)
+  const [journal, setJournal]       = useState({})
 
   const segment = workout.segments[segIndex]
   const isLast  = segIndex >= workout.segments.length - 1
+  const segmentType = segment ? getSegmentType(segment) : null
 
   function handleNext() {
     if (isLast) {
@@ -45,26 +91,30 @@ export default function WorkoutPlayer({ workout, onComplete, onClose }) {
   }
 
   function handleSave({ feel, notes }) {
-    const durationMin = Math.max(1, Math.round((Date.now() - startRef.current) / 60000))
+    const startedAt = workout.startedAt ?? Date.now()
+    const durationMin = Math.max(1, Math.round((Date.now() - startedAt) / 60000))
     onComplete({
       date:      new Date().toISOString(),
-      type:      workout.type,
+      type:      getWorkoutType(workout),
       title:     workout.title,
       duration:  durationMin,
       feel,
       notes,
-      exercises: workout.segments
-        .filter(s => s.kind === 'exercise')
-        .map(s => ({ name: s.name, sets: s.sets, reps: s.reps })),
+      exercises: buildExerciseSummary(workout, journal),
+      sets:      buildSetLog(journal),
     })
   }
+
+  const handleJournalChange = useCallback((rows) => {
+    setJournal(current => ({ ...current, [segIndex]: rows }))
+  }, [segIndex])
 
   if (showPost) {
     return (
       <div style={s.screen}>
         <PostWorkoutLog
           workout={workout}
-          startedAt={startRef.current}
+          startedAt={workout.startedAt}
           onSave={handleSave}
           onCancel={onClose}
         />
@@ -78,17 +128,24 @@ export default function WorkoutPlayer({ workout, onComplete, onClose }) {
       <div style={s.header}>
         <button style={s.backBtn} onClick={onClose} aria-label="Close">← Back</button>
         <div style={s.counter}>
-          {segment.kind === 'exercise'
+          {segmentType === 'exercise'
             ? `Exercise ${exerciseIndex(workout, segIndex)} of ${exerciseCount(workout)}`
             : `Segment ${segIndex + 1} of ${workout.segments.length}`}
         </div>
       </div>
 
       {/* Segment body */}
-      <div style={s.body}>
-        {segment.kind === 'timed'    && <TimedSegment     segment={segment} />}
-        {segment.kind === 'text'     && <TextSegment      segment={segment} />}
-        {segment.kind === 'exercise' && <ExerciseSegment  segment={segment} key={segIndex} onAllSetsDone={() => {}} />}
+      <div style={{ ...s.body, justifyContent: segmentType === 'exercise' ? 'flex-start' : 'center' }}>
+        {segmentType === 'timed'    && <TimedSegment     segment={segment} key={segIndex} />}
+        {segmentType === 'text'     && <TextSegment      segment={segment} />}
+        {segmentType === 'exercise' && (
+          <ExerciseSegment
+            segment={segment}
+            savedRows={journal[segIndex]}
+            key={segIndex}
+            onJournalChange={handleJournalChange}
+          />
+        )}
       </div>
 
       {/* Progress dots */}
@@ -113,7 +170,7 @@ export default function WorkoutPlayer({ workout, onComplete, onClose }) {
         <button style={s.nextBtn} onClick={handleNext}>
           {isLast
             ? 'Finish workout →'
-            : segment.kind === 'exercise' ? 'Next exercise →' : 'Next segment →'}
+            : segmentType === 'exercise' ? 'Next exercise →' : 'Next segment →'}
         </button>
         <button style={s.endBtn} onClick={handleEndEarly}>End early</button>
       </div>
@@ -122,10 +179,10 @@ export default function WorkoutPlayer({ workout, onComplete, onClose }) {
 }
 
 function exerciseCount(workout) {
-  return workout.segments.filter(s => s.kind === 'exercise').length
+  return workout.segments.filter(s => getSegmentType(s) === 'exercise').length
 }
 function exerciseIndex(workout, segIndex) {
-  return workout.segments.slice(0, segIndex + 1).filter(s => s.kind === 'exercise').length
+  return workout.segments.slice(0, segIndex + 1).filter(s => getSegmentType(s) === 'exercise').length
 }
 
 // ─── Timed segment (counts up) ───────────────────────────────────────────────
@@ -135,7 +192,6 @@ function TimedSegment({ segment }) {
   const intervalRef = useRef(null)
 
   useEffect(() => {
-    setElapsed(0)
     intervalRef.current = setInterval(() => setElapsed(e => e + 1), 1000)
     return () => clearInterval(intervalRef.current)
   }, [segment])
@@ -148,7 +204,8 @@ function TimedSegment({ segment }) {
     <div style={s.timedWrap}>
       <p style={s.segName}>{segment.name}</p>
       <p style={s.timer}>{fmtMMSS(done ? elapsed : remaining)}</p>
-      <p style={s.segDetail}>{segment.detail}</p>
+      <p style={s.segDetail}>{getSegmentInstruction(segment)}</p>
+      {segment.effort && <p style={s.effortLine}>{segment.effort}</p>}
       <p style={s.targetLine}>
         {done
           ? `Target hit — ${fmtMMSS(target)} · extra ${fmtMMSS(elapsed - target)}`
@@ -164,23 +221,42 @@ function TextSegment({ segment }) {
   return (
     <div style={s.textWrap}>
       <p style={s.segName}>{segment.name}</p>
-      <p style={s.textDetail}>{segment.detail}</p>
+      <p style={s.textDetail}>{getSegmentInstruction(segment)}</p>
     </div>
   )
 }
 
 // ─── Exercise segment (sets × reps with rest timer) ──────────────────────────
 
-function ExerciseSegment({ segment }) {
-  const [setsDone, setSetsDone] = useState(Array(segment.sets).fill(false))
+function makeSetRows(segment, savedRows) {
+  if (savedRows) return savedRows
+  return Array.from({ length: segment.sets }, (_, index) => ({
+    exercise:    segment.name,
+    exerciseId:  segment.exerciseId,
+    setNumber:   index + 1,
+    plannedReps: segment.reps,
+    reps:        String(segment.reps ?? ''),
+    weight:      '',
+    rpe:         segment.rpeTarget ?? '',
+    note:        '',
+    done:        false,
+  }))
+}
+
+function ExerciseSegment({ segment, savedRows, onJournalChange }) {
+  const [setRows, setSetRows] = useState(() => makeSetRows(segment, savedRows))
   const [restLeft, setRestLeft] = useState(0)   // seconds remaining; 0 = no active rest
   const restRef = useRef(null)
 
   useEffect(() => () => clearInterval(restRef.current), [])
 
+  useEffect(() => {
+    onJournalChange?.(setRows)
+  }, [setRows, onJournalChange])
+
   function startRest() {
     clearInterval(restRef.current)
-    setRestLeft(segment.restSec || 60)
+    setRestLeft(segment.restSeconds ?? segment.restSec ?? 60)
     restRef.current = setInterval(() => {
       setRestLeft(t => {
         if (t <= 1) { clearInterval(restRef.current); return 0 }
@@ -194,38 +270,81 @@ function ExerciseSegment({ segment }) {
     setRestLeft(0)
   }
 
-  function markSet(i) {
-    if (setsDone[i]) return
-    const next = [...setsDone]
-    next[i] = true
-    setSetsDone(next)
-    // Start rest if there are more sets to go
-    const remaining = next.filter(x => !x).length
-    if (remaining > 0) startRest()
-    else clearInterval(restRef.current)
+  function updateSet(index, patch) {
+    setSetRows(rows => rows.map((row, i) => i === index ? { ...row, ...patch } : row))
   }
 
-  const allDone = setsDone.every(Boolean)
+  function toggleSet(index) {
+    setSetRows(rows => {
+      const next = rows.map((row, i) => i === index ? { ...row, done: !row.done } : row)
+      const toggledOn = !rows[index].done
+      const remaining = next.filter(row => !row.done).length
+      if (toggledOn && remaining > 0) startRest()
+      else if (remaining === 0) clearInterval(restRef.current)
+      return next
+    })
+  }
+
+  const allDone = setRows.every(row => row.done)
 
   return (
     <div style={s.exWrap}>
       <p style={s.exName}>{segment.name}</p>
       <p style={s.exReps}>{segment.sets} × {segment.reps}</p>
+      {segment.loadSuggestion?.suggestion && (
+        <p style={s.loadHint}>{segment.loadSuggestion.suggestion}</p>
+      )}
       <div style={s.setList}>
-        {setsDone.map((done, i) => (
-          <button
+        {setRows.map((row, i) => (
+          <div
             key={i}
             style={{
               ...s.setRow,
-              background:  done ? 'var(--color-success-bg)' : 'var(--color-card)',
-              borderColor: done ? 'var(--color-success)'    : 'var(--color-border)',
-              color:       done ? 'var(--color-success)'    : 'var(--color-text)',
+              background:  row.done ? 'var(--color-success-bg)' : 'var(--color-card)',
+              borderColor: row.done ? 'var(--color-success)'    : 'var(--color-border)',
+              color:       row.done ? 'var(--color-success)'    : 'var(--color-text)',
             }}
-            onClick={() => markSet(i)}
+            onClick={() => toggleSet(i)}
           >
-            <span>Set {i + 1}</span>
-            <span>{done ? '✓' : segment.reps}</span>
-          </button>
+            <div style={s.setTop}>
+              <span style={s.setName}>Set {i + 1}</span>
+              <span style={s.setPlanned}>planned {row.plannedReps}</span>
+              <span style={s.setDone}>{row.done ? 'done' : 'open'}</span>
+            </div>
+            <div style={s.setInputs}>
+              <label style={s.setField} onClick={e => e.stopPropagation()}>
+                <span style={s.setLabel}>actual</span>
+                <input
+                  style={s.setInput}
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  value={row.reps}
+                  onChange={e => updateSet(i, { reps: e.target.value })}
+                />
+              </label>
+              <label style={s.setField} onClick={e => e.stopPropagation()}>
+                <span style={s.setLabel}>weight</span>
+                <input
+                  style={s.setInput}
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.5"
+                  value={row.weight}
+                  placeholder="0"
+                  onChange={e => updateSet(i, { weight: e.target.value })}
+                />
+              </label>
+            </div>
+            <input
+              style={s.noteInput}
+              value={row.note}
+              placeholder="note"
+              onClick={e => e.stopPropagation()}
+              onChange={e => updateSet(i, { note: e.target.value })}
+            />
+          </div>
         ))}
       </div>
 
@@ -248,11 +367,11 @@ function ExerciseSegment({ segment }) {
 function PostWorkoutLog({ startedAt, onSave, onCancel }) {
   const [feel,  setFeel]  = useState(3)
   const [notes, setNotes] = useState('')
-  const [elapsedSec, setElapsedSec] = useState(Math.round((Date.now() - startedAt) / 1000))
+  const [elapsedSec, setElapsedSec] = useState(0)
 
   useEffect(() => {
     const id = setInterval(() => {
-      setElapsedSec(Math.round((Date.now() - startedAt) / 1000))
+      setElapsedSec(Math.round((Date.now() - (startedAt ?? Date.now())) / 1000))
     }, 1000)
     return () => clearInterval(id)
   }, [startedAt])
@@ -335,15 +454,17 @@ const s = {
     textTransform: 'uppercase', fontWeight: 600,
   },
 
-  body: {
-    flex:           1,
-    display:        'flex',
-    flexDirection:  'column',
-    justifyContent: 'center',
-    alignItems:     'center',
-    textAlign:      'center',
-    gap:            '20px',
-  },
+	  body: {
+	    flex:           1,
+	    display:        'flex',
+	    flexDirection:  'column',
+	    justifyContent: 'center',
+	    alignItems:     'center',
+	    textAlign:      'center',
+	    gap:            '20px',
+	    overflowY:      'auto',
+	    paddingTop:     '4px',
+	  },
 
   // Timed
   timedWrap: {
@@ -353,6 +474,7 @@ const s = {
   segName:  { fontSize: '14px', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-muted)' },
   timer:    { fontFamily: 'var(--font-display)', fontSize: '72px', color: 'var(--color-text)', lineHeight: 1, letterSpacing: '-1px' },
   segDetail: { fontSize: '14px', color: 'var(--color-text)', maxWidth: 280, lineHeight: 1.4 },
+  effortLine:{ fontSize: '12px', color: 'var(--color-accent)', fontWeight: 600 },
   targetLine:{ fontSize: '11px', color: 'var(--color-muted)', marginTop: 4 },
 
   // Text
@@ -372,11 +494,37 @@ const s = {
   },
   exName: { fontFamily: 'var(--font-display)', fontSize: '22px', color: 'var(--color-text)', textAlign: 'center' },
   exReps: { fontSize: '18px', color: 'var(--color-accent)', fontWeight: 600, textAlign: 'center', marginTop: '-4px' },
+  loadHint: { fontSize: '12px', color: 'var(--color-muted)', textAlign: 'center', lineHeight: 1.35, marginTop: '-2px' },
   setList: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' },
   setRow: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '14px 16px', borderRadius: 'var(--radius-sm)', border: '0.5px solid',
+    display: 'flex', flexDirection: 'column', gap: '8px',
+    padding: '12px', borderRadius: 'var(--radius-sm)', border: '0.5px solid',
     cursor: 'pointer', fontSize: '14px', fontWeight: 500, transition: 'all 0.15s',
+  },
+  setTop: {
+    display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '8px', alignItems: 'center',
+  },
+  setName: { fontSize: '13px', fontWeight: 600 },
+  setPlanned: { fontSize: '11px', color: 'var(--color-muted)', fontWeight: 500 },
+  setDone: { fontSize: '11px', color: 'inherit', fontWeight: 600 },
+  setInputs: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' },
+  setField: {
+    display: 'grid', gridTemplateColumns: 'auto 1fr', alignItems: 'center', gap: '6px',
+    borderBottom: '0.5px solid var(--color-border)', paddingBottom: '4px',
+  },
+  setLabel: {
+    fontSize: '10px', color: 'var(--color-muted)', fontWeight: 600, textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+  },
+  setInput: {
+    width: '100%', background: 'transparent', border: 'none', outline: 'none',
+    color: 'var(--color-text)', fontFamily: 'var(--font-body)', fontSize: '14px',
+    textAlign: 'right',
+  },
+  noteInput: {
+    width: '100%', background: 'transparent', border: 'none', borderBottom: '0.5px solid var(--color-border)',
+    outline: 'none', color: 'var(--color-text)', fontFamily: 'var(--font-body)', fontSize: '12px',
+    padding: '4px 0',
   },
   restBox: {
     marginTop: '10px', padding: '10px 14px', borderRadius: 'var(--radius-sm)',
