@@ -7,10 +7,9 @@ import {
   useNutrition,
 } from '../context/index.js'
 import { useSettings } from '../context/SettingsContext.jsx'
-import { GYM_ACCESS, PHASE_LABELS, WORKOUT_TYPES } from '../constants/fitness.js'
-import { getPhase, getTypeForDay, getWeekDates, getWeekNumber, generateWorkout } from '../utils/fitness.js'
+import { GYM_ACCESS, WORKOUT_TYPES } from '../constants/fitness.js'
+import { getTypeForDay, getWeekDates, getWeekNumber, generateWorkout } from '../utils/fitness.js'
 import { getTodayISO } from '../utils/time.js'
-import Fitness from './Fitness.jsx'
 import Nutrition from './Nutrition.jsx'
 
 const SECTIONS = ['today', 'training', 'nutrition', 'insights']
@@ -222,10 +221,42 @@ function formatWorkoutDate(value) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+function formatSelectedDay(value) {
+  return value.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).toLowerCase()
+}
+
+function toLocalISO(date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 function effortToFeel(effort) {
   if (effort === 'Hard') return 5
   if (effort === 'Easy') return 2
   return 3
+}
+
+function workoutFocus(type, title = '') {
+  if (type === WORKOUT_TYPES.STRENGTH_A) return 'push'
+  if (type === WORKOUT_TYPES.STRENGTH_B) return 'lower'
+  if (type === WORKOUT_TYPES.EASY_RUN || type === WORKOUT_TYPES.TEMPO_RUN || type === WORKOUT_TYPES.LONG_RUN) return 'run'
+  if (type === WORKOUT_TYPES.STRETCH) return 'mobility'
+  if (String(type).toLowerCase() === 'hyrox' || title.toLowerCase().includes('hyrox')) return 'HYROX'
+  if (title.toLowerCase().includes('full')) return 'full'
+  if (title.toLowerCase().includes('mobility')) return 'mobility'
+  if (title.toLowerCase().includes('run')) return 'run'
+  return title.toLowerCase().split(' ')[0] || 'workout'
+}
+
+function entryRpe(entry) {
+  const explicit = entry.rpe ?? entry.rpeScore ?? entry.rpeTarget
+  if (Number.isFinite(Number(explicit))) return Number(explicit)
+  if (entry.effort === 'Easy') return 4
+  if (entry.effort === 'Moderate') return 6
+  if (entry.effort === 'Hard') return 8
+  return null
 }
 
 function statusDetail(status) {
@@ -348,11 +379,6 @@ function HealthToday({
 
   return (
     <main style={s.today}>
-      <header style={s.header}>
-        <p style={s.eyebrow}>health</p>
-        <h1 style={s.title}>Today</h1>
-      </header>
-
       <section style={s.plannerCard}>
         <p style={s.plannerTitle}>TODAY'S HEALTH PLAN</p>
 
@@ -433,7 +459,7 @@ function EmptyTraining({ onCreatePlan, onLogWorkout }) {
       <section style={s.block}>
         <PlannerRow label="plan" value="not created" detail="optional" />
         <PlannerRow label="schedule" value="open" detail="choose later" />
-        <PlannerRow label="history" value="available" detail="log any session" />
+        <PlannerRow label="journal" value="available" detail="log any session" />
         <p style={s.emptyCopy}>No training plan yet.</p>
         <div style={s.actions}>
           <ActionButton onClick={onCreatePlan}>create plan</ActionButton>
@@ -452,61 +478,126 @@ function EmptyTraining({ onCreatePlan, onLogWorkout }) {
   )
 }
 
-function DailyTrainingCard({ onStartWorkout, onLogWorkout }) {
+function getTrainingDayPlan(fitnessState, settingsState, date) {
+  const iso = toLocalISO(date)
+  const dayKey = DAY_KEYS[date.getDay()]
+  const configuredDays = fitnessState.programConfig.trainingDays ?? []
+  const hasConfiguredSchedule = configuredDays.length > 0
+  const scheduled = hasConfiguredSchedule
+    ? configuredDays.includes(dayKey)
+    : getTypeForDay(date.getDay()) !== WORKOUT_TYPES.REST
+
+  if (!scheduled) {
+    return { iso, scheduled: false, workout: null, status: 'open' }
+  }
+
+  const configuredDayType = fitnessState.programConfig.dayTypes?.[dayKey]
+  const workoutType = DAY_TYPE_TO_WORKOUT_TYPE[configuredDayType] ?? getTypeForDay(date.getDay())
+  const workout = generateWorkout(workoutType, settingsState.gymAccess, getWeekNumber(fitnessState.programStartDate))
+  const storedStatus = fitnessState.workoutDayStatus?.[iso]?.status
+  const isToday = iso === getTodayISO()
+  const status = storedStatus || (isToday && fitnessState.todayComplete ? 'completed' : 'planned')
+
+  return { iso, scheduled: true, workout, status }
+}
+
+function WeeklyTrainingPlan({ onStartWorkout, onLogWorkout }) {
   const { fitnessState } = useFitness()
   const { settingsState } = useSettings()
-  const trainingPlan = getTodayTrainingPlan(fitnessState, settingsState)
-  const workout = trainingPlan.workout
+  const weekDates = useMemo(() => getWeekDates(), [])
+  const today = getTodayISO()
+  const [selectedIso, setSelectedIso] = useState(today)
+  const selectedDate = weekDates.find(date => toLocalISO(date) === selectedIso) ?? weekDates[0]
+  const selectedPlan = getTrainingDayPlan(fitnessState, settingsState, selectedDate)
+  const isSelectedToday = selectedPlan.iso === today
 
   return (
-    <section style={{ ...s.block, ...s.trainingBlock }}>
-      <SectionHeader eyebrow="today" title={workout?.title ?? 'Open day'} />
-      {trainingPlan.scheduled ? (
-        <>
-          <PlannerRow label="type" value={workout.subtitle.split('·')[0].trim()} detail={`~${workout.durationEst} min`} />
-          <PlannerRow label="status" value={STATUS_LABELS[trainingPlan.status]} detail={statusDetail(trainingPlan.status)} />
-          <DailyWorkoutActions
-            status={trainingPlan.status}
-            workout={workout}
-            onStartWorkout={onStartWorkout}
-            onLogWorkout={onLogWorkout}
-          />
-        </>
-      ) : (
-        <>
-          <PlannerRow label="status" value="open day" detail="no scheduled session" />
-          <div style={s.actions}>
-            <ActionButton onClick={onLogWorkout}>log workout</ActionButton>
-          </div>
-        </>
-      )}
+    <section style={{ ...s.trainingBlock, ...s.trainingPlanner }}>
+      <div style={s.trainingWeekList}>
+        {weekDates.map(date => {
+          const dayPlan = getTrainingDayPlan(fitnessState, settingsState, date)
+          const isToday = dayPlan.iso === today
+          const selected = dayPlan.iso === selectedIso
+
+          return (
+            <button
+              key={dayPlan.iso}
+              style={{
+                ...s.trainingWeekDay,
+                ...(selected ? s.trainingWeekDaySelected : {}),
+                ...(isToday ? s.trainingWeekDayToday : {}),
+              }}
+              onClick={() => setSelectedIso(dayPlan.iso)}
+              type="button"
+            >
+              <span style={s.trainingDayName}>{date.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 1).toUpperCase()}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      <div style={s.selectedTraining}>
+        <PlannerRow label="day" value={formatSelectedDay(selectedDate)} />
+        {selectedPlan.scheduled ? (
+          <>
+            <PlannerRow label="workout" value={selectedPlan.workout.title.toLowerCase()} />
+            <PlannerRow label="focus" value={workoutFocus(selectedPlan.workout.type, selectedPlan.workout.title)} />
+            <PlannerRow label="duration" value={`~${selectedPlan.workout.durationEst} min`} />
+            <PlannerRow label="status" value={(STATUS_LABELS[selectedPlan.status] ?? selectedPlan.status).toLowerCase()} detail={statusDetail(selectedPlan.status)} />
+            {isSelectedToday ? (
+              <DailyWorkoutActions
+                status={selectedPlan.status}
+                workout={selectedPlan.workout}
+                onStartWorkout={onStartWorkout}
+                onLogWorkout={onLogWorkout}
+              />
+            ) : (
+              <InlineActions>
+                <ActionButton secondary onClick={onLogWorkout}>log workout</ActionButton>
+              </InlineActions>
+            )}
+          </>
+        ) : (
+          <>
+            <PlannerRow label="workout" value="open day" />
+            <PlannerRow label="status" value="unscheduled" />
+            <InlineActions>
+              <ActionButton secondary onClick={onLogWorkout}>log workout</ActionButton>
+            </InlineActions>
+          </>
+        )}
+      </div>
     </section>
   )
 }
 
-function WorkoutHistory() {
+function WorkoutJournal() {
   const { fitnessState } = useFitness()
   const today = getTodayISO()
   const todayStatus = fitnessState.workoutDayStatus?.[today]?.status
   const logs = [...(fitnessState.workoutLog ?? [])].reverse().slice(0, 6)
   const hasTodaySkipped = todayStatus === 'skipped' && !logs.some(entry => String(entry.date).slice(0, 10) === today)
-  const history = hasTodaySkipped
+  const journal = hasTodaySkipped
     ? [{ date: today, title: 'Planned workout', duration: 0, status: 'skipped', effort: '' }, ...logs].slice(0, 6)
     : logs
 
   return (
     <section style={{ ...s.block, ...s.trainingBlock }}>
-      <SectionHeader eyebrow="history" title="Recent workouts" />
-      {history.length === 0 ? (
+      <p style={s.sectionLabel}>journal</p>
+      {journal.length === 0 ? (
         <p style={s.emptyCopy}>No workouts logged yet.</p>
       ) : (
-        <div style={s.historyList}>
-          {history.map((entry, index) => (
-            <div key={`${entry.date}-${index}`} style={s.historyRow}>
-              <span style={s.historyDate}>{formatWorkoutDate(entry.date)}</span>
-              <span style={s.historyMain}>{entry.title || entry.type || 'Workout'}</span>
-              <span style={s.historyMeta}>
-                {entry.duration ? `${entry.duration} min` : '—'} · {STATUS_LABELS[entry.status] ?? 'Completed'}{entry.effort ? ` · ${entry.effort}` : ''}
+        <div style={s.journalList}>
+          {journal.map((entry, index) => (
+            <div key={`${entry.date}-${index}`} style={s.journalRow}>
+              <span style={s.journalDate}>{formatWorkoutDate(entry.date)}</span>
+              <span style={s.journalMeta}>
+                {[
+                  workoutFocus(entry.type, entry.title),
+                  entry.duration ? `${entry.duration} min` : null,
+                  entry.status === 'completed' ? '●' : '○',
+                  entryRpe(entry) ? `RPE ${entryRpe(entry)}/10` : null,
+                ].filter(Boolean).join(' · ')}
               </span>
             </div>
           ))}
@@ -519,9 +610,11 @@ function WorkoutHistory() {
 function ConfiguredTraining({ onStartWorkout, onLogWorkout }) {
   return (
     <div style={s.trainingScreen}>
-      <DailyTrainingCard onStartWorkout={onStartWorkout} onLogWorkout={onLogWorkout} />
-      <Fitness onStartWorkout={onStartWorkout} />
-      <WorkoutHistory />
+      <header style={{ ...s.header, ...s.trainingHeader }}>
+        <p style={s.eyebrow}>training</p>
+      </header>
+      <WeeklyTrainingPlan onStartWorkout={onStartWorkout} onLogWorkout={onLogWorkout} />
+      <WorkoutJournal />
     </div>
   )
 }
@@ -728,11 +821,13 @@ export default function Health({ onStartWorkout }) {
   const [section, setSection] = useState('today')
   const [sheet, setSheet] = useState(null)
   const { fitnessState } = useFitness()
-  const phaseKey = getPhase(fitnessState.programStartDate, fitnessState.programEndDate)
 
   return (
     <div style={s.screen}>
       <div style={s.top}>
+        <header style={s.topHeader}>
+          <p style={s.topEyebrow}>health</p>
+        </header>
         <div style={s.tabs} aria-label="health sections">
           {SECTIONS.map(item => (
             <button
@@ -745,9 +840,6 @@ export default function Health({ onStartWorkout }) {
             </button>
           ))}
         </div>
-        {fitnessState.program.configured && (
-          <p style={s.phaseLine}>{PHASE_LABELS[phaseKey]} · week {getWeekNumber(fitnessState.programStartDate)}</p>
-        )}
       </div>
 
       {section === 'today' && (
@@ -786,41 +878,43 @@ const s = {
     position:   'sticky',
     top:        0,
     zIndex:     20,
-    padding:    'max(env(safe-area-inset-top), 9px) 20px 4px',
+    padding:    'max(env(safe-area-inset-top), 18px) 20px 8px',
     background: 'color-mix(in srgb, var(--color-bg) 98%, transparent)',
+  },
+  topHeader: {
+    marginBottom: '7px',
+  },
+  topEyebrow: {
+    margin:        0,
+    color:         'var(--color-muted)',
+    fontSize:      '10px',
+    fontWeight:    700,
+    letterSpacing: '0.1em',
   },
   tabs: {
     display:    'flex',
     alignItems: 'center',
-    gap:        '4px',
+    gap:        '6px',
     padding:    0,
     background: 'transparent',
   },
   tab: {
-    minHeight:    '21px',
+    minHeight:    '26px',
     border:       'var(--border)',
     borderRadius: '999px',
     background:   'transparent',
     color:        'var(--color-muted)',
-    fontSize:     '10px',
+    fontSize:     '11px',
     fontWeight:   650,
-    padding:      '3px 7px',
+    padding:      '4px 10px',
   },
   tabActive: {
-    borderColor: 'color-mix(in srgb, var(--color-accent) 34%, var(--color-border))',
-    background:  'color-mix(in srgb, var(--color-accent-bg) 62%, transparent)',
+    borderColor: 'color-mix(in srgb, var(--color-accent) 44%, var(--color-border))',
+    background:  'color-mix(in srgb, var(--color-accent-bg) 42%, transparent)',
     color:       'var(--color-text)',
   },
-  phaseLine: {
-    margin:        '5px 2px 0',
-    color:         'var(--color-muted)',
-    fontSize:      '9px',
-    fontWeight:    650,
-    letterSpacing: '0',
-    textTransform: 'uppercase',
-  },
   today: {
-    padding:       '5px 20px 0',
+    padding:       '4px 20px 0',
     display:       'flex',
     flexDirection: 'column',
     gap:           '6px',
@@ -832,6 +926,9 @@ const s = {
   trainingScreen: {
     minHeight:     '100dvh',
     padding:       '6px 0 0',
+  },
+  trainingHeader: {
+    margin:  '0 20px 2px',
   },
   header: {
     display:       'flex',
@@ -863,19 +960,16 @@ const s = {
   block: {
     display:       'flex',
     flexDirection: 'column',
-    gap:           '3px',
-    padding:       '9px 10px',
-    border:        'var(--border)',
-    borderRadius:  '10px',
-    background:    'var(--color-card)',
+    gap:           '4px',
+    padding:       '8px 0 10px',
+    borderTop:     '0.5px solid color-mix(in srgb, var(--color-border) 54%, transparent)',
+    background:    'transparent',
   },
   plannerCard: {
     display:       'flex',
     flexDirection: 'column',
-    padding:       '10px 11px',
-    border:        'var(--border)',
-    borderRadius:  '10px',
-    background:    'var(--color-card)',
+    padding:       '6px 0 0',
+    background:    'transparent',
   },
   plannerTitle: {
     margin:        '0 0 4px',
@@ -888,7 +982,7 @@ const s = {
     display:       'flex',
     flexDirection: 'column',
     gap:           '1px',
-    padding:       '7px 0 6px',
+    padding:       '8px 0 7px',
     borderTop:     '0.5px solid color-mix(in srgb, var(--color-border) 44%, transparent)',
   },
   groupLabel: {
@@ -903,7 +997,10 @@ const s = {
     gap:           '1px',
   },
   trainingBlock: {
-    margin:  '0 20px 7px',
+    margin:  '0 20px 2px',
+  },
+  trainingPlanner: {
+    paddingTop: '4px',
   },
   emptyCopy: {
     margin:    '2px 0 0',
@@ -932,6 +1029,56 @@ const s = {
     fontWeight: 650,
     lineHeight: 1.1,
     textTransform: 'none',
+  },
+  sectionLabel: {
+    margin:        0,
+    color:         'var(--color-muted)',
+    fontSize:      '10px',
+    fontWeight:    700,
+    letterSpacing: '0.1em',
+  },
+  trainingWeekList: {
+    display:           'flex',
+    gap:               '5px',
+    marginTop:         0,
+    paddingBottom:     '8px',
+    overflowX:         'auto',
+    scrollbarWidth:    'none',
+    msOverflowStyle:   'none',
+    WebkitOverflowScrolling: 'touch',
+    borderBottom:      '0.5px solid color-mix(in srgb, var(--color-border) 44%, transparent)',
+  },
+  trainingWeekDay: {
+    display:       'flex',
+    alignItems:     'center',
+    justifyContent: 'center',
+    minWidth:       '31px',
+    minHeight:      '28px',
+    padding:        '4px 0',
+    border:         'var(--border)',
+    borderRadius:   '999px',
+    background:     'transparent',
+    color:          'var(--color-muted)',
+  },
+  trainingWeekDaySelected: {
+    borderColor: 'color-mix(in srgb, var(--color-accent) 44%, var(--color-border))',
+    background:  'color-mix(in srgb, var(--color-accent-bg) 42%, transparent)',
+    color:       'var(--color-text)',
+  },
+  trainingWeekDayToday: {
+    borderColor: 'color-mix(in srgb, var(--color-accent) 54%, var(--color-border))',
+  },
+  trainingDayName: {
+    color:         'currentColor',
+    fontSize:      '11px',
+    fontWeight:    700,
+    letterSpacing: '0.08em',
+  },
+  selectedTraining: {
+    display:       'flex',
+    flexDirection: 'column',
+    gap:           '1px',
+    padding:       '8px 0 2px',
   },
   row: {
     display:             'grid',
@@ -1005,7 +1152,7 @@ const s = {
   },
   secondaryAction: {
     border:     'var(--border)',
-    background: 'color-mix(in srgb, var(--color-card) 66%, transparent)',
+    background: 'transparent',
     color:      'var(--color-text)',
   },
   checkRow: {
@@ -1155,12 +1302,12 @@ const s = {
     gap:            '8px',
     marginTop:      '16px',
   },
-  historyList: {
+  journalList: {
     display:       'flex',
     flexDirection: 'column',
     gap:           '2px',
   },
-  historyRow: {
+  journalRow: {
     display:             'grid',
     gridTemplateColumns: '58px minmax(0, 1fr)',
     gap:                 '4px 10px',
@@ -1169,22 +1316,13 @@ const s = {
     padding:             '5px 0',
     borderTop:           '0.5px solid color-mix(in srgb, var(--color-border) 50%, transparent)',
   },
-  historyDate: {
+  journalDate: {
     gridRow:    '1 / 3',
     color:      'var(--color-muted)',
     fontSize:   '11px',
     fontWeight: 700,
   },
-  historyMain: {
-    minWidth:    0,
-    color:       'var(--color-text)',
-    fontSize:    '13px',
-    fontWeight:  700,
-    overflow:    'hidden',
-    textOverflow:'ellipsis',
-    whiteSpace:  'nowrap',
-  },
-  historyMeta: {
+  journalMeta: {
     color:     'var(--color-muted)',
     fontSize:  '11px',
   },
