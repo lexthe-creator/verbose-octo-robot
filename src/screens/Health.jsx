@@ -54,20 +54,18 @@ const TRAINING_DAYS_BY_COUNT = {
 }
 
 const DAY_TYPE_DEFAULTS = {
-  general:   ['run_easy', 'upper', 'lower', 'full_body', 'mobility', 'run_easy'],
-  fat_loss:  ['run_easy', 'full_body', 'upper', 'lower', 'mobility', 'run_easy'],
+  general:   ['run', 'upper', 'lower', 'full_body', 'mobility', 'run'],
+  fat_loss:  ['run', 'full_body', 'upper', 'lower', 'mobility', 'run'],
   strength:  ['upper', 'lower', 'upper', 'lower', 'full_body', 'mobility'],
-  endurance: ['run_easy', 'strength', 'run_tempo', 'run_long', 'mobility', 'run_easy'],
-  hyrox:     ['run_easy', 'full_body', 'run_tempo', 'strength', 'run_long', 'mobility'],
-  custom:    ['full_body', 'run_easy', 'mobility', 'upper', 'lower', 'run_long'],
+  endurance: ['run', 'upper', 'run', 'lower', 'mobility', 'run'],
+  hyrox:     ['run', 'full_body', 'run', 'upper', 'lower', 'mobility'],
+  custom:    ['full_body', 'run', 'mobility', 'upper', 'lower', 'custom'],
 }
 
 const WORKOUT_LOG_TYPES = [
-  { type: WORKOUT_TYPES.STRENGTH_A, title: 'Strength' },
-  { type: WORKOUT_TYPES.EASY_RUN, title: 'Run' },
-  { type: 'walk', title: 'Walk' },
-  { type: WORKOUT_TYPES.STRETCH, title: 'Mobility' },
-  { type: 'hyrox', title: 'HYROX' },
+  { type: 'run', title: 'Run' },
+  { type: 'strength', title: 'Strength' },
+  { type: 'mobility', title: 'Mobility' },
   { type: 'other', title: 'Other' },
 ]
 
@@ -81,7 +79,9 @@ const DAY_TYPE_TO_WORKOUT_TYPE = {
   push:      WORKOUT_TYPES.STRENGTH_A,
   pull:      WORKOUT_TYPES.STRENGTH_B,
   strength:  WORKOUT_TYPES.STRENGTH_A,
+  custom:    'custom',
   mobility:  WORKOUT_TYPES.STRETCH,
+  run:       WORKOUT_TYPES.EASY_RUN,
   run_easy:  WORKOUT_TYPES.EASY_RUN,
   run_tempo: WORKOUT_TYPES.TEMPO_RUN,
   run_long:  WORKOUT_TYPES.LONG_RUN,
@@ -240,6 +240,8 @@ function toLocalISO(date) {
 
 function normalizeWorkoutDayType(type) {
   if (!type || type === WORKOUT_TYPES.REST) return null
+  if (type === 'custom') return 'custom'
+  if (type === 'run') return 'run'
   if (type === WORKOUT_TYPES.EASY_RUN) return 'run_easy'
   if (type === WORKOUT_TYPES.TEMPO_RUN) return 'run_tempo'
   if (type === WORKOUT_TYPES.LONG_RUN) return 'run_long'
@@ -258,6 +260,20 @@ function weekInPhase(programStartDate) {
 }
 
 function buildHealthWorkout(dayType, fitnessState, settingsState) {
+  if (dayType === 'custom') {
+    return {
+      id:          `${getTodayISO()}_custom`,
+      date:        getTodayISO(),
+      dayType,
+      type:        dayType,
+      title:       'Custom',
+      subtitle:    'Custom workout',
+      durationEst: 0,
+      estimatedMinutes: 0,
+      segments:    [],
+    }
+  }
+
   const workout = generateWorkout({
     dayType,
     equipment:   settingsState.gymAccess,
@@ -280,6 +296,9 @@ function effortToFeel(effort) {
 }
 
 function workoutFocus(type, title = '') {
+  if (type === 'strength' || type === 'upper' || type === 'full_body') return 'strength'
+  if (type === 'run') return 'run'
+  if (type === 'mobility') return 'mobility'
   if (type === WORKOUT_TYPES.STRENGTH_A) return 'push'
   if (type === WORKOUT_TYPES.STRENGTH_B) return 'lower'
   if (type === WORKOUT_TYPES.EASY_RUN || type === WORKOUT_TYPES.TEMPO_RUN || type === WORKOUT_TYPES.LONG_RUN) return 'run'
@@ -311,6 +330,7 @@ function workoutTypeLabel(workout) {
   const focus = workoutFocus(workout?.type, workout?.title)
   if (focus === 'run') return 'Run'
   if (focus === 'mobility') return 'Recovery'
+  if (focus === 'strength') return 'Strength'
   if (focus === 'full') return 'Full'
   if (focus === 'push') return 'Upper'
   if (focus === 'lower') return 'Lower'
@@ -839,30 +859,117 @@ function PlanSetupSheet({ onClose }) {
   )
 }
 
+function NumberField({ label, value, onChange, inputMode = 'numeric', min = '1', max }) {
+  return (
+    <label style={s.fieldStack}>
+      <span style={s.fieldLabel}>{label}</span>
+      <input
+        style={s.lineInput}
+        type="number"
+        inputMode={inputMode}
+        min={min}
+        max={max}
+        value={value}
+        onChange={event => onChange(event.target.value)}
+      />
+    </label>
+  )
+}
+
+function NotesField({ value, onChange }) {
+  return (
+    <label style={s.fieldStack}>
+      <span style={s.fieldLabel}>Notes</span>
+      <textarea
+        style={s.textarea}
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        rows={3}
+      />
+    </label>
+  )
+}
+
 function LogWorkoutSheet({ onClose }) {
   const { fitnessDispatch } = useFitness()
   const [workoutType, setWorkoutType] = useState(WORKOUT_LOG_TYPES[0].type)
   const [duration, setDuration] = useState('30')
+  const [distance, setDistance] = useState('')
+  const [rpe, setRpe] = useState('6')
   const [effort, setEffort] = useState('Moderate')
   const [notes, setNotes] = useState('')
+  const [exerciseRows, setExerciseRows] = useState([
+    { id: 'ex1', exercise: '', sets: '', reps: '', weight: '' },
+  ])
+
+  function updateExerciseRow(id, patch) {
+    setExerciseRows(rows => rows.map(row => row.id === id ? { ...row, ...patch } : row))
+  }
+
+  function addExerciseRow() {
+    setExerciseRows(rows => [
+      ...rows,
+      { id: `ex${Date.now()}`, exercise: '', sets: '', reps: '', weight: '' },
+    ])
+  }
 
   function saveLog() {
     const option = WORKOUT_LOG_TYPES.find(item => item.type === workoutType) ?? WORKOUT_LOG_TYPES[0]
     const durationMin = Math.max(1, Number(duration) || 1)
+    const rpeScore = Math.max(1, Math.min(10, Number(rpe) || 1))
+    const strengthRows = exerciseRows
+      .map(row => ({
+        exercise: row.exercise.trim(),
+        sets:     Math.max(0, Number(row.sets) || 0),
+        reps:     Math.max(0, Number(row.reps) || 0),
+        weight:   Math.max(0, Number(row.weight) || 0),
+      }))
+      .filter(row => row.exercise)
+    const sets = strengthRows.flatMap(row =>
+      Array.from({ length: row.sets || 1 }, (_, index) => ({
+        exercise:    row.exercise,
+        setNumber:   index + 1,
+        plannedReps: row.reps,
+        reps:        row.reps,
+        weight:      row.weight,
+        rpe:         rpeScore,
+        note:        '',
+      }))
+    )
+    const payload = {
+      date: getTodayISO(),
+      type: option.type,
+      title: option.title,
+      duration: durationMin,
+      effort,
+      feel: effortToFeel(effort),
+      notes: notes.trim(),
+      exercises: [],
+      status: 'completed',
+      source: 'manual',
+    }
+
+    if (workoutType === 'run') {
+      payload.distance = Math.max(0, Number(distance) || 0)
+      payload.rpe = rpeScore
+      payload.feel = Math.max(1, Math.min(5, Math.round(rpeScore / 2)))
+      payload.effort = rpeScore >= 8 ? 'Hard' : rpeScore <= 4 ? 'Easy' : 'Moderate'
+    }
+
+    if (workoutType === 'strength') {
+      payload.rpe = rpeScore
+      payload.sets = sets
+      payload.exercises = strengthRows.map(row => ({
+        name: row.exercise,
+        sets: row.sets,
+        reps: row.reps,
+        weight: row.weight,
+      }))
+    }
+
     fitnessDispatch({
       type: 'LOG_WORKOUT',
-      payload: {
-        date: getTodayISO(),
-        type: option.type,
-        title: option.title,
-        duration: durationMin,
-        effort,
-        feel: effortToFeel(effort),
-        notes: notes.trim(),
-        exercises: [],
-        status: 'completed',
-        source: 'manual',
-      },
+      payload,
     })
     onClose()
   }
@@ -875,30 +982,74 @@ function LogWorkoutSheet({ onClose }) {
           <p style={s.fieldLabel}>Workout type</p>
           <OptionGrid options={WORKOUT_LOG_TYPES.map(item => ({ value: item.type, label: item.title }))} value={workoutType} onChange={setWorkoutType} />
         </div>
-        <label style={s.fieldStack}>
-          <span style={s.fieldLabel}>Duration</span>
-          <input
-            style={s.lineInput}
-            type="number"
-            inputMode="numeric"
-            min="1"
-            value={duration}
-            onChange={event => setDuration(event.target.value)}
-          />
-        </label>
-        <div>
-          <p style={s.fieldLabel}>Effort</p>
-          <OptionGrid options={EFFORT_OPTIONS.map(item => ({ value: item, label: item }))} value={effort} onChange={setEffort} />
-        </div>
-        <label style={s.fieldStack}>
-          <span style={s.fieldLabel}>Notes</span>
-          <textarea
-            style={s.textarea}
-            value={notes}
-            onChange={event => setNotes(event.target.value)}
-            rows={3}
-          />
-        </label>
+        {workoutType === 'run' && (
+          <>
+            <NumberField label="distance" value={distance} onChange={setDistance} inputMode="decimal" />
+            <NumberField label="duration" value={duration} onChange={setDuration} />
+            <NumberField label="RPE" value={rpe} onChange={setRpe} min="1" max="10" />
+          </>
+        )}
+        {workoutType === 'strength' && (
+          <div style={s.exerciseList}>
+            <p style={s.fieldLabel}>Exercise list</p>
+            {exerciseRows.map(row => (
+              <div key={row.id} style={s.exerciseRow}>
+                <input
+                  style={{ ...s.lineInput, ...s.exerciseNameInput }}
+                  value={row.exercise}
+                  onChange={event => updateExerciseRow(row.id, { exercise: event.target.value })}
+                  placeholder="exercise"
+                />
+                <div style={s.exerciseGrid}>
+                  <input
+                    style={s.lineInput}
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    value={row.sets}
+                    onChange={event => updateExerciseRow(row.id, { sets: event.target.value })}
+                    placeholder="sets"
+                  />
+                  <input
+                    style={s.lineInput}
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    value={row.reps}
+                    onChange={event => updateExerciseRow(row.id, { reps: event.target.value })}
+                    placeholder="reps"
+                  />
+                  <input
+                    style={s.lineInput}
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    value={row.weight}
+                    onChange={event => updateExerciseRow(row.id, { weight: event.target.value })}
+                    placeholder="weight"
+                  />
+                </div>
+              </div>
+            ))}
+            <ActionButton secondary onClick={addExerciseRow}>add exercise</ActionButton>
+          </div>
+        )}
+        {workoutType === 'mobility' && (
+          <>
+            <NumberField label="duration" value={duration} onChange={setDuration} />
+            <NotesField value={notes} onChange={setNotes} />
+          </>
+        )}
+        {workoutType === 'other' && (
+          <>
+            <NumberField label="duration" value={duration} onChange={setDuration} />
+            <div>
+              <p style={s.fieldLabel}>Effort</p>
+              <OptionGrid options={EFFORT_OPTIONS.map(item => ({ value: item, label: item }))} value={effort} onChange={setEffort} />
+            </div>
+            <NotesField value={notes} onChange={setNotes} />
+          </>
+        )}
       </div>
       <div style={s.sheetActions}>
         <ActionButton secondary onClick={onClose}>cancel</ActionButton>
@@ -1515,6 +1666,26 @@ const s = {
     fontSize:     '14px',
     padding:      '9px 10px',
     resize:       'vertical',
+  },
+  exerciseList: {
+    display:       'flex',
+    flexDirection: 'column',
+    gap:           '8px',
+  },
+  exerciseRow: {
+    display:       'flex',
+    flexDirection: 'column',
+    gap:           '6px',
+    paddingBottom: '8px',
+    borderBottom:  '0.5px solid color-mix(in srgb, var(--color-border) 58%, transparent)',
+  },
+  exerciseNameInput: {
+    minHeight: '36px',
+  },
+  exerciseGrid: {
+    display:             'grid',
+    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+    gap:                 '6px',
   },
   optionGrid: {
     display:             'grid',

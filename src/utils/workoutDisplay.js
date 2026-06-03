@@ -136,6 +136,7 @@ export function workoutNeedsCore(workout) {
 export function getWorkoutFocus(entry = {}) {
   const type = String(entry.dayType ?? entry.type ?? '').toLowerCase()
   const title = String(entry.title ?? '').toLowerCase()
+  if (type.includes('strength') || title.includes('strength')) return 'Strength'
   if (type.includes('push') || title.includes('push')) return 'Push'
   if (type.includes('lower') || title.includes('lower')) return 'Lower'
   if (type.includes('run') || title.includes('run')) return 'Run'
@@ -143,6 +144,7 @@ export function getWorkoutFocus(entry = {}) {
   if (type.includes('full') || title.includes('full')) return 'Full'
   if (type.includes('mobility') || title.includes('mobility')) return 'Mobility'
   if (type.includes('pull') || title.includes('pull')) return 'Pull'
+  if (type.includes('custom') || title.includes('custom')) return 'Custom'
   return entry.title ?? 'Workout'
 }
 

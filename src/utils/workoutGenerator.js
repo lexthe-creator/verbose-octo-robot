@@ -668,11 +668,14 @@ export function generateWorkout(config) {
   const targetDuration = durationMinutes ?? (normalizedDayType === 'mobility' ? mobilityDuration : 45)
   const date  = getTodayISO()
   const id    = `${date}_${normalizedDayType ?? 'rest'}`
-  const title = getDayTypeLabel(normalizedDayType ?? 'rest')
+  const title = dayType === 'run' ? 'Run' : getDayTypeLabel(normalizedDayType ?? 'rest')
   const base  = { id, date, dayType: normalizedDayType, type: normalizedDayType, title, phase, weekInPhase, status: 'planned' }
 
   if (!normalizedDayType || normalizedDayType === 'rest') {
     return { ...base, title: 'Rest Day', focus: 'recovery', durationEstimate: 0, estimatedMinutes: 0, segments: [] }
+  }
+  if (normalizedDayType === 'custom') {
+    return { ...base, title: 'Custom', focus: 'custom', durationEstimate: 0, estimatedMinutes: 0, segments: [] }
   }
 
   let segments
@@ -706,6 +709,7 @@ export function generateWorkout(config) {
 }
 
 function normalizeDayType(dayType) {
+  if (dayType === 'run') return 'run_easy'
   if (dayType === 'strength' || dayType === 'strength_a' || dayType === 'strength_b') return 'full_body'
   if (dayType === 'stretch' || dayType === 'recovery' || dayType === 'mobility_recovery') return 'mobility'
   if (dayType === 'intervals' || dayType === 'run_interval') return 'run_intervals'
@@ -716,6 +720,7 @@ function normalizeDayType(dayType) {
 function getWorkoutFocus(dayType) {
   if (dayType?.startsWith('run')) return 'running'
   if (dayType === 'mobility') return 'recovery'
+  if (dayType === 'custom') return 'custom'
   if (dayType === 'hybrid_conditioning') return 'hybrid conditioning'
   if (dayType === 'upper' || dayType === 'push' || dayType === 'pull') return 'upper strength'
   if (dayType === 'lower') return 'lower strength'
@@ -761,55 +766,55 @@ const PROGRAM_STRUCTURES = {
     4: [
       { title: 'Upper A', dayType: 'upper', purpose: 'horizontal push, horizontal pull, shoulders, arms, core' },
       { title: 'Lower A', dayType: 'lower', purpose: 'squat, hinge, unilateral, glute, core' },
-      { title: 'Upper B', dayType: 'pull', purpose: 'vertical push/pull balance, shoulders, arms, core' },
+      { title: 'Upper B', dayType: 'upper', purpose: 'vertical push/pull balance, shoulders, arms, core' },
       { title: 'Lower B', dayType: 'lower', purpose: 'squat variation, hinge or glute, unilateral, carry or core' },
     ],
     5: [
       { title: 'Upper A', dayType: 'upper', purpose: 'upper strength' },
       { title: 'Lower A', dayType: 'lower', purpose: 'lower strength' },
-      { title: 'Conditioning + Core', dayType: 'hybrid_conditioning', purpose: 'conditioning, carries, core' },
-      { title: 'Upper B', dayType: 'pull', purpose: 'upper pull and accessory strength' },
+      { title: 'Full Body', dayType: 'full_body', purpose: 'full body strength and core' },
+      { title: 'Upper B', dayType: 'upper', purpose: 'upper accessory strength' },
       { title: 'Lower B', dayType: 'lower', purpose: 'lower variation and core' },
     ],
   },
   [PROGRAM_TYPES.HYBRID]: {
     3: [
-      { title: 'Strength', dayType: 'full_body', purpose: 'full body strength' },
-      { title: 'Hybrid Conditioning', dayType: 'hybrid_conditioning', purpose: 'conditioning, carries, core' },
-      { title: 'Strength', dayType: 'full_body', purpose: 'full body strength' },
+      { title: 'Full Body', dayType: 'full_body', purpose: 'full body strength' },
+      { title: 'Run', dayType: 'run', purpose: 'conditioning' },
+      { title: 'Full Body', dayType: 'full_body', purpose: 'full body strength' },
     ],
     4: [
-      { title: 'Upper Strength', dayType: 'upper', purpose: 'upper strength' },
-      { title: 'Lower Strength', dayType: 'lower', purpose: 'lower strength' },
-      { title: 'Hybrid Conditioning', dayType: 'hybrid_conditioning', purpose: 'conditioning' },
-      { title: 'Full Body Hybrid', dayType: 'full_body', purpose: 'full body strength with carry/core' },
+      { title: 'Upper', dayType: 'upper', purpose: 'upper strength' },
+      { title: 'Lower', dayType: 'lower', purpose: 'lower strength' },
+      { title: 'Run', dayType: 'run', purpose: 'conditioning' },
+      { title: 'Full Body', dayType: 'full_body', purpose: 'full body strength with carry/core' },
     ],
     5: [
-      { title: 'Upper Strength', dayType: 'upper', purpose: 'upper strength' },
-      { title: 'Lower Strength', dayType: 'lower', purpose: 'lower strength' },
-      { title: 'Hybrid Conditioning', dayType: 'hybrid_conditioning', purpose: 'conditioning' },
-      { title: 'Full Body Strength', dayType: 'full_body', purpose: 'full body strength' },
-      { title: 'Hybrid Conditioning', dayType: 'hybrid_conditioning', purpose: 'conditioning' },
+      { title: 'Upper', dayType: 'upper', purpose: 'upper strength' },
+      { title: 'Lower', dayType: 'lower', purpose: 'lower strength' },
+      { title: 'Run', dayType: 'run', purpose: 'conditioning' },
+      { title: 'Full Body', dayType: 'full_body', purpose: 'full body strength' },
+      { title: 'Mobility', dayType: 'mobility', purpose: 'recovery' },
     ],
   },
   [PROGRAM_TYPES.RUNNING]: {
     3: [
-      { title: 'Easy Run', dayType: 'run_easy', purpose: 'aerobic base' },
-      { title: 'Intervals', dayType: 'run_intervals', purpose: 'speed and running economy' },
-      { title: 'Long Run', dayType: 'run_long', purpose: 'endurance base' },
+      { title: 'Run A', dayType: 'run', purpose: 'aerobic base' },
+      { title: 'Run B', dayType: 'run', purpose: 'speed and running economy' },
+      { title: 'Run C', dayType: 'run', purpose: 'endurance base' },
     ],
     4: [
-      { title: 'Easy Run', dayType: 'run_easy', purpose: 'aerobic base' },
-      { title: 'Intervals', dayType: 'run_intervals', purpose: 'speed and running economy' },
-      { title: 'Tempo Run', dayType: 'run_tempo', purpose: 'threshold control' },
-      { title: 'Long Run', dayType: 'run_long', purpose: 'endurance base' },
+      { title: 'Run A', dayType: 'run', purpose: 'aerobic base' },
+      { title: 'Run B', dayType: 'run', purpose: 'speed and running economy' },
+      { title: 'Run C', dayType: 'run', purpose: 'threshold control' },
+      { title: 'Run D', dayType: 'run', purpose: 'endurance base' },
     ],
     5: [
-      { title: 'Easy Run', dayType: 'run_easy', purpose: 'aerobic base' },
-      { title: 'Intervals', dayType: 'run_intervals', purpose: 'speed and running economy' },
-      { title: 'Recovery Run', dayType: 'run_recovery', purpose: 'easy recovery volume' },
-      { title: 'Tempo Run', dayType: 'run_tempo', purpose: 'threshold control' },
-      { title: 'Long Run', dayType: 'run_long', purpose: 'endurance base' },
+      { title: 'Run A', dayType: 'run', purpose: 'aerobic base' },
+      { title: 'Run B', dayType: 'run', purpose: 'speed and running economy' },
+      { title: 'Run C', dayType: 'run', purpose: 'easy recovery volume' },
+      { title: 'Run D', dayType: 'run', purpose: 'threshold control' },
+      { title: 'Run E', dayType: 'run', purpose: 'endurance base' },
     ],
   },
   [PROGRAM_TYPES.MOBILITY_RECOVERY]: {

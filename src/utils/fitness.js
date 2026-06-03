@@ -50,6 +50,7 @@ export function getPhaseConfig(phase, weekInPhase) {
 
 const DAY_TYPE_LABEL_MAP = {
   run_easy:  'Easy Run',
+  run:       'Run',
   run_intervals: 'Intervals',
   run_recovery: 'Recovery Run',
   run_tempo: 'Tempo Run',
@@ -61,6 +62,7 @@ const DAY_TYPE_LABEL_MAP = {
   push:      'Push',
   pull:      'Pull',
   mobility:  'Mobility',
+  custom:    'Custom',
   rest:      'Rest',
 }
 

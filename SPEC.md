@@ -1194,7 +1194,7 @@ Helpers exposed via `useDay()`: `updateTaskTime(taskId, time)`, `updateMealWindo
   },
   programConfig: {
     trainingDays: [],      // ['mon','tue','thu','sat']
-    dayTypes:     {},      // { mon: 'upper', tue: 'run_easy', thu: 'lower' }
+    dayTypes:     {},      // { mon: 'upper', tue: 'run', thu: 'lower' }
     goal:         null,    // matches program.type
     audioEnabled: false,
     weeklyDays:   0,       // count of training days
@@ -1210,6 +1210,24 @@ Phase is **derived** — call `getPhase(programStartDate)`. Never stored. 13-wee
 Week number is **derived** — call `getWeekNumber(programStartDate)`. Never stored.
 
 Actions: `LOG_WORKOUT`, `LOG_WORKOUT_SETS`, `CONFIGURE_PROGRAM`, `UPDATE_PROGRAM_CONFIG`, `UPDATE_FITNESS`, `INCREMENT_FOCUS_SESSIONS`.
+
+Training day types should stay user-facing and simple:
+- `upper`
+- `lower`
+- `full_body`
+- `run`
+- `mobility`
+- `custom`
+
+Push and pull are movement patterns inside generated upper/full-body strength workouts. They should not be exposed as separate workout day types because they overlap with Upper.
+
+Open Day logging should use four simple manual categories:
+- Run — distance, duration, RPE
+- Strength — exercise list, sets, reps, weight
+- Mobility — duration, notes
+- Other — duration, effort, notes
+
+Custom is reserved for ad-hoc or user-authored workouts. V1 may store it as a day type without generating a full structured session.
 
 ### 4.5 InboxContext (`aiml_inbox`, schema v2)
 
@@ -1932,7 +1950,7 @@ Do not implement Calendar behavior beyond the approved read-only V1 scope until 
 - **Header** — phase label (terracotta, small caps) + "Training" title + "Week N" badge. When `programEndDate` is set: accent "X weeks to race" line below (or "Race week!" when 0).
 - **Today card** — generated via `generateWorkout(getTodayType(), gymAccess, weekNum)` where `weekNum = getWeekNumber(programStartDate)`. Card header is tappable: toggles full workout preview with 300ms max-height animation. Preview shows WARM UP / MAIN / COOL DOWN sections; each row: name left + `3×10` or `2:00` right in accent. Footer: `~Xmin` + "Start Workout" button. Collapsed state shows original Start/Completed button.
 - **Weekly strip** — 7-column grid (Mon–Sun) labeled `M T W T F S S`. Selecting a day updates the workout details below using the configured program and the new `workoutGenerator` path.
-- **Journal** — last 5 entries from `fitness.workoutLog` (reverse order). Rows render date, workout focus, duration, completion marker, and RPE when present, e.g. `Jun 2 | Push | 40 min | ● | RPE 6/10`. Use `Journal`, not History or Recent, for logged workout rows.
+- **Journal** — last 5 entries from `fitness.workoutLog` (reverse order). Rows render date, workout focus, duration, completion marker, and RPE when present, e.g. `Jun 2 | Strength | 40 min | ● | RPE 6/10`. Use `Journal`, not History or Recent, for logged workout rows.
 - Fitness owns the primary full workout experience. Health Today may mirror compact training status only and must not duplicate the full workout preview, weekly planner, or exercise details.
 - Health → Training is allowed to show the selected day's generated workout before start. It should use the same generated workout data, render a compact planner-style segment preview grouped by warm up / main / cool down, and keep actions unchanged. This preview must not create a separate Health workout generator or separate workout state.
 
@@ -2153,13 +2171,13 @@ Movement-pattern selection must happen before exercise selection. Primary patter
 Program structures:
 - Strength 3 days: Full Body A, Full Body B, Full Body C.
 - Strength 4 days: Upper A, Lower A, Upper B, Lower B.
-- Strength 5 days: Upper A, Lower A, Conditioning + Core, Upper B, Lower B. This is the preferred strength split for 5 days per week.
-- Hybrid 3 days: Strength, Hybrid Conditioning, Strength.
-- Hybrid 4 days: Upper Strength, Lower Strength, Hybrid Conditioning, Full Body Hybrid.
-- Hybrid 5 days: Upper Strength, Lower Strength, Hybrid Conditioning, Upper or Full Body Strength, Hybrid Conditioning.
-- Running 3 days: Easy Run, Intervals, Long Run.
-- Running 4 days: Easy Run, Intervals, Tempo Run, Long Run.
-- Running 5 days: Easy Run, Intervals, Recovery Run, Tempo Run, Long Run.
+- Strength 5 days: Upper A, Lower A, Full Body, Upper B, Lower B. This is the preferred strength split for 5 days per week.
+- Hybrid 3 days: Full Body, Run, Full Body.
+- Hybrid 4 days: Upper, Lower, Run, Full Body.
+- Hybrid 5 days: Upper, Lower, Run, Full Body, Mobility.
+- Running 3 days: Run, Run, Run.
+- Running 4 days: Run, Run, Run, Run.
+- Running 5 days: Run, Run, Run, Run, Run.
 
 Duration rules:
 - 30 minutes: 4-5 movements, 2-3 sets, one core movement, minimal accessories.
@@ -2258,26 +2276,25 @@ WorkoutPlayer accepts these new `type` values as the primary shape. It may defen
 
 Workout quality rules:
 - If a workout title or focus includes `Core`, the generated workout must include at least one explicit core segment.
-- Push + Core, Lower + Core, and Run + Core variants should add a core accessory/finisher instead of relying only on compound lifts that happen to involve core stabilization.
+- Upper + Core, Lower + Core, and Run + Core variants should add a core accessory/finisher instead of relying only on compound lifts that happen to involve core stabilization.
 - Strength workouts must be generated from templates, not broad random exercise shuffles. Templates define movement-pattern slots and varied prescriptions; exercise variety comes from choosing library exercises that satisfy each slot.
-- Upper / Push template: primary chest press, secondary vertical press, shoulder isolation, tricep isolation, optional upper-body accessory, and 1–2 core movements; target 6–8 main movements.
+- Upper template: primary push, primary pull, shoulder/rear-delt balance, arm/accessory work, and 1–2 core movements; target 6–8 main movements.
 - Lower template: primary squat, primary hinge, unilateral movement, glute movement, accessory, and 1–2 core movements; target 6–8 main movements.
-- Pull template: vertical pull, horizontal pull, rear delt, bicep, accessory, and 1–2 core movements; target 6–8 main movements.
 - Full Body template: squat, hinge, push, pull, carry or conditioning, and core; target 5–7 main movements.
 - Prescriptions should vary by role instead of stamping every exercise as the same sets and reps: primary compounds use heavier lower-rep work, secondary/accessory movements use moderate or higher reps, and timed core can use duration targets.
 - Health → Training is a planner and workout preview, not an execution surface. It should show the selected workout as a simple header (`Upper Body`, `Tue, Jun 2 · 45–60 min`, `○ Planned`), a weekly overview with workout type and completion state, and section previews. Main Workout is expanded by default; warm-up and cool-down are collapsed by default and can be expanded. Do not show repetitive metadata tables or repeat equipment on every row when all movements use the same equipment category.
 
 Warm-up and cool-down selection must match workout type:
-- `push` and `upper` use upper-body activation/recovery.
+- `upper` uses upper-body activation/recovery.
 - `lower` uses lower-body activation/recovery.
 - `full_body` uses full-body activation/recovery.
-- `run_easy`, `run_tempo`, and `run_long` use running prep and walking/jogging cool-down.
+- `run`, `run_easy`, `run_tempo`, and `run_long` use running prep and walking/jogging cool-down.
 
 **Routing by dayType:**
-- `run_easy | run_tempo | run_long` → `buildRunWorkout`
-- `upper | lower | full_body | push | pull` → `buildStrengthWorkout`
+- `run | run_easy | run_tempo | run_long` → `buildRunWorkout`
+- `upper | lower | full_body` → `buildStrengthWorkout`
 - `mobility` → `buildMobilityWorkout`
-- `rest` or unknown → `{ segments: [], estimatedMinutes: 0 }`
+- `custom`, `rest`, or unknown → `{ segments: [], estimatedMinutes: 0 }`
 
 **Run durations** (seconds) per phase and week within phase (wk1–wk4):
 
