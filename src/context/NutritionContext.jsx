@@ -1,11 +1,27 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useReducer } from 'react'
 import { getTodayISO } from '../utils/time.js'
+import {
+  MEAL_SLOTS,
+  getMealSlotEntries,
+  getLoggedMealSlotCount,
+  getNutritionProgress,
+  getNutritionStatusSymbol,
+  getNutritionTotals,
+  toNutritionNumber as toNumber,
+} from '../utils/nutrition.js'
 
 const NUTRITION_STORAGE_KEY = 'aiml_nutrition'
 const SCHEMA_VERSION        = 1
 
-export const MEAL_SLOTS = ['breakfast', 'lunch', 'snack', 'dinner']
+export {
+  MEAL_SLOTS,
+  getMealSlotEntries,
+  getLoggedMealSlotCount,
+  getNutritionProgress,
+  getNutritionStatusSymbol,
+  getNutritionTotals,
+}
 
 export const DEFAULT_NUTRITION_TARGETS = {
   calories: 1955,
@@ -23,11 +39,6 @@ const initialNutritionState = {
 
 function createId(prefix) {
   return `${prefix}${Date.now()}${Math.random().toString(36).slice(2, 7)}`
-}
-
-function toNumber(value) {
-  const n = Number(value)
-  return Number.isFinite(n) ? Math.max(0, n) : 0
 }
 
 function normalizeTargets(targets = {}) {
@@ -244,30 +255,6 @@ function saveNutritionState(state) {
 
 export function getNutritionEntriesForDate(state, date = getTodayISO()) {
   return getLogForDate(state, date).entries
-}
-
-export function getNutritionTotals(entries = []) {
-  return entries.reduce((totals, entry) => ({
-    calories: totals.calories + toNumber(entry.calories),
-    protein:  totals.protein  + toNumber(entry.protein),
-    carbs:    totals.carbs    + toNumber(entry.carbs),
-    fat:      totals.fat      + toNumber(entry.fat),
-  }), { calories: 0, protein: 0, carbs: 0, fat: 0 })
-}
-
-export function getMealSlotEntries(entries = [], mealSlot) {
-  return entries.filter(entry => entry.mealSlot === mealSlot)
-}
-
-export function getLoggedMealSlotCount(entries = []) {
-  return MEAL_SLOTS.filter(slot => entries.some(entry => entry.mealSlot === slot)).length
-}
-
-export function getNutritionStatusSymbol(entries = []) {
-  const count = getLoggedMealSlotCount(entries)
-  if (count === 0) return '○'
-  if (count >= MEAL_SLOTS.length) return '☑'
-  return '◐'
 }
 
 const NutritionContext = createContext(null)

@@ -17,4 +17,5 @@ export { NutritionProvider, useNutrition,
          getNutritionTotals,
          getMealSlotEntries,
          getLoggedMealSlotCount,
+         getNutritionProgress,
          getNutritionStatusSymbol }            from './NutritionContext'

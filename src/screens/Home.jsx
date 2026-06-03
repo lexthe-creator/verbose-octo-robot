@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useUser } from '../context/UserContext.jsx'
 import { useSettings } from '../context/SettingsContext.jsx'
-import { getNutritionEntriesForDate, getNutritionStatusSymbol, useDay, useInbox, useNutrition, usePlanning } from '../context/index.js'
+import { getMealSlotEntries, getNutritionEntriesForDate, getNutritionStatusSymbol, useDay, useFitness, useInbox, useNutrition, usePlanning } from '../context/index.js'
 import { formatMealTime, parseHHMM, formatMins, getTodayISO } from '../utils/time.js'
+import { getDayTypeLabel, getPhase, getWeekNumber } from '../utils/fitness.js'
+import { generateWorkout } from '../utils/workoutGenerator.js'
 import { SCREENS } from '../constants/navigation.js'
 
 // ─── Time utilities ────────────────────────────────────────────────────────────
@@ -67,6 +69,7 @@ const TIMELINE_SECTIONS = [
 ]
 
 const DENSITY_OPTIONS = ['minimal', 'balanced', 'detailed']
+const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 
 // ─── Header helpers ───────────────────────────────────────────────────────────
 
@@ -86,11 +89,70 @@ function buildEventMarks(count) {
   return '|'.repeat(count)
 }
 
+function mealDetailFromEntries(entries = [], fallback) {
+  if (entries.length === 0) return fallback
+  const names = entries.map(entry => entry.name).filter(Boolean)
+  if (names.length === 0) return fallback
+  if (names.length === 1) return names[0]
+  return `${names[0]} +${names.length - 1}`
+}
+
+function getTodayWorkoutItem(dayState, fitnessState, settingsState) {
+  const today = getTodayISO()
+  const dayKey = DAY_KEYS[new Date().getDay()]
+  const configuredDays = fitnessState.programConfig?.trainingDays ?? []
+  const configuredDayType = fitnessState.programConfig?.dayTypes?.[dayKey]
+  const hasAssignedWorkout = !!fitnessState.program?.configured &&
+    configuredDays.includes(dayKey) &&
+    configuredDayType &&
+    configuredDayType !== 'rest'
+
+  if (hasAssignedWorkout) {
+    const weekNumber = getWeekNumber(fitnessState.programStartDate)
+    const phase = getPhase(fitnessState.programStartDate)
+    const workout = generateWorkout({
+      dayType:     configuredDayType,
+      equipment:   settingsState.gymAccess,
+      phase,
+      weekInPhase: ((weekNumber - 1) % 4) + 1,
+      history:     fitnessState.workoutLog,
+    })
+    const status = fitnessState.workoutDayStatus?.[today]?.status
+    const done = status === 'completed' || fitnessState.todayComplete
+
+    return {
+      time:    dayState.workout?.time ?? '18:30',
+      label:   workout.title,
+      detail:  `~${workout.estimatedMinutes} min`,
+      done,
+      planned: !done,
+    }
+  }
+
+  if (dayState.workout?.time && (dayState.workoutConfirmed || dayState.workout.confirmed)) {
+    const label = dayState.workout.type || getDayTypeLabel(dayState.workout.dayType) || 'Workout'
+    const detail = [dayState.workout.duration, dayState.workout.pace]
+      .filter(Boolean)
+      .join(' · ')
+      .toLowerCase()
+
+    return {
+      time:    dayState.workout.time,
+      label,
+      detail:  detail || 'warmup · main work · cooldown',
+      done:    dayState.workout.confirmed || dayState.workoutConfirmed,
+      planned: false,
+    }
+  }
+
+  return null
+}
+
 // ─── Timeline ─────────────────────────────────────────────────────────────────
 
 function buildTimeline(state, nowMinutes, options = {}) {
   const items = []
-  const { includePlannedWorkout = true } = options
+  const { nutritionEntries = [], workoutItem = null } = options
 
   // Morning ignition — always at 6am
   items.push({
@@ -103,16 +165,16 @@ function buildTimeline(state, nowMinutes, options = {}) {
   })
 
   // Workout
-  if (state.workout?.time && (state.workoutConfirmed || state.workout.confirmed || includePlannedWorkout)) {
-    const wm = parseHHMM(state.workout.time)
+  if (workoutItem?.time) {
+    const wm = parseHHMM(workoutItem.time)
     items.push({
       key:      'workout',
       timeMins: wm,
-      label:    `${state.workout.type} · ${state.workout.duration}`,
-      detail:   (state.workout.pace || 'warmup · main work · cooldown').toLowerCase(),
+      label:    workoutItem.label,
+      detail:   workoutItem.detail,
       type:     'workout',
-      done:     state.workout.confirmed || (state.workoutConfirmed && nowMinutes > wm),
-      planned:  !state.workoutConfirmed && !state.workout.confirmed,
+      done:     workoutItem.done,
+      planned:  workoutItem.planned,
     })
   }
 
@@ -133,16 +195,18 @@ function buildTimeline(state, nowMinutes, options = {}) {
 
   // Meal windows
   Object.entries(state.meals).forEach(([slot, meal]) => {
+    const slotEntries = getMealSlotEntries(nutritionEntries, slot)
+    const logged = slotEntries.length > 0
     items.push({
       key:      `meal-${slot}`,
       timeMins: parseHHMM(meal.startTime),
       label:    `${meal.label.toLowerCase()} window`,
-      detail:   `${formatMealTime(meal.startTime)} - ${formatMealTime(meal.endTime)}`,
+      detail:   mealDetailFromEntries(slotEntries, `${formatMealTime(meal.startTime)} - ${formatMealTime(meal.endTime)}`),
       type:     'meal',
-      done:     meal.eaten,
-      late:     !meal.eaten && nowMinutes > parseHHMM(meal.lateAfter),
+      done:     logged || meal.eaten,
+      late:     !logged && !meal.eaten && nowMinutes > parseHHMM(meal.lateAfter),
       mealSlot: slot,
-      guidance: true,
+      guidance: !logged,
     })
   })
 
@@ -660,6 +724,7 @@ export default function Home({ onNavigate }) {
   const { userState }                                  = useUser()
   const { settingsState }                              = useSettings()
   const { dayState, dayDispatch, updateTaskTime }       = useDay()
+  const { fitnessState }                                = useFitness()
   const { inboxState }                                 = useInbox()
   const { planningState }                              = usePlanning()
   const { nutritionState }                             = useNutrition()
@@ -674,9 +739,22 @@ export default function Home({ onNavigate }) {
 
   const [expandedTask, setExpandedTask] = useState(null)
 
+  const todayNutritionEntries = useMemo(
+    () => getNutritionEntriesForDate(nutritionState, getTodayISO()),
+    [nutritionState]
+  )
+
+  const todayWorkoutItem = useMemo(
+    () => getTodayWorkoutItem(dayState, fitnessState, settingsState),
+    [dayState, fitnessState, settingsState]
+  )
+
   const timelineItems = useMemo(
-    () => buildTimeline(dayState, currentMins, { includePlannedWorkout: true }),
-    [dayState, currentMins]
+    () => buildTimeline(dayState, currentMins, {
+      nutritionEntries: todayNutritionEntries,
+      workoutItem:      todayWorkoutItem,
+    }),
+    [dayState, currentMins, todayNutritionEntries, todayWorkoutItem]
   )
 
   const homeDensity = DENSITY_OPTIONS.includes(settingsState.homeDensity)
@@ -686,7 +764,6 @@ export default function Home({ onNavigate }) {
     const today = getTodayISO()
     const tasks = dayState.tasks ?? []
     const completedTasks = tasks.filter(task => task.done).length
-    const nutritionEntries = getNutritionEntriesForDate(nutritionState, today)
     const eventsToday = (inboxState.calendarItems ?? []).filter(item => item.date === today).length
     const reflectedToday = (planningState.reflectionLog ?? []).some(entry => entry.date === today) ||
       localStorage.getItem('lastReflectionDate') === today
@@ -699,7 +776,7 @@ export default function Home({ onNavigate }) {
 
     return {
       journalSymbol: reflectedToday ? '☑' : '○',
-      nutritionSymbol: getNutritionStatusSymbol(nutritionEntries),
+      nutritionSymbol: getNutritionStatusSymbol(todayNutritionEntries),
       planSymbol: !hasAnyPlan ? '○' : isPlanComplete ? '☑' : '◐',
       taskMarks: buildTaskMarks(completedTasks, tasks.length),
       eventMarks: buildEventMarks(eventsToday),
@@ -708,7 +785,7 @@ export default function Home({ onNavigate }) {
       onMorningClick: () => onNavigate(SCREENS.IGNITION),
       onEveningClick: () => onNavigate(SCREENS.EOD),
     }
-  }, [dayState, inboxState.calendarItems, nutritionState, onNavigate, planningState.reflectionLog, planningState.dailyPlans])
+  }, [dayState, inboxState.calendarItems, onNavigate, planningState.reflectionLog, planningState.dailyPlans, todayNutritionEntries])
 
   function handleToggleExpand(taskId) {
     setExpandedTask(prev => prev === taskId ? null : taskId)

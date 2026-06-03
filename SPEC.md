@@ -371,6 +371,7 @@ Nutrition V1C defaults:
 - V1 should not require a setup step before food logging
 - saved foods are explicit user actions; manually logged foods should not be auto-saved
 - Home completion should be driven by meal-slot logging, not target completion
+- Home Daily Flow meal windows should derive completion from NutritionContext entries for the current date. If breakfast, lunch, snack, or dinner has at least one logged food entry, the matching Daily Flow meal window counts as complete and shows the logged meal/food name beneath that slot.
 
 Nutrition V1C should not include:
 - barcode scanning
@@ -1519,6 +1520,9 @@ Layout zones top to bottom:
 6. **Daily Flow** — primary Home content after the header. It renders the full derived chronological timeline: Morning ignition, scheduled tasks, meal windows, planned or confirmed workout, events when available, and the current "you are here" marker. Preserve the current timeline look unless a small spacing adjustment is required to fit the new header.
 7. **Tasks in Daily Flow** — task rows from `DayContext` remain interactive inside the planner flow. Tapping the check circle toggles done. Tapping row text expands/collapses the inline time picker. Done rows are strikethrough + green + reduced opacity.
 8. **Nutrition behavior** — nutrition in the header is a compact status affordance only. Meal windows remain timeline guidance blocks and may route to Nutrition logging later. Do not introduce a large new Nutrition system until supported elsewhere in the spec.
+   - Daily Flow meal completion is derived from Nutrition V1C meal-slot entries for the current date. A logged breakfast, lunch, snack, or dinner marks that meal window complete and shows the logged meal or food name as the row detail.
+   - Nutrition progress is based on completed meal-slot count out of the four supported slots: breakfast 25%, lunch 50%, dinner 75%, snack 100% when all four slots are logged. It must not use calorie or macro target progress for Home completion.
+   - Home workout rows must come only from today's configured assigned workout, today's confirmed scheduled workout/run, or no workout row when the day is open. Legacy/default `DayContext.workout` values must not appear as planned workouts unless they are confirmed for today.
 9. **Removed/avoided Home patterns** — do not render Current Focus if it duplicates Daily Flow. Do not render a large Next Action hero card. Do not add another dashboard card, redundant CTA, or duplicated Fitness quick tool on Home because Fitness has bottom navigation.
 
 Planner tab status rules:
