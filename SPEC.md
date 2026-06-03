@@ -522,6 +522,18 @@ Codex should:
 
 Each PR should remain tightly scoped.
 
+### Temporary QA Stabilization
+
+QA passes may temporarily suppress automatic planning and check-in prompts so the tester can freely move through the app without modal interruption.
+
+During this QA stabilization pass:
+- automatic Morning Check-In, EOD reflection, Weekly Planning, Fitness setup, Nutrition setup, or other planning/check-in prompts should not open on initial app load or normal navigation
+- manual access to existing check-in, weekly planning, training setup, and nutrition setup flows should remain available where the app already exposes a CTA or route
+- suppression should be controlled by a simple internal app-level flag, currently `QA_DISABLE_AUTO_PROMPTS`
+- the flag must be easy to remove when QA is complete
+- persisted user data, workout history, set logs, workout status, RPE, weights, reps, and notes must not be cleared or destructively migrated as part of QA suppression
+- cleanup before QA changes should remove only unused, duplicate, abandoned, or clearly obsolete code, without changing behavior unless the behavior is obsolete
+
 ## Home + Timeline Interaction Model
 
 This section defines the Phase 1 Home behavior in dependency order. Each layer should support the one before it: the screen hierarchy establishes what matters, the interaction hierarchy defines what the user is guided toward, and the timeline behaviors adapt around the user's real day.

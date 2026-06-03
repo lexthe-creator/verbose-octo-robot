@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useDay, useFitness, useSettings } from './context/index.js'
 import { SCREENS, getEnabledNavTabs } from './constants/navigation.js'
+import { QA_DISABLE_AUTO_PROMPTS } from './config/qa.js'
 import { shouldShowNav, getRoute } from './navigation/router.js'
 import { useNavigate } from './navigation/useNavigate.js'
 import { getTodayISO, isThisWeek } from './utils/time.js'
@@ -44,6 +45,7 @@ export default function App() {
   const [isEditingProgram, setIsEditingProgram] = useState(false)
 
   const [showReflection, setShowReflection] = useState(() => {
+    if (QA_DISABLE_AUTO_PROMPTS) return false
     if (new URLSearchParams(window.location.search).get('eod') === '1') return true
     const h    = new Date().getHours()
     const last = localStorage.getItem('lastReflectionDate')
@@ -51,6 +53,7 @@ export default function App() {
   })
 
   const [showWeeklyPlan, setShowWeeklyPlan] = useState(() => {
+    if (QA_DISABLE_AUTO_PROMPTS) return false
     if (new URLSearchParams(window.location.search).get('weekly') === '1') return true
     const now  = new Date()
     const last = localStorage.getItem('lastWeeklyPlanDate')
@@ -103,7 +106,7 @@ export default function App() {
           />
         )}
         {screen === SCREENS.FITNESS && (
-          <Fitness onStartWorkout={handleStartWorkout} />
+          <Fitness onStartWorkout={handleStartWorkout} onNavigate={navigate} />
         )}
         {screen === SCREENS.FITNESS_SETUP && (
           <FitnessSetup
@@ -193,16 +196,6 @@ export default function App() {
         />
       )}
     </div>
-  )
-}
-
-function PlannerPlaceholder({ eyebrow, title, detail }) {
-  return (
-    <main style={styles.placeholder}>
-      <p style={styles.placeholderEyebrow}>{eyebrow}</p>
-      <h1 style={styles.placeholderTitle}>{title}</h1>
-      <p style={styles.placeholderDetail}>{detail}</p>
-    </main>
   )
 }
 

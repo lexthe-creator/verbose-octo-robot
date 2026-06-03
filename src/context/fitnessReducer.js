@@ -27,3 +27,16 @@ export function logWorkout(state, payload) {
     todayComplete: entryDate === getTodayISO() ? status === 'completed' : state.todayComplete,
   }
 }
+
+export function setWorkoutDayStatus(state, payload) {
+  const date = payload.date ?? getTodayISO()
+  const status = payload.status
+  return {
+    ...state,
+    workoutDayStatus: {
+      ...state.workoutDayStatus,
+      [date]: { status, updatedAt: new Date().toISOString() },
+    },
+    todayComplete: date === getTodayISO() ? status === 'completed' : state.todayComplete,
+  }
+}

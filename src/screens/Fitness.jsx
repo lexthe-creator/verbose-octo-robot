@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useFitness }  from '../context/index.js'
 import { useSettings } from '../context/SettingsContext.jsx'
-import FitnessSetup    from './FitnessSetup.jsx'
+import { SCREENS } from '../constants/navigation.js'
 import { getPhase, getWeekNumber } from '../utils/fitness.js'
 import { generateWorkout } from '../utils/workoutGenerator.js'
 import { getWeekStrip } from '../utils/fitnessSelectors.js'
@@ -413,7 +413,34 @@ function buildWorkout(dayType, fitnessState, settingsState, weekNum, phaseKey) {
   }
 }
 
-export default function Fitness({ onStartWorkout }) {
+function UnconfiguredFitness({ onNavigate }) {
+  return (
+    <div style={s.screen}>
+      <div style={s.header}>
+        <p style={s.phase}>training</p>
+        <div style={s.titleRow}>
+          <h1 style={s.title}>Training</h1>
+        </div>
+        <p style={s.raceCountdown}>No training plan yet.</p>
+      </div>
+      <section style={s.section}>
+        <div style={s.todayCard}>
+          <p style={s.name}>Open day</p>
+          <p style={s.sub}>Create a plan from Health when you are ready.</p>
+          <button
+            style={s.startBtn}
+            onClick={() => onNavigate?.(SCREENS.HEALTH)}
+            type="button"
+          >
+            Open Health
+          </button>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+export default function Fitness({ onStartWorkout, onNavigate }) {
   const { fitnessState }  = useFitness()
   const { settingsState } = useSettings()
 
@@ -421,16 +448,8 @@ export default function Fitness({ onStartWorkout }) {
   // null = viewing today, 0–6 = browsing a specific day.
   const [selectedIndex, setSelectedIndex] = useState(null)
 
-  // Guard: show setup wizard as full-screen overlay if program not yet configured.
-  // Primary path: App.jsx intercepts FITNESS navigation when !configured.
-  // This is the fallback for any edge case where Fitness renders unconfigured.
   if (!fitnessState.program.configured) {
-    return (
-      <FitnessSetup
-        onComplete={() => {/* configured flag now true; Fitness re-renders normally */}}
-        isEditing={false}
-      />
-    )
+    return <UnconfiguredFitness onNavigate={onNavigate} />
   }
 
   const { programStartDate, programEndDate, workoutLog, todayComplete, programConfig } = fitnessState
@@ -590,5 +609,34 @@ const s = {
     display:       'flex',
     flexDirection: 'column',
     gap:           'var(--space-2)',
+  },
+  todayCard: {
+    display:       'flex',
+    flexDirection: 'column',
+    gap:           'var(--space-3)',
+    background:    'var(--color-card)',
+    border:        'var(--border)',
+    borderRadius:  'var(--radius-card)',
+    padding:       '16px',
+  },
+  name: {
+    color:      'var(--color-text)',
+    fontSize:   '17px',
+    fontWeight: 600,
+  },
+  sub: {
+    color:    'var(--color-muted)',
+    fontSize: '12px',
+  },
+  startBtn: {
+    width:        '100%',
+    padding:      '14px',
+    borderRadius: 'var(--radius-sm)',
+    border:       'none',
+    background:   'var(--color-accent)',
+    color:        '#fff',
+    fontSize:     '15px',
+    fontWeight:   600,
+    cursor:       'pointer',
   },
 }

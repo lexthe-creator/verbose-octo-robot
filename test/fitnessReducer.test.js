@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { logWorkout } from '../src/context/fitnessReducer.js'
+import { logWorkout, setWorkoutDayStatus } from '../src/context/fitnessReducer.js'
+import { getTodayISO } from '../src/utils/time.js'
 
 const baseState = {
   programStartDate: null,
@@ -49,4 +50,102 @@ test('LOG_WORKOUT preserves completed set journal rows', () => {
   assert.equal(next.workoutLog[0].sets[0].reps, 10)
   assert.equal(next.workoutLog[0].sets[0].plannedReps, 12)
   assert.equal(next.workoutLog[0].rpe, 6)
+})
+
+test('LOG_WORKOUT stores completed status and day status without losing history fields', () => {
+  const today = getTodayISO()
+  const next = logWorkout(baseState, {
+    date:     `${today}T15:00:00.000Z`,
+    type:     'upper',
+    title:    'Upper Body',
+    duration: 48,
+    feel:     4,
+    rpe:      8,
+    notes:    'added load',
+    sets: [
+      {
+        exercise:    'Bench Press',
+        exerciseId:  'bench_press',
+        setNumber:   2,
+        plannedReps: 8,
+        reps:        7,
+        weight:      135,
+        rpe:         8,
+        note:        'last rep slow',
+      },
+    ],
+  })
+
+  assert.equal(next.workoutLog.length, 1)
+  assert.equal(next.workoutLog[0].status, 'completed')
+  assert.equal(next.workoutLog[0].source, 'planned')
+  assert.equal(next.workoutDayStatus[today].status, 'completed')
+  assert.equal(next.todayComplete, true)
+  assert.deepEqual(next.workoutLog[0].sets[0], {
+    exercise:    'Bench Press',
+    exerciseId:  'bench_press',
+    setNumber:   2,
+    plannedReps: 8,
+    reps:        7,
+    weight:      135,
+    rpe:         8,
+    note:        'last rep slow',
+  })
+})
+
+test('SET_WORKOUT_DAY_STATUS preserves skipped and in-progress status without wiping logs', () => {
+  const today = getTodayISO()
+  const logged = logWorkout(baseState, {
+    date:     `${today}T15:00:00.000Z`,
+    type:     'lower',
+    title:    'Lower Body',
+    duration: 44,
+    feel:     3,
+    rpe:      7,
+    notes:    'steady',
+    sets:     [{ exercise: 'Squat', setNumber: 1, plannedReps: 6, reps: 6, weight: 155, rpe: 7, note: '' }],
+  })
+
+  const skipped = setWorkoutDayStatus(logged, { date: today, status: 'skipped' })
+  assert.equal(skipped.workoutDayStatus[today].status, 'skipped')
+  assert.equal(skipped.todayComplete, false)
+  assert.deepEqual(skipped.workoutLog, logged.workoutLog)
+
+  const inProgress = setWorkoutDayStatus(skipped, { date: today, status: 'in_progress' })
+  assert.equal(inProgress.workoutDayStatus[today].status, 'in_progress')
+  assert.equal(inProgress.todayComplete, false)
+  assert.deepEqual(inProgress.workoutLog, logged.workoutLog)
+})
+
+test('fitness workout history survives JSON persistence round trip', () => {
+  const next = logWorkout(baseState, {
+    date:     '2026-06-03T10:00:00.000Z',
+    type:     'pull',
+    title:    'Pull',
+    duration: 50,
+    feel:     4,
+    rpe:      7,
+    notes:    'keep grip wider',
+    sets: [
+      {
+        exercise:    'Lat Pulldown',
+        exerciseId:  'lat_pulldown',
+        setNumber:   1,
+        plannedReps: 10,
+        reps:        9,
+        weight:      80,
+        rpe:         7,
+        note:        'clean',
+      },
+    ],
+  })
+
+  const restored = JSON.parse(JSON.stringify({ version: 2, data: next })).data
+  assert.equal(restored.workoutLog[0].type, next.workoutLog[0].type)
+  assert.equal(restored.workoutLog[0].title, next.workoutLog[0].title)
+  assert.equal(restored.workoutLog[0].duration, next.workoutLog[0].duration)
+  assert.equal(restored.workoutLog[0].rpe, next.workoutLog[0].rpe)
+  assert.equal(restored.workoutLog[0].notes, next.workoutLog[0].notes)
+  assert.deepEqual(restored.workoutLog[0].sets, next.workoutLog[0].sets)
+  assert.deepEqual(restored.workoutDayStatus, next.workoutDayStatus)
 })
