@@ -133,28 +133,174 @@ function withDisplayMeta(segment) {
   return next
 }
 
-function makeCoreSegment(dayType, phaseConfig, restSeconds) {
-  const base = {
+function uniqueById(exercises) {
+  const seen = new Set()
+  return exercises.filter(exercise => {
+    if (!exercise?.id || seen.has(exercise.id)) return false
+    seen.add(exercise.id)
+    return true
+  })
+}
+
+function getTemplatePool(dayType, equipment) {
+  const poolsByType = {
+    upper:     ['upper', 'push', 'pull', 'core'],
+    push:      ['push', 'upper', 'core'],
+    lower:     ['lower', 'core'],
+    pull:      ['pull', 'core'],
+    full_body: ['full_body', 'lower', 'push', 'pull', 'core'],
+  }
+  const equipmentOptions = equipment === 'bodyweight' ? ['bodyweight'] : [equipment, 'bodyweight']
+  return uniqueById((poolsByType[dayType] ?? [dayType])
+    .flatMap(type => equipmentOptions.flatMap(option => getExercisePool(type, option))))
+}
+
+function labelForExercise(exercise) {
+  return `${exercise?.id ?? ''} ${exercise?.name ?? ''} ${exercise?.muscleGroup ?? ''} ${exercise?.category ?? ''}`.toLowerCase()
+}
+
+function matchesLabelAny(exercise, patterns) {
+  const text = labelForExercise(exercise)
+  return patterns.some(pattern => pattern.test(text))
+}
+
+const SLOT_MATCHERS = {
+  chest:         exercise => matchesLabelAny(exercise, [/chest/, /bench press/, /chest press/, /push-up/, /dip/, /fly/]),
+  verticalPush:  exercise => matchesLabelAny(exercise, [/shoulder press/, /arnold press/, /overhead press/, /pike push-up/]),
+  shoulderIso:   exercise => matchesLabelAny(exercise, [/lateral raise/, /front raise/, /rear delt/, /face pull/, /pull-apart/]),
+  tricep:        exercise => exercise?.muscleGroup === 'triceps' || matchesLabelAny(exercise, [/tricep/, /diamond/, /dip/]),
+  squat:         exercise => matchesLabelAny(exercise, [/squat/, /leg press/, /thruster/]),
+  hinge:         exercise => matchesLabelAny(exercise, [/deadlift/, /romanian/, /\brdl\b/, /leg curl/, /hinge/]),
+  unilateral:    exercise => matchesLabelAny(exercise, [/lunge/, /split squat/, /step-up/, /single leg/]),
+  glute:         exercise => exercise?.muscleGroup === 'glutes' || matchesLabelAny(exercise, [/hip thrust/, /glute bridge/, /sumo squat/, /\bbridge\b/]),
+  verticalPull:  exercise => matchesLabelAny(exercise, [/pull-up/, /chin-up/, /pulldown/]),
+  horizontalPull: exercise => matchesLabelAny(exercise, [/\brow\b/, /inverted row/, /australian pull-up/]),
+  rearDelt:      exercise => exercise?.muscleGroup === 'rear delts' || matchesLabelAny(exercise, [/rear delt/, /face pull/, /pull-apart/]),
+  bicep:         exercise => exercise?.muscleGroup === 'biceps' || matchesLabelAny(exercise, [/bicep/, /curl/, /chin-up/]),
+  push:          exercise => SLOT_MATCHERS.chest(exercise) || SLOT_MATCHERS.verticalPush(exercise),
+  pull:          exercise => SLOT_MATCHERS.verticalPull(exercise) || SLOT_MATCHERS.horizontalPull(exercise),
+  carry:         exercise => matchesLabelAny(exercise, [/carry/, /bear crawl/, /turkish get-up/, /man maker/, /barbell complex/]),
+  upperAccessory: exercise => matchesLabelAny(exercise, [/incline/, /fly/, /rear delt/, /face pull/, /pull-apart/, /front raise/]),
+  lowerAccessory: exercise => matchesLabelAny(exercise, [/leg extension/, /leg curl/, /calf/]),
+  pullAccessory: exercise => matchesLabelAny(exercise, [/shrug/, /trap/, /face pull/, /pull-apart/, /\brow\b/]),
+  core:          exercise => exercise?.muscleGroup === 'core' || (exercise?.muscles ?? []).includes('core'),
+}
+
+const STRENGTH_TEMPLATES = {
+  upper: [
+    { slot: 'primary_chest', role: 'primary_compound', match: SLOT_MATCHERS.chest },
+    { slot: 'vertical_push', role: 'primary_compound', match: SLOT_MATCHERS.verticalPush },
+    { slot: 'shoulder_isolation', role: 'isolation', match: SLOT_MATCHERS.shoulderIso },
+    { slot: 'tricep_isolation', role: 'isolation', match: SLOT_MATCHERS.tricep },
+    { slot: 'upper_accessory', role: 'accessory', match: SLOT_MATCHERS.upperAccessory, optional: true },
+    { slot: 'core_anti_extension', role: 'core', match: SLOT_MATCHERS.core, preferredIds: ['dead_bug'] },
+    { slot: 'core_brace', role: 'core_timed', match: SLOT_MATCHERS.core, preferredIds: ['plank'] },
+  ],
+  push: [
+    { slot: 'primary_chest', role: 'primary_compound', match: SLOT_MATCHERS.chest },
+    { slot: 'vertical_push', role: 'primary_compound', match: SLOT_MATCHERS.verticalPush },
+    { slot: 'shoulder_isolation', role: 'isolation', match: SLOT_MATCHERS.shoulderIso },
+    { slot: 'tricep_isolation', role: 'isolation', match: SLOT_MATCHERS.tricep },
+    { slot: 'upper_accessory', role: 'accessory', match: SLOT_MATCHERS.upperAccessory, optional: true },
+    { slot: 'core_anti_extension', role: 'core', match: SLOT_MATCHERS.core, preferredIds: ['dead_bug'] },
+    { slot: 'core_brace', role: 'core_timed', match: SLOT_MATCHERS.core, preferredIds: ['plank'] },
+  ],
+  lower: [
+    { slot: 'primary_squat', role: 'primary_compound', match: SLOT_MATCHERS.squat },
+    { slot: 'primary_hinge', role: 'primary_compound', match: SLOT_MATCHERS.hinge },
+    { slot: 'unilateral', role: 'secondary_compound', match: SLOT_MATCHERS.unilateral },
+    { slot: 'glute', role: 'accessory', match: SLOT_MATCHERS.glute },
+    { slot: 'lower_accessory', role: 'isolation', match: SLOT_MATCHERS.lowerAccessory, optional: true },
+    { slot: 'core_anti_rotation', role: 'core', match: SLOT_MATCHERS.core, preferredIds: ['pallof_press', 'dead_bug'] },
+    { slot: 'core_lateral', role: 'core_timed', match: SLOT_MATCHERS.core, preferredIds: ['side_plank', 'plank'] },
+  ],
+  pull: [
+    { slot: 'vertical_pull', role: 'primary_compound', match: SLOT_MATCHERS.verticalPull },
+    { slot: 'horizontal_pull', role: 'primary_compound', match: SLOT_MATCHERS.horizontalPull },
+    { slot: 'rear_delt', role: 'isolation', match: SLOT_MATCHERS.rearDelt },
+    { slot: 'bicep', role: 'isolation', match: SLOT_MATCHERS.bicep },
+    { slot: 'pull_accessory', role: 'accessory', match: SLOT_MATCHERS.pullAccessory, optional: true },
+    { slot: 'core_anti_extension', role: 'core', match: SLOT_MATCHERS.core, preferredIds: ['dead_bug'] },
+    { slot: 'core_brace', role: 'core_timed', match: SLOT_MATCHERS.core, preferredIds: ['plank'] },
+  ],
+  full_body: [
+    { slot: 'squat', role: 'primary_compound', match: SLOT_MATCHERS.squat },
+    { slot: 'hinge', role: 'primary_compound', match: SLOT_MATCHERS.hinge },
+    { slot: 'push', role: 'secondary_compound', match: SLOT_MATCHERS.push },
+    { slot: 'pull', role: 'secondary_compound', match: SLOT_MATCHERS.pull },
+    { slot: 'carry', role: 'carry_timed', match: SLOT_MATCHERS.carry, preferredIds: ['db_farmer_carry'] },
+    { slot: 'core', role: 'core_timed', match: SLOT_MATCHERS.core, preferredIds: ['plank', 'dead_bug'] },
+  ],
+}
+
+function selectForSlot(pool, slot, history, usedIds, equipment) {
+  const unused = pool.filter(exercise => !usedIds.has(exercise.id))
+  const candidates = unused.filter(slot.match)
+  if (candidates.length === 0 && slot.optional) return null
+  const preferred = candidates.filter(exercise => slot.preferredIds?.includes(exercise.id))
+  const exactEquipment = candidates.filter(exercise => exercise.equipment === equipment)
+  return selectExercises(preferred.length > 0 ? preferred : exactEquipment.length > 0 ? exactEquipment : candidates, 1, history)[0]
+    ?? selectExercises(unused, 1, history)[0]
+}
+
+function getSlotPrescription(slot, exercise, phase, phaseConfig) {
+  const deload = phase === 'deload'
+  const primaryReps = phase === 'peak' ? 5 : phase === 'build' ? 6 : 8
+  const secondaryReps = phase === 'peak' ? 6 : phase === 'build' ? 8 : 10
+
+  if (slot.role === 'primary_compound') {
+    return { sets: deload ? 2 : Math.max(4, phaseConfig.sets), reps: primaryReps, repRange: primaryReps <= 5 ? '5' : `${primaryReps - 2}-${primaryReps}` }
+  }
+  if (slot.role === 'secondary_compound') {
+    return { sets: deload ? 2 : 3, reps: secondaryReps, repRange: `${secondaryReps}-${secondaryReps + 2}` }
+  }
+  if (slot.role === 'isolation') {
+    return { sets: deload ? 2 : 3, reps: 15, repRange: '12-15' }
+  }
+  if (slot.role === 'accessory') {
+    return { sets: deload ? 2 : 3, reps: 12, repRange: '10-12' }
+  }
+  if (slot.role === 'carry_timed') {
+    return { sets: deload ? 2 : 3, reps: 45, repUnit: 'sec' }
+  }
+  if (slot.role === 'core_timed') {
+    return { sets: deload ? 2 : 3, reps: exercise.id === 'side_plank' ? 30 : 45, repUnit: 'sec' }
+  }
+  if (slot.role === 'core') {
+    return { sets: deload ? 2 : 3, reps: exercise.baseReps ?? 12 }
+  }
+  return { sets: phaseConfig.sets, reps: phaseConfig.reps }
+}
+
+function makeExerciseSegment(exercise, slot, phase, phaseConfig, history, restSeconds) {
+  const prescription = getSlotPrescription(slot, exercise, phase, phaseConfig)
+  return withDisplayMeta({
     section:        'main',
     type:           'sets_reps',
-    exerciseId:     `${dayType}_core_finisher`,
-    name:           dayType?.startsWith('run') ? 'Dead Bug' : 'Plank Shoulder Tap',
-    sets:           2,
-    reps:           dayType?.startsWith('run') ? 10 : 12,
-    rpeTarget:      Math.max(5, Math.round((phaseConfig.rpeTarget ?? 6) - 1)),
-    intensity:      'controlled',
-    cues:           dayType?.startsWith('run')
-      ? ['Move opposite arm and leg together', 'Keep your lower back gently pressed down', 'Go slow enough to stay braced']
-      : ['Keep hips square to the floor', 'Tap each shoulder without rocking', 'Slow reps count more than speed'],
-    loadSuggestion: { suggestion: 'Bodyweight — smooth and braced', basis: 'core finisher' },
+    exerciseId:     exercise.id,
+    name:           exercise.name,
+    sets:           prescription.sets,
+    reps:           prescription.reps,
+    repRange:       prescription.repRange,
+    repUnit:        prescription.repUnit,
+    rpeTarget:      slot.role?.startsWith('core') || slot.role === 'carry_timed'
+      ? Math.max(5, Math.round((phaseConfig.rpeTarget ?? 6) - 1))
+      : phaseConfig.rpeTarget,
+    intensity:      slot.role,
+    cues:           exercise.cues,
+    loadSuggestion: getLoadSuggestion(
+      exercise,
+      getLastPerformance(history ?? [], exercise.id),
+      phaseConfig,
+    ),
     restSeconds,
-    muscleGroup:    'core',
-    muscles:        ['core', 'shoulders'],
-    equipment:      'bodyweight',
-    category:       'core',
-    perSide:        true,
-  }
-  return withDisplayMeta(base)
+    muscleGroup:    exercise.muscleGroup,
+    muscles:        exercise.muscles,
+    equipment:      exercise.equipment,
+    category:       exercise.category,
+    templateSlot:   slot.slot,
+    templateRole:   slot.role,
+  })
 }
 
 // ─── Warmup / cooldown data for strength workouts ─────────────────────────────
@@ -222,42 +368,25 @@ const DEFAULT_REST = 90
 
 export function buildStrengthWorkout(dayType, equipment, phase, weekInPhase, history) {
   const phaseConfig = getPhaseConfig(phase, weekInPhase)
-  const pool        = getExercisePool(dayType, equipment)
-  const exercises   = selectExercises(pool, 4, history ?? [])
+  const pool        = getTemplatePool(dayType, equipment)
   const warmup      = STRENGTH_WARMUPS[dayType]   ?? UPPER_WARMUP
   const cooldown    = STRENGTH_COOLDOWNS[dayType] ?? UPPER_COOLDOWN
   const restSeconds = REST_SECONDS[phase] ?? DEFAULT_REST
+  const template    = STRENGTH_TEMPLATES[dayType] ?? STRENGTH_TEMPLATES.upper
+  const usedIds     = new Set()
 
-  const mainSegments = exercises.map(exercise => withDisplayMeta({
-    section:        'main',
-    type:           'sets_reps',
-    exerciseId:     exercise.id,
-    name:           exercise.name,
-    sets:           phaseConfig.sets,
-    reps:           phaseConfig.reps,
-    rpeTarget:      phaseConfig.rpeTarget,
-    intensity:      phaseConfig.intensity,
-    cues:           exercise.cues,
-    loadSuggestion: getLoadSuggestion(
-      exercise,
-      getLastPerformance(history ?? [], exercise.id),
-      phaseConfig,
-    ),
-    restSeconds,
-    muscleGroup:    exercise.muscleGroup,
-    muscles:        exercise.muscles,
-    equipment:      exercise.equipment,
-    category:       exercise.category,
-  }))
-
-  const coreSegment = ['push', 'lower'].includes(dayType)
-    ? [makeCoreSegment(dayType, phaseConfig, restSeconds)]
-    : []
+  const mainSegments = template
+    .map(slot => {
+      const exercise = selectForSlot(pool, slot, history ?? [], usedIds, equipment)
+      if (!exercise) return null
+      usedIds.add(exercise.id)
+      return makeExerciseSegment(exercise, slot, phase, phaseConfig, history ?? [], restSeconds)
+    })
+    .filter(Boolean)
 
   return [
     ...warmup.map(withDisplayMeta),
     ...mainSegments,
-    ...coreSegment,
     ...cooldown.map(withDisplayMeta),
   ]
 }
@@ -303,14 +432,21 @@ function makeRunSegment(segmentData, section, audioId) {
 export function buildRunWorkout(runType, phase, weekInPhase) {
   const mainDur = runDuration(runType, phase, weekInPhase)
   const phaseConfig = getPhaseConfig(phase, weekInPhase)
-  const coreSegment = makeCoreSegment(runType, phaseConfig, DEFAULT_REST)
+  const runCore = makeExerciseSegment(
+    EXERCISES.core.bodyweight[0],
+    { slot: 'run_core', role: 'core', match: SLOT_MATCHERS.core },
+    phase,
+    phaseConfig,
+    [],
+    DEFAULT_REST,
+  )
 
   switch (runType) {
     case 'run_easy':
       return [
         makeRunSegment(RUN_SEGMENTS.warmup.walk,    'warmup',   'warmup_walk'),
         { ...makeRunSegment(RUN_SEGMENTS.main.easy,  'main',    'main_easy'),  duration: mainDur },
-        coreSegment,
+        runCore,
         makeRunSegment(RUN_SEGMENTS.cooldown.walk,  'cooldown', 'cooldown_walk'),
       ]
 
@@ -320,7 +456,7 @@ export function buildRunWorkout(runType, phase, weekInPhase) {
         { ...makeRunSegment(RUN_SEGMENTS.main.tempo,     'main',    'main_tempo'),    duration: mainDur },
         { ...makeRunSegment(RUN_SEGMENTS.main.recovery,  'main',    'main_recovery'), duration: 120 },
         { ...makeRunSegment(RUN_SEGMENTS.main.tempo,     'main',    'main_tempo'),    duration: mainDur },
-        coreSegment,
+        runCore,
         makeRunSegment(RUN_SEGMENTS.cooldown.walk,       'cooldown', 'cooldown_walk'),
       ]
 
@@ -328,7 +464,7 @@ export function buildRunWorkout(runType, phase, weekInPhase) {
       return [
         makeRunSegment(RUN_SEGMENTS.warmup.walk,    'warmup',   'warmup_walk'),
         { ...makeRunSegment(RUN_SEGMENTS.main.long,  'main',    'main_long'),  duration: mainDur },
-        coreSegment,
+        runCore,
         makeRunSegment(RUN_SEGMENTS.cooldown.walk,  'cooldown', 'cooldown_walk'),
       ]
 

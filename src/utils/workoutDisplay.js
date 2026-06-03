@@ -17,7 +17,9 @@ export function formatSegmentPrescription(segment) {
   if (!segment) return ''
   if (getSegmentType(segment) === 'exercise') {
     const side = getSideInstruction(segment)
-    return [segment.sets && segment.reps ? `${segment.sets}x${segment.reps}` : '', side].filter(Boolean).join(' ')
+    const unit = segment.repUnit ? ` ${segment.repUnit}` : ''
+    const reps = segment.repRange ?? segment.reps
+    return [segment.sets && reps ? `${segment.sets}x${reps}${unit}` : '', side].filter(Boolean).join(' ')
   }
   if (segment.duration) return formatDuration(segment.duration)
   return ''
@@ -92,6 +94,28 @@ export function getNextUp(workout, currentIndex) {
     detail:    formatSegmentPrescription(next),
     equipment: getEquipmentNeededForSegment(next),
   }
+}
+
+const PREVIEW_SECTION_LABELS = {
+  warmup:   'warm up',
+  main:     'main',
+  cooldown: 'cool down',
+}
+
+export function getWorkoutPreviewSections(workout) {
+  return ['warmup', 'main', 'cooldown']
+    .map(section => ({
+      section,
+      title: PREVIEW_SECTION_LABELS[section],
+      rows: (workout?.segments ?? [])
+        .filter(segment => (segment.section ?? 'main') === section)
+        .map(segment => ({
+          name:         segment.name,
+          prescription: formatSegmentPrescription(segment),
+          equipment:    getEquipmentNeededForSegment(segment),
+        })),
+    }))
+    .filter(group => group.rows.length > 0)
 }
 
 export function hasExplicitCore(workout) {

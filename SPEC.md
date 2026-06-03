@@ -1917,7 +1917,8 @@ Do not implement Calendar behavior beyond the approved read-only V1 scope until 
 - **Today card** — generated via `generateWorkout(getTodayType(), gymAccess, weekNum)` where `weekNum = getWeekNumber(programStartDate)`. Card header is tappable: toggles full workout preview with 300ms max-height animation. Preview shows WARM UP / MAIN / COOL DOWN sections; each row: name left + `3×10` or `2:00` right in accent. Footer: `~Xmin` + "Start Workout" button. Collapsed state shows original Start/Completed button.
 - **Weekly strip** — 7-column grid (Mon–Sun) labeled `M T W T F S S`. Selecting a day updates the workout details below using the configured program and the new `workoutGenerator` path.
 - **Journal** — last 5 entries from `fitness.workoutLog` (reverse order). Rows render date, workout focus, duration, completion marker, and RPE when present, e.g. `Jun 2 | Push | 40 min | ● | RPE 6/10`. Use `Journal`, not History or Recent, for logged workout rows.
-- Fitness owns full workout detail. Health Today may mirror compact training status only and must not duplicate the full workout preview, weekly planner, or exercise details.
+- Fitness owns the primary full workout experience. Health Today may mirror compact training status only and must not duplicate the full workout preview, weekly planner, or exercise details.
+- Health → Training is allowed to show the selected day's generated workout before start. It should use the same generated workout data, render a compact planner-style segment preview grouped by warm up / main / cool down, and keep actions unchanged. This preview must not create a separate Health workout generator or separate workout state.
 
 ---
 
@@ -2150,6 +2151,13 @@ WorkoutPlayer accepts these new `type` values as the primary shape. It may defen
 Workout quality rules:
 - If a workout title or focus includes `Core`, the generated workout must include at least one explicit core segment.
 - Push + Core, Lower + Core, and Run + Core variants should add a core accessory/finisher instead of relying only on compound lifts that happen to involve core stabilization.
+- Strength workouts must be generated from templates, not broad random exercise shuffles. Templates define movement-pattern slots and varied prescriptions; exercise variety comes from choosing library exercises that satisfy each slot.
+- Upper / Push template: primary chest press, secondary vertical press, shoulder isolation, tricep isolation, optional upper-body accessory, and 1–2 core movements; target 6–8 main movements.
+- Lower template: primary squat, primary hinge, unilateral movement, glute movement, accessory, and 1–2 core movements; target 6–8 main movements.
+- Pull template: vertical pull, horizontal pull, rear delt, bicep, accessory, and 1–2 core movements; target 6–8 main movements.
+- Full Body template: squat, hinge, push, pull, carry or conditioning, and core; target 5–7 main movements.
+- Prescriptions should vary by role instead of stamping every exercise as the same sets and reps: primary compounds use heavier lower-rep work, secondary/accessory movements use moderate or higher reps, and timed core can use duration targets.
+- Health → Training is a planner and workout preview, not an execution surface. It should show the selected workout as a simple header (`Upper Body`, `Tue, Jun 2 · 45–60 min`, `○ Planned`), a weekly overview with workout type and completion state, and section previews. Main Workout is expanded by default; warm-up and cool-down are collapsed by default and can be expanded. Do not show repetitive metadata tables or repeat equipment on every row when all movements use the same equipment category.
 
 Warm-up and cool-down selection must match workout type:
 - `push` and `upper` use upper-body activation/recovery.

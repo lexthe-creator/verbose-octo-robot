@@ -10,6 +10,7 @@ import { useSettings } from '../context/SettingsContext.jsx'
 import { GYM_ACCESS, WORKOUT_TYPES } from '../constants/fitness.js'
 import { getPhase, getTypeForDay, getWeekDates, getWeekNumber } from '../utils/fitness.js'
 import { generateWorkout } from '../utils/workoutGenerator.js'
+import { getWorkoutPreviewSections } from '../utils/workoutDisplay.js'
 import { getTodayISO } from '../utils/time.js'
 import Nutrition from './Nutrition.jsx'
 
@@ -226,6 +227,10 @@ function formatSelectedDay(value) {
   return value.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).toLowerCase()
 }
 
+function formatTrainingHeaderDate(value) {
+  return value.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
 function toLocalISO(date) {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -295,11 +300,25 @@ function entryRpe(entry) {
   return null
 }
 
-function statusDetail(status) {
-  if (status === 'in_progress') return 'open'
-  if (status === 'completed') return 'done'
-  if (status === 'skipped') return 'moved'
-  return 'open day'
+function trainingStatusMarker(status) {
+  if (status === 'completed') return '● Completed'
+  if (status === 'skipped') return '○ Skipped'
+  if (status === 'in_progress') return '◐ In progress'
+  return '○ Planned'
+}
+
+function workoutTypeLabel(workout) {
+  const focus = workoutFocus(workout?.type, workout?.title)
+  if (focus === 'run') return 'Run'
+  if (focus === 'mobility') return 'Recovery'
+  if (focus === 'full') return 'Full'
+  if (focus === 'push') return 'Upper'
+  if (focus === 'lower') return 'Lower'
+  return workout?.title?.replace(' + Core', '') ?? 'Workout'
+}
+
+function displayExerciseName(name) {
+  return String(name ?? '').replace(/^DB\b/, 'Dumbbell')
 }
 
 function getReadiness(energy, soreness) {
@@ -540,6 +559,65 @@ function getTrainingDayPlan(fitnessState, settingsState, date) {
   return { iso, scheduled: true, workout, status }
 }
 
+function WorkoutHeader({ workout, date, status }) {
+  return (
+    <div style={s.workoutHeader}>
+      <h2 style={s.workoutTitle}>{workout.title.replace(' + Core', '')}</h2>
+      <p style={s.workoutMeta}>{formatTrainingHeaderDate(date)} · ~{workout.durationEst} min</p>
+      <p style={{ ...s.workoutStatus, ...(status === 'completed' ? s.workoutStatusDone : {}) }}>
+        {trainingStatusMarker(status)}
+      </p>
+    </div>
+  )
+}
+
+function WorkoutPreview({ workout }) {
+  const [expandedSections, setExpandedSections] = useState({ main: true })
+  const groups = getWorkoutPreviewSections(workout)
+  if (groups.length === 0) return null
+
+  return (
+    <div style={s.workoutPreview}>
+      {groups.map(group => (
+        <div key={group.section} style={s.previewGroup}>
+          <button
+            style={s.previewToggle}
+            onClick={() => setExpandedSections(current => ({ ...current, [group.section]: !current[group.section] }))}
+            type="button"
+          >
+            <span style={s.previewTitle}>{group.section === 'main' ? 'main workout' : group.title}</span>
+            <span style={s.previewCount}>{group.rows.length} movement{group.rows.length === 1 ? '' : 's'}</span>
+          </button>
+          {expandedSections[group.section] && (
+            <PreviewRows rows={group.rows} />
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function PreviewRows({ rows }) {
+  const equipmentKeys = [...new Set(rows.map(row => row.equipment.join(' · ')).filter(Boolean))]
+  const commonEquipment = equipmentKeys.length === 1 ? equipmentKeys[0] : ''
+  const showRowEquipment = equipmentKeys.length > 1
+
+  return (
+    <div style={s.previewRows}>
+      {commonEquipment && <p style={s.previewCommonEquipment}>equipment · {commonEquipment}</p>}
+      {rows.map((row, index) => (
+        <div key={`${row.name}-${index}`} style={s.previewRow}>
+          <span style={s.previewName}>{displayExerciseName(row.name)}</span>
+          <span style={s.previewPrescription}>{row.prescription}</span>
+          {showRowEquipment && row.equipment.length > 0 && (
+            <span style={s.previewEquipment}>{row.equipment.join(' · ')}</span>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function WeeklyTrainingPlan({ onStartWorkout, onLogWorkout }) {
   const { fitnessState } = useFitness()
   const { settingsState } = useSettings()
@@ -557,6 +635,7 @@ function WeeklyTrainingPlan({ onStartWorkout, onLogWorkout }) {
           const dayPlan = getTrainingDayPlan(fitnessState, settingsState, date)
           const isToday = dayPlan.iso === today
           const selected = dayPlan.iso === selectedIso
+          const completed = dayPlan.status === 'completed'
 
           return (
             <button
@@ -570,19 +649,19 @@ function WeeklyTrainingPlan({ onStartWorkout, onLogWorkout }) {
               type="button"
             >
               <span style={s.trainingDayName}>{date.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 1).toUpperCase()}</span>
+              <span style={s.trainingDayType}>
+                {dayPlan.scheduled ? workoutTypeLabel(dayPlan.workout) : 'Open'}{completed ? ' ✓' : ''}
+              </span>
             </button>
           )
         })}
       </div>
 
       <div style={s.selectedTraining}>
-        <PlannerRow label="day" value={formatSelectedDay(selectedDate)} />
         {selectedPlan.scheduled ? (
           <>
-            <PlannerRow label="workout" value={selectedPlan.workout.title.toLowerCase()} />
-            <PlannerRow label="focus" value={workoutFocus(selectedPlan.workout.type, selectedPlan.workout.title)} />
-            <PlannerRow label="duration" value={`~${selectedPlan.workout.durationEst} min`} />
-            <PlannerRow label="status" value={(STATUS_LABELS[selectedPlan.status] ?? selectedPlan.status).toLowerCase()} detail={statusDetail(selectedPlan.status)} />
+            <WorkoutHeader workout={selectedPlan.workout} date={selectedDate} status={selectedPlan.status} />
+            <WorkoutPreview workout={selectedPlan.workout} />
             {isSelectedToday ? (
               <DailyWorkoutActions
                 status={selectedPlan.status}
@@ -598,6 +677,7 @@ function WeeklyTrainingPlan({ onStartWorkout, onLogWorkout }) {
           </>
         ) : (
           <>
+            <PlannerRow label="day" value={formatSelectedDay(selectedDate)} />
             <PlannerRow label="workout" value="open day" />
             <PlannerRow label="status" value="unscheduled" />
             <InlineActions>
@@ -1089,13 +1169,15 @@ const s = {
   },
   trainingWeekDay: {
     display:       'flex',
+    flexDirection: 'column',
     alignItems:     'center',
     justifyContent: 'center',
-    minWidth:       '31px',
-    minHeight:      '28px',
-    padding:        '4px 0',
+    gap:            '3px',
+    minWidth:       '54px',
+    minHeight:      '42px',
+    padding:        '6px 7px',
     border:         'var(--border)',
-    borderRadius:   '999px',
+    borderRadius:   'var(--radius-sm)',
     background:     'transparent',
     color:          'var(--color-muted)',
   },
@@ -1113,11 +1195,131 @@ const s = {
     fontWeight:    700,
     letterSpacing: '0.08em',
   },
+  trainingDayType: {
+    maxWidth:      '46px',
+    color:         'currentColor',
+    fontSize:      '9px',
+    fontWeight:    620,
+    lineHeight:    1.05,
+    overflow:      'hidden',
+    textOverflow:  'ellipsis',
+    whiteSpace:    'nowrap',
+  },
   selectedTraining: {
     display:       'flex',
     flexDirection: 'column',
     gap:           '1px',
     padding:       '8px 0 2px',
+  },
+  workoutHeader: {
+    display:       'flex',
+    flexDirection: 'column',
+    gap:           '3px',
+    padding:       '5px 0 8px',
+  },
+  workoutTitle: {
+    margin:      0,
+    color:       'var(--color-text)',
+    fontFamily: 'var(--font-display)',
+    fontSize:   '26px',
+    lineHeight: 1.05,
+  },
+  workoutMeta: {
+    margin:     0,
+    color:      'var(--color-muted)',
+    fontSize:   '12px',
+    fontWeight: 540,
+  },
+  workoutStatus: {
+    margin:     '2px 0 0',
+    color:      'var(--color-muted)',
+    fontSize:   '12px',
+    fontWeight: 640,
+  },
+  workoutStatusDone: {
+    color: 'var(--color-success)',
+  },
+  workoutPreview: {
+    display:       'flex',
+    flexDirection: 'column',
+    gap:           '8px',
+    margin:        '8px 0 7px',
+    padding:       '8px 0 2px',
+    borderTop:     '0.5px solid color-mix(in srgb, var(--color-border) 44%, transparent)',
+    borderBottom:  '0.5px solid color-mix(in srgb, var(--color-border) 34%, transparent)',
+  },
+  previewGroup: {
+    display:       'flex',
+    flexDirection: 'column',
+    gap:           '2px',
+  },
+  previewToggle: {
+    display:        'flex',
+    justifyContent: 'space-between',
+    alignItems:     'baseline',
+    gap:            '10px',
+    width:          '100%',
+    padding:        '3px 0',
+    background:     'transparent',
+    border:         'none',
+    color:          'inherit',
+    cursor:         'pointer',
+  },
+  previewTitle: {
+    margin:        '0 0 1px',
+    color:         'var(--color-muted)',
+    fontSize:      '10px',
+    fontWeight:    700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+  },
+  previewCount: {
+    color:      'var(--color-muted)',
+    fontSize:   '10px',
+    fontWeight: 540,
+    whiteSpace: 'nowrap',
+  },
+  previewRows: {
+    display:       'flex',
+    flexDirection: 'column',
+    gap:           '1px',
+    paddingBottom: '4px',
+  },
+  previewCommonEquipment: {
+    margin:     '0 0 2px',
+    color:      'var(--color-muted)',
+    fontSize:   '10px',
+    fontWeight: 520,
+  },
+  previewRow: {
+    display:             'grid',
+    gridTemplateColumns: 'minmax(0, 1fr) auto',
+    gap:                 '6px',
+    alignItems:          'baseline',
+    minHeight:           '20px',
+    padding:             '1px 0',
+  },
+  previewName: {
+    minWidth:    0,
+    color:       'var(--color-text)',
+    fontSize:    '12px',
+    fontWeight:  560,
+    overflow:    'hidden',
+    textOverflow:'ellipsis',
+    whiteSpace:  'nowrap',
+  },
+  previewPrescription: {
+    color:      'var(--color-accent)',
+    fontSize:   '11px',
+    fontWeight: 650,
+    whiteSpace: 'nowrap',
+  },
+  previewEquipment: {
+    gridColumn: '1 / 3',
+    color:      'var(--color-muted)',
+    fontSize:   '10px',
+    fontWeight: 520,
+    lineHeight: 1.25,
   },
   row: {
     display:             'grid',
