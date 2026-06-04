@@ -100,8 +100,8 @@ function actionSteps(segment, index) {
   }]
 }
 
-function makeRestStep(previousStep, previousSegment, restIndex) {
-  const duration = previousSegment.restSeconds ?? previousSegment.restSec ?? 0
+function makeRestStep(previousStep, previousSegment, nextStep, restIndex) {
+  const duration = previousSegment?.restSeconds ?? previousSegment?.restSec ?? 0
   if (!duration) return null
   return {
     id: `${previousStep.id}_rest_${restIndex}`,
@@ -109,7 +109,7 @@ function makeRestStep(previousStep, previousSegment, restIndex) {
     type: 'rest',
     name: 'Rest',
     duration,
-    instruction: previousStep.name ? `Next: ${previousStep.name}` : '',
+    instruction: nextStep?.name ? `Next: ${nextStep.name}` : '',
     sourceSegmentIndex: previousStep.sourceSegmentIndex,
     media: {
       kind: 'placeholder',
@@ -130,6 +130,14 @@ function nextActionInSamePhase(steps, startIndex, phase) {
   return false
 }
 
+function getNextActionInSamePhase(steps, startIndex, phase) {
+  for (let i = startIndex + 1; i < steps.length; i++) {
+    if (steps[i].phase !== phase) return null
+    if (steps[i].type !== 'rest') return steps[i]
+  }
+  return null
+}
+
 export function normalizeWorkoutForPlayback(workout) {
   const rawSteps = (workout?.segments ?? []).flatMap((segment, index) => actionSteps(segment, index))
   const ordered = PLAYBACK_PHASES.flatMap(phase => rawSteps.filter(step => step.phase === phase))
@@ -139,7 +147,8 @@ export function normalizeWorkoutForPlayback(workout) {
     steps.push(step)
     const source = workout.segments?.[step.sourceSegmentIndex]
     if (step.type === 'sets_reps' && nextActionInSamePhase(ordered, ordered.indexOf(step), step.phase)) {
-      const rest = makeRestStep(step, source, steps.length)
+      const nextStep = getNextActionInSamePhase(ordered, ordered.indexOf(step), step.phase)
+      const rest = makeRestStep(step, source, nextStep, steps.length)
       if (rest) steps.push(rest)
     }
   })

@@ -137,10 +137,15 @@ const EQUIPMENT_OPTIONS = [
   {
     value: GYM_ACCESS.DUMBBELLS,
     title: 'Dumbbells',
-    desc:  'Dumbbells and bodyweight. Home gym ready.',
+    desc:  'Dumbbells and bodyweight.',
   },
   {
-    value: GYM_ACCESS.GYM,
+    value: GYM_ACCESS.HOME_GYM,
+    title: 'Home gym',
+    desc:  'Rack, barbell, bench, cables, dumbbells, and bodyweight.',
+  },
+  {
+    value: GYM_ACCESS.FULL_GYM,
     title: 'Full gym',
     desc:  'Full equipment access. Barbells, cables, machines.',
   },

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   formatSegmentPrescription,
   getEquipmentNeededForSegment,
@@ -163,6 +163,10 @@ export default function WorkoutPlayer({ workout, onComplete, onClose }) {
     setStepIndex(index => Math.min(steps.length - 1, index + 1))
   }
 
+  const handleExerciseRowsChange = useCallback((stepId, rows) => {
+    setJournal(current => ({ ...current, [stepId]: rows }))
+  }, [])
+
   function handleSave({ feel, rpe, notes }) {
     const startedAt = workout.startedAt ?? Date.now()
     const durationMin = Math.max(1, Math.round((Date.now() - startedAt) / 60000))
@@ -220,9 +224,10 @@ export default function WorkoutPlayer({ workout, onComplete, onClose }) {
         )}
         {step?.type === 'sets_reps' && (
           <ExerciseStep
+            key={step.id}
             step={step}
             savedRows={journal[step.id]}
-            onRowsChange={rows => setJournal(current => ({ ...current, [step.id]: rows }))}
+            onRowsChange={handleExerciseRowsChange}
           />
         )}
         {step?.type === 'text' && (
@@ -334,8 +339,8 @@ function ExerciseStep({ step, savedRows, onRowsChange }) {
   const equipment = getEquipmentNeededForSegment(step)
 
   useEffect(() => {
-    onRowsChange(rows)
-  }, [rows, onRowsChange])
+    onRowsChange(step.id, rows)
+  }, [rows, step.id, onRowsChange])
 
   function updateSet(index, patch) {
     setRows(current => current.map((row, i) => i === index ? { ...row, ...patch } : row))

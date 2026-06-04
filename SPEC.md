@@ -1098,7 +1098,7 @@ Action: `UPDATE_PROFILE { key, value }`.
 ```js
 {
   theme:             'dark',
-  gymAccess:         'bodyweight', // 'bodyweight' | 'dumbbells' | 'gym'
+  gymAccess:         'bodyweight', // 'bodyweight' | 'dumbbells' | 'home_gym' | 'full_gym' | legacy 'gym'
   plaidConnected:    false,
   calendarConnected: false,
   modules: {
@@ -1934,7 +1934,7 @@ Do not implement Calendar behavior beyond the approved read-only V1 scope until 
 **Nav:** Hidden (back arrow header only).
 
 - **Profile card** — text input for `profile.name`; onBlur dispatches `UPDATE_PROFILE { name }`.
-- **Training card** — 3-pill equipment toggle (Bodyweight / Dumbbells / Full gym); dispatches `UPDATE_SETTING { key: 'gymAccess', value }`. Controls which exercise list `generateWorkout` selects.
+- **Training card** — general equipment profile toggle (Bodyweight / Dumbbells / Home gym / Full gym); dispatches `UPDATE_SETTING { key: 'gymAccess', value }`. Controls which exercise list `generateWorkout` selects. Home gym should be treated as barbell/rack/cable capable, not dumbbell-only. Legacy `gym` values remain readable as full-gym access.
 - **Program card** — start date input → `UPDATE_FITNESS { key: 'programStartDate', value }` · race date input → `UPDATE_FITNESS { key: 'programEndDate', value }`. Both ISO date strings or null.
 - **Connections card** — Plaid (bank & spending) and Google Calendar rows. Stub `StubSheet` bottom-sheet explains V2 timeline.
 - **About card** — shows app version, current training phase label (`PHASE_LABELS[getPhase(programStartDate, programEndDate)]`), and week number (`getWeekNumber(programStartDate)`).

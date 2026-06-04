@@ -10,7 +10,8 @@ import { THEMES } from '../constants/theme.js'
 const EQUIPMENT_OPTIONS = [
   { value: GYM_ACCESS.BODYWEIGHT, label: 'Bodyweight' },
   { value: GYM_ACCESS.DUMBBELLS,  label: 'Dumbbells'  },
-  { value: GYM_ACCESS.GYM,        label: 'Full gym'   },
+  { value: GYM_ACCESS.HOME_GYM,   label: 'Home gym'   },
+  { value: GYM_ACCESS.FULL_GYM,   label: 'Full gym'   },
 ]
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
@@ -419,7 +420,7 @@ const s = {
   // Equipment pill toggle
   pillRow: {
     display:            'grid',
-    gridTemplateColumns:'repeat(3, 1fr)',
+    gridTemplateColumns:'repeat(2, 1fr)',
     gap:                '6px',
   },
   pill: {

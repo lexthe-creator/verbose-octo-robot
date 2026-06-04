@@ -11,6 +11,8 @@ export const WORKOUT_TYPES = {
 export const GYM_ACCESS = {
   BODYWEIGHT: 'bodyweight',
   DUMBBELLS:  'dumbbells',
+  HOME_GYM:   'home_gym',
+  FULL_GYM:   'full_gym',
   GYM:        'gym',
 }
 

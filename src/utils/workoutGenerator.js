@@ -92,19 +92,20 @@ export function selectExercises(pool, count, workoutLog) {
     if (!entry.date) continue
     const diffDays = (new Date(today) - new Date(entry.date)) / (1000 * 60 * 60 * 24)
     for (const set of (entry.sets ?? [])) {
-      if (!set.exercise) continue
-      if (diffDays <= 7)  recent7.add(set.exercise)
-      if (diffDays <= 14) recent14.add(set.exercise)
+      const keys = [set.exerciseId, set.exercise].filter(Boolean)
+      if (keys.length === 0) continue
+      if (diffDays <= 7) keys.forEach(key => recent7.add(key))
+      if (diffDays <= 14) keys.forEach(key => recent14.add(key))
     }
   }
 
   // Priority 1: exclude exercises done in the last 7 days
-  const eligible  = pool.filter(ex => !recent7.has(ex.id))
+  const eligible  = pool.filter(ex => !recent7.has(ex.id) && !recent7.has(ex.name))
   // Priority 2: among eligible, prefer not done in last 14 days
-  const preferred = shuffleWithSeed(eligible.filter(ex => !recent14.has(ex.id)), seedBase)
-  const moderate  = shuffleWithSeed(eligible.filter(ex =>  recent14.has(ex.id)), seedBase + 1)
+  const preferred = shuffleWithSeed(eligible.filter(ex => !recent14.has(ex.id) && !recent14.has(ex.name)), seedBase)
+  const moderate  = shuffleWithSeed(eligible.filter(ex =>  recent14.has(ex.id) || recent14.has(ex.name)), seedBase + 1)
   // Fallback: if eligible count is short, pull from the 7-day pool
-  const fallback  = shuffleWithSeed(pool.filter(ex => recent7.has(ex.id)),       seedBase + 2)
+  const fallback  = shuffleWithSeed(pool.filter(ex => recent7.has(ex.id) || recent7.has(ex.name)), seedBase + 2)
 
   return [...preferred, ...moderate, ...fallback].slice(0, count)
 }

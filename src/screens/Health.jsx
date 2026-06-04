@@ -42,8 +42,8 @@ const DAYS_OPTIONS = [3, 4, 5, 6]
 const EQUIPMENT_OPTIONS = [
   { value: 'bodyweight', access: GYM_ACCESS.BODYWEIGHT, label: 'Bodyweight' },
   { value: 'dumbbells', access: GYM_ACCESS.DUMBBELLS, label: 'Dumbbells' },
-  { value: 'home_gym', access: GYM_ACCESS.DUMBBELLS, label: 'Home gym' },
-  { value: 'full_gym', access: GYM_ACCESS.GYM, label: 'Full gym' },
+  { value: 'home_gym', access: GYM_ACCESS.HOME_GYM, label: 'Home gym' },
+  { value: 'full_gym', access: GYM_ACCESS.FULL_GYM, label: 'Full gym' },
 ]
 
 const TRAINING_DAYS_BY_COUNT = {
@@ -795,7 +795,8 @@ function OptionGrid({ options, value, onChange }) {
 }
 
 function getEquipmentChoice(gymAccess) {
-  if (gymAccess === GYM_ACCESS.GYM) return 'full_gym'
+  if (gymAccess === GYM_ACCESS.HOME_GYM) return 'home_gym'
+  if (gymAccess === GYM_ACCESS.FULL_GYM || gymAccess === GYM_ACCESS.GYM) return 'full_gym'
   if (gymAccess === GYM_ACCESS.DUMBBELLS) return 'dumbbells'
   return 'bodyweight'
 }
