@@ -2088,15 +2088,69 @@ Navigation:
 **Rendered by:** `App.jsx` as global overlay when `activeWorkout !== null`.
 **Props:** `{ workout, onComplete(log), onClose() }`
 
-Full-screen `position: fixed` overlay (`z-index: 150`). Flows through `workout.segments[]` sequentially.
+WorkoutPlayer V1 is a guided workout playback system. It may reuse the visual language of the previous player, but the logic should be organized around safe step-by-step execution, not around patching the old segment UI.
+
+Full-screen `position: fixed` overlay (`z-index: 150`). It normalizes `workout.segments[]` into executable phase steps and flows through those steps sequentially.
+
+V1 priorities:
+1. Safe playback controls.
+2. Phase-structured workout execution.
+3. Separate action steps.
+4. First-class rest steps.
+5. Media-ready exercise metadata.
+6. Equipment-aware generation.
+7. Programming quality.
+8. Logging improvements.
+
+Playback controls:
+- Previous — always available after the first executable step; returns to the previous step without losing entered set data.
+- Next — always available; moves forward or opens the post-workout log on the last step.
+- Pause / Resume — pauses timed and rest countdowns without leaving the workout.
+- Exit — closes the overlay through `onClose()`; users must never be trapped after tapping forward.
+- Autoplay On / Off — controls whether completed timed/rest steps advance automatically. Autoplay defaults to on for rest and timed steps.
+- Resume Workout — if the same workout is reopened during the same app session, the player should restore the current step, elapsed/rest time, autoplay setting, paused state, and entered set rows where available.
+
+Execution structure:
+- Workouts are organized by phases: `warmup`, `main`, `finisher`, and `cooldown`.
+- `core` may appear as its own generated section, but playback should treat it as part of the main training block unless a future spec creates a separate phase.
+- The top progress label shows progress within the current phase, e.g. `MAIN 3 of 7`, not total workout segments.
+- Progress dots may remain global as secondary orientation, but phase progress is primary.
+- Every action is its own executable step. Instruction text such as `30 seconds each leg` or `45 seconds each side` must be expanded into separate left/right or side-specific timed steps when possible.
+- Rest is a first-class step with its own label, countdown, media placeholder state, Previous/Next behavior, and autoplay behavior. Rest must not be hidden only in notes or inside set rows.
+
+Step shape:
+```js
+{
+  id: string,
+  phase: 'warmup' | 'main' | 'finisher' | 'cooldown',
+  type: 'timed' | 'sets_reps' | 'rest' | 'text',
+  name: string,
+  duration?: number,
+  instruction?: string,
+  exerciseId?: string,
+  sets?: number,
+  reps?: number,
+  repRange?: string,
+  repUnit?: string,
+  media?: {
+    kind: 'video' | 'gif' | 'image' | 'placeholder',
+    src: string | null,
+    poster?: string | null,
+    alt: string,
+  },
+  equipmentNeeded?: string[],
+  sourceSegmentIndex?: number,
+}
+```
 
 **Segment kinds:**
 
 | Kind | Renderer | Behavior |
 |---|---|---|
-| `timed` | `TimedSegment` | Count-up timer vs target duration; shows remaining until target hit, then elapsed |
+| `timed` | `TimedSegment` | Countdown against target duration; pause/resume aware; can autoplay to next step when complete |
 | `text` | `TextSegment` | Static card with name + instruction detail |
-| `exercise` | `ExerciseSegment` | Set rows (tap to mark done); 60s rest countdown (skippable) between sets |
+| `sets_reps` / `exercise` | `ExerciseSegment` | Set rows (tap to mark done); set data persists while navigating previous/next |
+| `rest` | `RestSegment` | First-class countdown step with skip/next and autoplay behavior |
 
 **Next Up:** during execution, show the upcoming segment/exercise beneath the header or current timer. It should include the next name, sets/reps or duration, and equipment needed. If there is no upcoming segment, show a quiet finish-state label.
 
@@ -2104,9 +2158,11 @@ Full-screen `position: fixed` overlay (`z-index: 150`). Flows through `workout.s
 
 **Workout journal:** exercise segments render one row per planned set. Each row shows planned reps, allows actual reps and weight entry, and toggles complete/incomplete when tapped. Toggling a completed set off preserves entered reps, weight, and notes. Actual reps may differ from planned reps and should default to the planned reps when first completed.
 
-**Rest timer:** rest is a full timer state, not a small pill. When rest is active, render a large countdown above exercise details with a secondary skip control. The next-exercise action remains available but visually quieter than the timer.
+**Rest timer:** rest is a full playback step, not a small pill. When rest is active, render a large countdown with a secondary skip/next control. Rest participates in Previous, Next, Pause, Resume, and Autoplay exactly like other playback steps.
 
-**Side-based movements:** unilateral movements should clearly communicate side behavior. For reps, show explicit `each side` instructions when applicable. Timed side-based work may use separate left/right timers or clearly labeled per-side timing.
+**Side-based movements:** unilateral movements should clearly communicate side behavior. For reps, show explicit `each side` instructions when applicable. Timed side-based work must use separate left/right timers or clearly labeled per-side timing instead of burying `each side` in instruction text.
+
+**Media support:** every generated exercise/timed step should support a `media` placeholder. V1 may render a static placeholder, but the data shape must allow video, GIF, poster images, and alt text without another workout schema rewrite.
 
 **Post-workout log:** (`PostWorkoutLog`) — elapsed timer, 5-emoji feel selector, workout-level RPE 1-10 selector, notes textarea, "Save workout" → calls `onComplete({ date, type, title, duration, feel, rpe, notes, exercises[], sets[] })`. App.jsx dispatches `LOG_WORKOUT` and clears `activeWorkout`.
 
@@ -2153,6 +2209,7 @@ It should generate workouts from:
 - duration
 - recovery needs
 - exercise mapping
+- executable workout playback steps
 
 Supported V1 training lanes:
 - `strength` — strength, muscle, body composition, joint health; roughly 80% strength and 20% conditioning/recovery.
@@ -2165,6 +2222,8 @@ Equipment profiles:
 - `dumbbells` — dumbbells and bodyweight; bench only when enabled by mapped exercise metadata.
 - `home_gym` — squat rack, barbell, bench, cable machine, dumbbells, and bodyweight. Treat as close to full gym, not dumbbell-only.
 - `full_gym` / legacy `gym` — home gym plus machines/cardio/specialty items when mapped.
+
+Equipment setup is a general profile setting for all generated workouts. It must not be HYROX-specific. Fitness setup may ask what equipment the user has, but the saved value belongs to Settings and should influence every generated training lane.
 
 Movement-pattern selection must happen before exercise selection. Primary patterns include horizontal push, vertical push, horizontal pull, vertical pull, squat, and hinge. Secondary patterns include unilateral, glute dominant, carry, conditioning, and core. Strength, hybrid, and mobility/recovery sessions must include actual core work, prioritizing anti-extension, anti-rotation, and lateral-stability core before flexion.
 
@@ -2190,6 +2249,8 @@ Generated workout output should expose:
 - `id`, `title`, `type`/`dayType`, `focus`, `durationEstimate`/`estimatedMinutes`, `status`, and `segments[]`.
 - Segment sections: `warmup`, `main`, `core`, `finisher`, and `cooldown` where relevant.
 - Exercise metadata: `exerciseId`, `name`, `tier`, `movementPattern`, `muscleGroup`, `equipment`, `sets`, `reps` or `duration`, side instruction when unilateral, `cues`, and notes/load guidance.
+- Media placeholder metadata for each generated executable step.
+- First-class rest steps before playback when rest is needed between actions.
 
 Quality rules:
 - Strength workouts include a primary movement, secondary movement, accessory, and core.
@@ -2199,6 +2260,7 @@ Quality rules:
 - Hybrid days include strength and conditioning.
 - Running days include warm-up, main run segment, and cool-down.
 - Mobility days remain low intensity.
+- Core should appear intentionally across the week: anti-rotation, carries, planks, dead bugs, hollow holds, and trunk-stability work should be represented by templates rather than random filler.
 - Avoid duplicate exercises and avoid stacking too many similar movements in short sessions.
 - Default strength days should not be only four main movements unless duration is 30 minutes or less.
 - Home Gym should use barbell/cable options where appropriate.
@@ -2273,6 +2335,13 @@ Sets/reps segment (strength main):
 ```
 
 WorkoutPlayer accepts these new `type` values as the primary shape. It may defensively tolerate the deprecated `kind: 'timed' | 'exercise' | 'text'` segments until all older call sites are removed.
+
+Before playback, segments should be normalized into guided executable steps:
+- grouped under phases `warmup`, `main`, `finisher`, `cooldown`
+- side-based timed work expanded into separate steps
+- rest inserted as `type: 'rest'` steps after set-based work when another action follows in the same phase
+- media placeholders attached to every step
+- equipment metadata carried forward from segment/exercise metadata
 
 Workout quality rules:
 - If a workout title or focus includes `Core`, the generated workout must include at least one explicit core segment.

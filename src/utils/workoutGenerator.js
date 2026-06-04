@@ -148,9 +148,16 @@ export function getLoadSuggestion(exercise, lastPerformance, phaseConfig) {
 }
 
 function withDisplayMeta(segment) {
+  const mediaAlt = segment.media?.alt ?? `${segment.name ?? 'Workout step'} demonstration placeholder`
   const next = {
     ...segment,
     equipmentNeeded: getEquipmentNeededForSegment(segment),
+    media: {
+      kind: segment.media?.kind ?? 'placeholder',
+      src: segment.media?.src ?? null,
+      poster: segment.media?.poster ?? null,
+      alt: mediaAlt,
+    },
   }
   if (isSideBasedSegment(next)) {
     next.perSide = true
@@ -220,7 +227,7 @@ const STRENGTH_TEMPLATES = {
     { slot: 'tricep_isolation', role: 'isolation', match: SLOT_MATCHERS.tricep },
     { slot: 'upper_accessory', role: 'accessory', match: SLOT_MATCHERS.upperAccessory, optional: true },
     { slot: 'core_anti_extension', role: 'core', match: SLOT_MATCHERS.core, preferredIds: ['dead_bug'] },
-    { slot: 'core_brace', role: 'core_timed', match: SLOT_MATCHERS.core, preferredIds: ['plank'] },
+    { slot: 'core_brace', role: 'core_timed', match: SLOT_MATCHERS.core, preferredIds: ['plank', 'hollow_hold'] },
   ],
   push: [
     { slot: 'primary_chest', role: 'primary_compound', match: SLOT_MATCHERS.chest },
@@ -229,7 +236,7 @@ const STRENGTH_TEMPLATES = {
     { slot: 'tricep_isolation', role: 'isolation', match: SLOT_MATCHERS.tricep },
     { slot: 'upper_accessory', role: 'accessory', match: SLOT_MATCHERS.upperAccessory, optional: true },
     { slot: 'core_anti_extension', role: 'core', match: SLOT_MATCHERS.core, preferredIds: ['dead_bug'] },
-    { slot: 'core_brace', role: 'core_timed', match: SLOT_MATCHERS.core, preferredIds: ['plank'] },
+    { slot: 'core_brace', role: 'core_timed', match: SLOT_MATCHERS.core, preferredIds: ['plank', 'hollow_hold'] },
   ],
   lower: [
     { slot: 'primary_squat', role: 'primary_compound', match: SLOT_MATCHERS.squat },
@@ -247,7 +254,7 @@ const STRENGTH_TEMPLATES = {
     { slot: 'bicep', role: 'isolation', match: SLOT_MATCHERS.bicep },
     { slot: 'pull_accessory', role: 'accessory', match: SLOT_MATCHERS.pullAccessory, optional: true },
     { slot: 'core_anti_extension', role: 'core', match: SLOT_MATCHERS.core, preferredIds: ['dead_bug'] },
-    { slot: 'core_brace', role: 'core_timed', match: SLOT_MATCHERS.core, preferredIds: ['plank'] },
+    { slot: 'core_brace', role: 'core_timed', match: SLOT_MATCHERS.core, preferredIds: ['plank', 'hollow_hold'] },
   ],
   full_body: [
     { slot: 'squat', role: 'primary_compound', match: SLOT_MATCHERS.squat },
@@ -255,7 +262,7 @@ const STRENGTH_TEMPLATES = {
     { slot: 'push', role: 'secondary_compound', match: SLOT_MATCHERS.push },
     { slot: 'pull', role: 'secondary_compound', match: SLOT_MATCHERS.pull },
     { slot: 'carry', role: 'carry_timed', match: SLOT_MATCHERS.carry, preferredIds: ['db_farmer_carry'] },
-    { slot: 'core', role: 'core_timed', match: SLOT_MATCHERS.core, preferredIds: ['plank', 'dead_bug'] },
+    { slot: 'core', role: 'core_timed', match: SLOT_MATCHERS.core, preferredIds: ['plank', 'dead_bug', 'hollow_hold'] },
   ],
 }
 

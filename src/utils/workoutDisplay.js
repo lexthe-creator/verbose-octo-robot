@@ -99,18 +99,22 @@ export function getNextUp(workout, currentIndex) {
 const PREVIEW_SECTION_LABELS = {
   warmup:   'warm up',
   main:     'main',
-  core:     'core',
   finisher: 'finisher',
   cooldown: 'cool down',
 }
 
+function getPreviewSection(segment) {
+  if (segment?.section === 'core') return 'main'
+  return segment?.section ?? 'main'
+}
+
 export function getWorkoutPreviewSections(workout) {
-  return ['warmup', 'main', 'core', 'finisher', 'cooldown']
+  return ['warmup', 'main', 'finisher', 'cooldown']
     .map(section => ({
       section,
       title: PREVIEW_SECTION_LABELS[section],
       rows: (workout?.segments ?? [])
-        .filter(segment => (segment.section ?? 'main') === section)
+        .filter(segment => getPreviewSection(segment) === section)
         .map(segment => ({
           name:         segment.name,
           prescription: formatSegmentPrescription(segment),

@@ -72,7 +72,8 @@ function TodayCard({ workout, todayComplete, isToday, onStart }) {
   const abbr        = TYPE_ABBR[workoutType] || '?'
 
   const warmupSegs = workout.segments.filter(s => s.section === 'warmup')
-  const mainSegs   = workout.segments.filter(s => s.section === 'main' || s.section === 'finisher' || !s.section)
+  const mainSegs   = workout.segments.filter(s => s.section === 'main' || s.section === 'core' || !s.section)
+  const finisherSegs = workout.segments.filter(s => s.section === 'finisher')
   const coolSegs   = workout.segments.filter(s => s.section === 'cooldown')
 
   return (
@@ -107,6 +108,7 @@ function TodayCard({ workout, todayComplete, isToday, onStart }) {
         <div style={tc.prevWrap}>
           {warmupSegs.length > 0 && <PreviewSection title="WARM UP"   segs={warmupSegs} />}
           {mainSegs.length   > 0 && <PreviewSection title="MAIN"      segs={mainSegs}   />}
+          {finisherSegs.length > 0 && <PreviewSection title="FINISHER" segs={finisherSegs} />}
           {coolSegs.length   > 0 && <PreviewSection title="COOL DOWN" segs={coolSegs}   />}
 
           <div style={tc.prevFooter}>
