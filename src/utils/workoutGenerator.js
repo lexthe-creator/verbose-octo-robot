@@ -175,6 +175,48 @@ function uniqueById(exercises) {
   })
 }
 
+function getAllExercises() {
+  return Object.values(EXERCISES)
+    .flatMap(category => Object.values(category))
+    .flat()
+    .filter(Boolean)
+}
+
+const EXERCISE_BY_ID = getAllExercises().reduce((map, exercise) => {
+  const list = map.get(exercise.id) ?? []
+  list.push(exercise)
+  map.set(exercise.id, list)
+  return map
+}, new Map())
+
+function getAllowedEquipment(equipment) {
+  const normalized = normalizeEquipmentProfile(equipment)
+  if (normalized === 'gym') return new Set(['gym', 'dumbbells', 'bodyweight', 'all'])
+  if (normalized === 'dumbbells') return new Set(['dumbbells', 'bodyweight', 'all'])
+  return new Set(['bodyweight', 'all'])
+}
+
+function buildSubstitutionOptions(exercise, equipment) {
+  const allowed = getAllowedEquipment(equipment)
+  return uniqueById((exercise.substitutes ?? [])
+    .flatMap(id => EXERCISE_BY_ID.get(id) ?? [])
+    .filter(option => allowed.has(option.equipment)))
+    .slice(0, 3)
+    .map(option => ({
+      exerciseId: option.id,
+      name: option.name,
+      equipment: option.equipment,
+      equipmentNeeded: getEquipmentNeededForSegment(option),
+      cues: option.cues ?? [],
+      media: {
+        kind: 'placeholder',
+        src: null,
+        poster: null,
+        alt: `${option.name} demonstration placeholder`,
+      },
+    }))
+}
+
 function getTemplatePool(dayType, equipment) {
   const normalized = normalizeEquipmentProfile(equipment)
   const poolsByType = {
@@ -308,7 +350,7 @@ function getSlotPrescription(slot, exercise, phase, phaseConfig) {
   return { sets: phaseConfig.sets, reps: phaseConfig.reps }
 }
 
-function makeExerciseSegment(exercise, slot, phase, phaseConfig, history, restSeconds) {
+function makeExerciseSegment(exercise, slot, phase, phaseConfig, history, restSeconds, equipmentProfile = exercise.equipment) {
   const prescription = getSlotPrescription(slot, exercise, phase, phaseConfig)
   return withDisplayMeta({
     section:        'main',
@@ -333,6 +375,7 @@ function makeExerciseSegment(exercise, slot, phase, phaseConfig, history, restSe
     muscleGroup:    exercise.muscleGroup,
     muscles:        exercise.muscles,
     equipment:      exercise.equipment,
+    substitutions:  buildSubstitutionOptions(exercise, equipmentProfile),
     category:       exercise.category,
     templateSlot:   slot.slot,
     templateRole:   slot.role,
@@ -417,7 +460,7 @@ export function buildStrengthWorkout(dayType, equipment, phase, weekInPhase, his
       const exercise = selectForSlot(pool, { ...slot, durationMinutes }, history ?? [], usedIds, normalizedEquipment)
       if (!exercise) return null
       usedIds.add(exercise.id)
-      return makeExerciseSegment(exercise, { ...slot, durationMinutes }, phase, phaseConfig, history ?? [], restSeconds)
+      return makeExerciseSegment(exercise, { ...slot, durationMinutes }, phase, phaseConfig, history ?? [], restSeconds, normalizedEquipment)
     })
     .filter(Boolean)
 

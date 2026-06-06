@@ -61,8 +61,8 @@ function buildExerciseSummary(steps, journal) {
     .map(step => {
       const rows = journal[step.id] ?? []
       return {
-        name: step.name,
-        exerciseId: step.exerciseId,
+        name: rows[0]?.exercise ?? step.name,
+        exerciseId: rows[0]?.exerciseId ?? step.exerciseId,
         sets: step.sets,
         reps: step.reps,
         completed: rows.filter(row => row.done).length,
@@ -92,6 +92,26 @@ function getStepTimer(savedTimers, step) {
   if (saved) return saved
   const duration = Number(step.duration) || 0
   return { remaining: duration, elapsed: 0, complete: duration === 0 }
+}
+
+function getInitialSubstitutionId(step, savedRows) {
+  const savedId = savedRows?.[0]?.exerciseId
+  if (!savedId || savedId === step.exerciseId) return null
+  return step.substitutions?.some(option => option.exerciseId === savedId) ? savedId : null
+}
+
+function getActiveStep(step, substitutionId) {
+  const substitution = step.substitutions?.find(option => option.exerciseId === substitutionId)
+  if (!substitution) return step
+  return {
+    ...step,
+    name: substitution.name,
+    exerciseId: substitution.exerciseId,
+    equipment: substitution.equipment,
+    equipmentNeeded: substitution.equipmentNeeded,
+    cues: substitution.cues,
+    media: substitution.media,
+  }
 }
 
 export default function WorkoutPlayer({ workout, onComplete, onClose }) {
@@ -208,7 +228,7 @@ export default function WorkoutPlayer({ workout, onComplete, onClose }) {
           style={{ ...s.autoBtn, color: autoplay ? 'var(--color-accent)' : 'var(--color-muted)' }}
           onClick={() => setAutoplay(value => !value)}
         >
-          autoplay {autoplay ? 'on' : 'off'}
+          Autoplay {autoplay ? 'On' : 'Off'}
         </button>
       </header>
 
@@ -291,9 +311,10 @@ function NextUp({ step }) {
 }
 
 function MediaPlaceholder({ step }) {
+  const kindLabel = step?.media?.kind === 'placeholder' ? 'video / gif placeholder' : step?.media?.kind
   return (
     <div style={s.media}>
-      <span style={s.mediaKind}>{step?.media?.kind ?? 'placeholder'}</span>
+      <span style={s.mediaKind}>{kindLabel ?? 'video / gif placeholder'}</span>
       <span style={s.mediaAlt}>{step?.media?.alt ?? 'movement preview placeholder'}</span>
     </div>
   )
@@ -319,6 +340,7 @@ function RestStep({ step, timer, paused }) {
       <h2 style={s.stepName}>{step.name}</h2>
       <p style={s.timer}>{fmtMMSS(timer?.remaining)}</p>
       {paused && <p style={s.paused}>paused</p>}
+      {step.instruction && <p style={s.nextInstruction}>{step.instruction}</p>}
       <p style={s.stepDetail}>Breathe, reset, and get ready for what is next.</p>
     </section>
   )
@@ -334,9 +356,12 @@ function TextStep({ step }) {
 }
 
 function ExerciseStep({ step, savedRows, onRowsChange }) {
+  const [substitutionId, setSubstitutionId] = useState(() => getInitialSubstitutionId(step, savedRows))
+  const activeStep = getActiveStep(step, substitutionId)
   const [rows, setRows] = useState(() => makeSetRows(step, savedRows))
-  const sideInstruction = getSideInstruction(step)
-  const equipment = getEquipmentNeededForSegment(step)
+  const sideInstruction = getSideInstruction(activeStep)
+  const equipment = getEquipmentNeededForSegment(activeStep)
+  const cues = (activeStep.cues ?? []).slice(0, 3)
 
   useEffect(() => {
     onRowsChange(step.id, rows)
@@ -350,14 +375,65 @@ function ExerciseStep({ step, savedRows, onRowsChange }) {
     setRows(current => current.map((row, i) => i === index ? { ...row, done: !row.done } : row))
   }
 
+  function chooseSubstitution(option) {
+    setSubstitutionId(option.exerciseId)
+    setRows(current => current.map(row => ({
+      ...row,
+      exercise: option.name,
+      exerciseId: option.exerciseId,
+      done: false,
+    })))
+  }
+
+  function chooseOriginal() {
+    setSubstitutionId(null)
+    setRows(current => current.map(row => ({
+      ...row,
+      exercise: step.name,
+      exerciseId: step.exerciseId,
+      done: false,
+    })))
+  }
+
   return (
     <section style={s.exercise}>
       <p style={s.stepKind}>action</p>
-      <h2 style={s.exerciseName}>{step.name}</h2>
-      <p style={s.prescription}>{formatSegmentPrescription(step)}</p>
+      <h2 style={s.exerciseName}>{activeStep.name}</h2>
+      <p style={s.prescription}>{formatSegmentPrescription(activeStep)}</p>
       {sideInstruction && <p style={s.sideHint}>{sideInstruction}</p>}
       {equipment.length > 0 && <p style={s.equipment}>equipment · {equipment.join(' · ')}</p>}
-      {step.loadSuggestion?.suggestion && <p style={s.loadHint}>{step.loadSuggestion.suggestion}</p>}
+      {activeStep.loadSuggestion?.suggestion && <p style={s.loadHint}>{activeStep.loadSuggestion.suggestion}</p>}
+      {cues.length > 0 && (
+        <div style={s.cueList}>
+          <p style={s.cueLabel}>coach cues</p>
+          {cues.map(cue => <p key={cue} style={s.cueItem}>• {cue}</p>)}
+        </div>
+      )}
+      {(step.substitutions?.length ?? 0) > 0 && (
+        <div style={s.swapList}>
+          <p style={s.cueLabel}>equipment-ready swaps</p>
+          <div style={s.swapButtons}>
+            {substitutionId && (
+              <button style={s.swapBtn} onClick={chooseOriginal} type="button">
+                original
+              </button>
+            )}
+            {step.substitutions.map(option => (
+              <button
+                key={option.exerciseId}
+                style={{
+                  ...s.swapBtn,
+                  ...(substitutionId === option.exerciseId ? s.swapBtnActive : {}),
+                }}
+                onClick={() => chooseSubstitution(option)}
+                type="button"
+              >
+                {option.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div style={s.setList}>
         {rows.map((row, index) => (
@@ -652,6 +728,12 @@ const s = {
     lineHeight: 1.45,
     maxWidth: 300,
   },
+  nextInstruction: {
+    color: 'var(--color-accent)',
+    fontSize: '13px',
+    fontWeight: 700,
+    lineHeight: 1.35,
+  },
   effort: {
     color: 'var(--color-accent)',
     fontSize: '12px',
@@ -698,6 +780,52 @@ const s = {
     color: 'var(--color-muted)',
     textAlign: 'center',
     lineHeight: 1.35,
+  },
+  cueList: {
+    borderTop: '0.5px solid color-mix(in srgb, var(--color-border) 58%, transparent)',
+    borderBottom: '0.5px solid color-mix(in srgb, var(--color-border) 58%, transparent)',
+    padding: '9px 0',
+    marginTop: '4px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+  },
+  cueLabel: {
+    color: 'var(--color-muted)',
+    fontSize: '10px',
+    fontWeight: 750,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+  },
+  cueItem: {
+    color: 'var(--color-text)',
+    fontSize: '12px',
+    lineHeight: 1.35,
+  },
+  swapList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '6px',
+    marginTop: '2px',
+  },
+  swapButtons: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '6px',
+  },
+  swapBtn: {
+    border: '0.5px solid var(--color-border)',
+    borderRadius: 'var(--radius-pill)',
+    background: 'var(--color-card)',
+    color: 'var(--color-muted)',
+    fontSize: '11px',
+    fontWeight: 650,
+    padding: '7px 10px',
+  },
+  swapBtnActive: {
+    borderColor: 'var(--color-accent)',
+    background: 'var(--color-accent-bg)',
+    color: 'var(--color-accent)',
   },
   setList: {
     display: 'flex',

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { generateTrainingProgram, generateWorkout, getProgramStructure } from '../src/utils/workoutGenerator.js'
+import { getPhaseProgress, normalizeWorkoutForPlayback } from '../src/utils/workoutPlayback.js'
 import {
   getEquipmentNeededForWorkout,
   getJournalRow,
@@ -282,6 +283,51 @@ test('next up exposes name, prescription, and equipment', () => {
   assert.equal(next.label, 'next up')
   assert.ok(next.name)
   assert.ok(next.detail || next.equipment.length > 0)
+})
+
+test('playback phase labels use user-facing phase-local progress', () => {
+  const workout = {
+    segments: [
+      { section: 'warmup', type: 'timed', name: 'Leg Swings', duration: 60, instruction: '30 seconds each leg' },
+      { section: 'main', type: 'sets_reps', name: 'Squat', sets: 3, reps: 8, restSeconds: 90 },
+      { section: 'main', type: 'sets_reps', name: 'Row', sets: 3, reps: 10 },
+      { section: 'cooldown', type: 'timed', name: 'Lat Stretch', duration: 60, instruction: '30 seconds each side' },
+    ],
+  }
+  const steps = normalizeWorkoutForPlayback(workout)
+
+  assert.deepEqual(getPhaseProgress(steps, 1), { label: 'Warm-Up', current: 2, total: 2 })
+  assert.deepEqual(getPhaseProgress(steps, 2), { label: 'Main', current: 1, total: 3 })
+  assert.deepEqual(getPhaseProgress(steps, 5), { label: 'Cool Down', current: 1, total: 2 })
+})
+
+test('rest steps expose actual next exercise instruction', () => {
+  const steps = normalizeWorkoutForPlayback({
+    segments: [
+      { section: 'main', type: 'sets_reps', name: 'Squat', sets: 3, reps: 8, restSeconds: 90 },
+      { section: 'main', type: 'sets_reps', name: 'Row', sets: 3, reps: 10 },
+    ],
+  })
+  const rest = steps.find(step => step.type === 'rest')
+
+  assert.ok(rest)
+  assert.equal(rest.instruction, 'Next: Row')
+})
+
+test('generated exercise segments expose cues and equipment-compatible substitutions', () => {
+  const workout = generateWorkout({
+    dayType: 'upper',
+    equipment: 'dumbbells',
+    phase: 'base',
+    weekInPhase: 1,
+    history: [],
+  })
+  const segment = allExerciseSegments(workout).find(item => item.substitutions?.length > 0)
+
+  assert.ok(segment)
+  assert.ok(segment.cues.length > 0)
+  assert.ok(segment.substitutions.every(option => ['dumbbells', 'bodyweight'].includes(option.equipment)))
+  assert.ok(segment.substitutions.every(option => option.media?.kind === 'placeholder'))
 })
 
 test('workout preview sections expose grouped prescriptions and equipment', () => {

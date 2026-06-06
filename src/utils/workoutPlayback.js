@@ -167,10 +167,12 @@ export function getPhaseProgress(steps, stepIndex) {
   const currentInPhase = phaseSteps.findIndex(step => step.id === current.id) + 1
   return {
     label: current.phase === 'warmup'
-      ? 'WARM-UP'
+      ? 'Warm-Up'
       : current.phase === 'cooldown'
-        ? 'COOL DOWN'
-        : current.phase.toUpperCase(),
+        ? 'Cool Down'
+        : current.phase === 'finisher'
+          ? 'Finisher'
+          : 'Main',
     current: currentInPhase,
     total: phaseSteps.length,
   }

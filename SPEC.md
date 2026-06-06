@@ -2114,6 +2114,7 @@ Execution structure:
 - Workouts are organized by phases: `warmup`, `main`, `finisher`, and `cooldown`.
 - `core` may appear as its own generated section, but playback should treat it as part of the main training block unless a future spec creates a separate phase.
 - The top progress label shows progress within the current phase, e.g. `MAIN 3 of 7`, not total workout segments.
+- The visible progress label should read naturally in Title Case, e.g. `Warm-Up 2 of 6`, `Main 1 of 3`, or `Cool Down 1 of 4`.
 - Progress dots may remain global as secondary orientation, but phase progress is primary.
 - Every action is its own executable step. Instruction text such as `30 seconds each leg` or `45 seconds each side` must be expanded into separate left/right or side-specific timed steps when possible.
 - Rest is a first-class step with its own label, countdown, media placeholder state, Previous/Next behavior, and autoplay behavior. Rest must not be hidden only in notes or inside set rows.
@@ -2159,10 +2160,17 @@ Step shape:
 **Workout journal:** exercise segments render one row per planned set. Each row shows planned reps, allows actual reps and weight entry, and toggles complete/incomplete when tapped. Toggling a completed set off preserves entered reps, weight, and notes. Actual reps may differ from planned reps and should default to the planned reps when first completed.
 
 **Rest timer:** rest is a full playback step, not a small pill. When rest is active, render a large countdown with a secondary skip/next control. Rest participates in Previous, Next, Pause, Resume, and Autoplay exactly like other playback steps.
+Rest should render its own `Next: [actual next exercise]` detail when the next exercise is known.
 
 **Side-based movements:** unilateral movements should clearly communicate side behavior. For reps, show explicit `each side` instructions when applicable. Timed side-based work must use separate left/right timers or clearly labeled per-side timing instead of burying `each side` in instruction text.
 
 **Media support:** every generated exercise/timed step should support a `media` placeholder. V1 may render a static placeholder, but the data shape must allow video, GIF, poster images, and alt text without another workout schema rewrite.
+
+**Ladder-style execution layer:** after the basic playback controls are stable, WorkoutPlayer may add lightweight execution affordances without changing the saved workout schema:
+- Autoplay toggle should be visible and readable as `Autoplay On` / `Autoplay Off`.
+- The video/GIF placeholder area should stay visible as a future media slot.
+- Coach cues from exercise metadata should surface during exercise playback as short scannable cues.
+- Equipment-compatible substitutions may be shown as compact swap options. Choosing a substitution should preserve the current prescription and set-row structure while logging the substituted exercise name/id.
 
 **Post-workout log:** (`PostWorkoutLog`) — elapsed timer, 5-emoji feel selector, workout-level RPE 1-10 selector, notes textarea, "Save workout" → calls `onComplete({ date, type, title, duration, feel, rpe, notes, exercises[], sets[] })`. App.jsx dispatches `LOG_WORKOUT` and clears `activeWorkout`.
 
