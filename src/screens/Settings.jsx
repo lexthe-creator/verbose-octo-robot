@@ -3,16 +3,13 @@ import { useUser } from '../context/UserContext.jsx'
 import { useSettings } from '../context/SettingsContext.jsx'
 import { useFitness } from '../context/index.js'
 import { getPhase, getWeekNumber } from '../utils/fitness.js'
-import { GYM_ACCESS, PHASE_LABELS } from '../constants/fitness.js'
+import {
+  PHASE_LABELS,
+  formatEquipmentProfileLabels,
+  getEquipmentProfileFromSettings,
+} from '../constants/fitness.js'
 import { SCREENS } from '../constants/navigation.js'
 import { THEMES } from '../constants/theme.js'
-
-const EQUIPMENT_OPTIONS = [
-  { value: GYM_ACCESS.BODYWEIGHT, label: 'Bodyweight' },
-  { value: GYM_ACCESS.DUMBBELLS,  label: 'Dumbbells + bands' },
-  { value: GYM_ACCESS.HOME_GYM,   label: 'Home setup' },
-  { value: GYM_ACCESS.FULL_GYM,   label: 'Full gym' },
-]
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
@@ -30,14 +27,12 @@ export default function Settings({ onBack, onNavigate }) {
     userDispatch({ type: 'UPDATE_PROFILE', payload: { key: 'name', value: clean } })
   }
 
-  function handleEquipment(value) {
-    settingsDispatch({ type: 'UPDATE_SETTING', payload: { key: 'gymAccess', value } })
-  }
-
   const { programStartDate, programEndDate } = fitnessState
   const phaseKey = getPhase(programStartDate, programEndDate)
   const weekNum  = getWeekNumber(programStartDate)
   const DENSITY_OPTIONS = ['minimal', 'balanced', 'detailed']
+  const equipmentProfile = getEquipmentProfileFromSettings(settingsState)
+  const equipmentDisplay = formatEquipmentProfileLabels(equipmentProfile)
 
   return (
     <div style={s.screen}>
@@ -66,29 +61,10 @@ export default function Settings({ onBack, onNavigate }) {
       <section style={s.card}>
         <p style={s.cardLabel}>Training</p>
         <div style={s.field}>
-          <label style={s.fieldLabel}>Equipment</label>
-          <div style={s.pillRow}>
-            {EQUIPMENT_OPTIONS.map(opt => {
-              const active = settingsState.gymAccess === opt.value
-              return (
-                <button
-                  key={opt.value}
-                  style={{
-                    ...s.pill,
-                    background:  active ? 'var(--color-accent-bg)'            : 'var(--color-chart-bar)',
-                    border:      active ? '0.5px solid var(--color-accent)'   : 'var(--border)',
-                    color:       active ? 'var(--color-accent)'               : 'var(--color-faint)',
-                    fontWeight:  active ? 600                                  : 500,
-                  }}
-                  onClick={() => handleEquipment(opt.value)}
-                >
-                  {opt.label}
-                </button>
-              )
-            })}
-          </div>
+          <label style={s.fieldLabel}>Equipment Profile</label>
+          <p style={s.profileValue}>{equipmentDisplay}</p>
           <p style={s.helper}>
-            Controls what exercises get generated in your workouts
+            Controls what exercises get generated in your workouts.
           </p>
         </div>
         <div style={s.divider} />
@@ -405,6 +381,13 @@ const s = {
     fontSize:   '10px',
     color:      'var(--color-faint)',
     lineHeight: 1.4,
+  },
+  profileValue: {
+    margin:      0,
+    color:       'var(--color-text)',
+    fontSize:    '14px',
+    fontWeight:  600,
+    lineHeight:  1.35,
   },
   editProgramBtn: {
     alignSelf:  'flex-start',

@@ -1,10 +1,17 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useReducer, useEffect } from 'react'
+import {
+  equipmentToGymAccess,
+  getEquipmentProfileFromSettings,
+  normalizeEquipmentProfile,
+} from '../constants/fitness.js'
 
 const SETTINGS_STORAGE_KEY = 'aiml_settings'
 const SCHEMA_VERSION       = 1
 
 const initialSettingsState = {
   theme:             'light',
+  equipmentProfile:  [],
   gymAccess:         'bodyweight',
   homeDensity:       'balanced',
   homeMode:          'build',
@@ -25,10 +32,13 @@ const initialSettingsState = {
 function migrateSettings(stored) {
   if (!stored) return initialSettingsState
   if (stored.version === 1) {
-    const data = stored.data
+    const data = stored.data || {}
+    const equipmentProfile = getEquipmentProfileFromSettings(data)
     return {
       ...initialSettingsState,
       ...data,
+      equipmentProfile,
+      gymAccess: equipmentToGymAccess(equipmentProfile),
       modules: { ...initialSettingsState.modules, ...(data.modules || {}) },
     }
   }
@@ -45,9 +55,12 @@ function loadSettingsState() {
     if (legacyRaw) {
       const legacy = JSON.parse(legacyRaw)
       if (legacy.settings) {
+        const equipmentProfile = getEquipmentProfileFromSettings(legacy.settings)
         return {
           ...initialSettingsState,
           ...legacy.settings,
+          equipmentProfile,
+          gymAccess: equipmentToGymAccess(equipmentProfile),
           modules: { ...initialSettingsState.modules },
         }
       }
@@ -68,6 +81,14 @@ export function settingsReducer(state, action) {
   switch (action.type) {
     case 'UPDATE_SETTING': {
       const { key, value } = action.payload
+      if (key === 'equipmentProfile') {
+        const equipmentProfile = normalizeEquipmentProfile(value)
+        return {
+          ...state,
+          equipmentProfile,
+          gymAccess: equipmentToGymAccess(equipmentProfile),
+        }
+      }
       return { ...state, [key]: value }
     }
     case 'UPDATE_MODULE': {

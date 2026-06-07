@@ -3,7 +3,12 @@ import { useFitness }   from '../context/index.js'
 import { useSettings }  from '../context/SettingsContext.jsx'
 import { getTodayISO }  from '../utils/time.js'
 import { getPhase, getWeekNumber } from '../utils/fitness.js'
-import { PHASE_LABELS, GYM_ACCESS } from '../constants/fitness.js'
+import {
+  EQUIPMENT_OPTIONS,
+  PHASE_LABELS,
+  formatEquipmentProfileLabels,
+  getEquipmentProfileFromSettings,
+} from '../constants/fitness.js'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -168,29 +173,6 @@ function normalizeProgramType(type) {
   if (type === 'mobility' || type === 'recovery') return 'mobility_recovery'
   return type
 }
-
-const EQUIPMENT_OPTIONS = [
-  {
-    value: GYM_ACCESS.BODYWEIGHT,
-    title: 'Bodyweight only',
-    desc:  'No equipment needed. Anywhere, anytime.',
-  },
-  {
-    value: GYM_ACCESS.DUMBBELLS,
-    title: 'Dumbbells + bands',
-    desc:  'Home equipment bundle. Dumbbells, resistance bands, kettlebells.',
-  },
-  {
-    value: GYM_ACCESS.HOME_GYM,
-    title: 'Full home setup',
-    desc:  'Barbell, bench, rack, dumbbells, cables, and resistance training.',
-  },
-  {
-    value: GYM_ACCESS.FULL_GYM,
-    title: 'Full gym access',
-    desc:  'Complete facility. All machines, platforms, and training tools.',
-  },
-]
 
 // ─── Step 1 — Choose program ──────────────────────────────────────────────────
 
@@ -357,28 +339,30 @@ function Step4({ sortedSelectedDays, dayTypes, setDayTypes, selectedProgram }) {
 
 // ─── Step 5 — Equipment ───────────────────────────────────────────────────────
 
-function Step5({ equipment, onSelect }) {
+function Step5({ selectedEquipment, onToggle }) {
   return (
     <div style={sc.stepWrap}>
       <div style={sc.heading}>
         <h1 style={sc.h1}>What equipment do you have?</h1>
-        <p style={sc.sub}>Controls what exercises get generated.</p>
+        <p style={sc.sub}>Select all equipment workouts can assume.</p>
       </div>
-      <div style={sc.cardList}>
+      <div style={sc.equipmentGrid}>
         {EQUIPMENT_OPTIONS.map(opt => {
-          const active = equipment === opt.value
+          const active = selectedEquipment.includes(opt.value)
           return (
             <button
               key={opt.value}
+              type="button"
               style={{
-                ...sc.programCard,
+                ...sc.equipmentItem,
                 background: active ? 'var(--color-accent-bg)' : 'var(--color-card)',
                 border:     active ? '1.5px solid var(--color-accent)' : 'var(--border)',
+                color:      active ? 'var(--color-accent)' : 'var(--color-text)',
               }}
-              onClick={() => onSelect(opt.value)}
+              onClick={() => onToggle(opt.value)}
             >
-              <p style={sc.programTitle}>{opt.title}</p>
-              <p style={sc.programDesc}>{opt.desc}</p>
+              <span style={sc.equipmentCheckbox}>{active ? '✓' : ''}</span>
+              <span style={sc.equipmentLabel}>{opt.label}</span>
             </button>
           )
         })}
@@ -436,9 +420,9 @@ function Step6({ startDate, goalDate, showGoalDate, onStartDateChange, onGoalDat
 
 function Step7({
   selectedProgram, weeklyDays, sortedSelectedDays, dayTypes,
-  equipment, startDate, phaseLabel, weekNum, audioEnabled, onAudioToggle,
+  selectedEquipment, startDate, phaseLabel, weekNum, audioEnabled, onAudioToggle,
 }) {
-  const equipLabel  = EQUIPMENT_OPTIONS.find(e => e.value === equipment)?.title ?? equipment
+  const equipLabel  = formatEquipmentProfileLabels(selectedEquipment)
   const startDisplay = startDate
     ? new Date(startDate + 'T00:00:00').toLocaleDateString('en-US', {
         month: 'long', day: 'numeric', year: 'numeric',
@@ -524,7 +508,7 @@ export default function FitnessSetup({ onComplete, onBack, isEditing = false }) 
   })
   const [selectedDays, setSelectedDays]   = useState(() => existing.trainingDays ?? [])
   const [dayTypes, setDayTypes]           = useState(() => existing.dayTypes ?? {})
-  const [equipment, setEquipment]         = useState(() => settingsState.gymAccess || GYM_ACCESS.BODYWEIGHT)
+  const [selectedEquipment, setSelectedEquipment] = useState(() => getEquipmentProfileFromSettings(settingsState))
   const [startDate, setStartDate]         = useState(() => fitnessState.programStartDate || getTodayISO())
   const [goalDate, setGoalDate]           = useState(() => fitnessState.programEndDate || '')
   const [showGoalDate, setShowGoalDate]   = useState(() => Boolean(fitnessState.programEndDate))
@@ -610,9 +594,14 @@ export default function FitnessSetup({ onComplete, onBack, isEditing = false }) 
     }
   }
 
-  function handleEquipmentSelect(value) {
-    setEquipment(value)
-    settingsDispatch({ type: 'UPDATE_SETTING', payload: { key: 'gymAccess', value } })
+  function handleEquipmentToggle(value) {
+    setSelectedEquipment(current => {
+      const next = current.includes(value)
+        ? current.filter(item => item !== value)
+        : [...current, value]
+      settingsDispatch({ type: 'UPDATE_SETTING', payload: { key: 'equipmentProfile', value: next } })
+      return next
+    })
   }
 
   function handleStartDateChange(value) {
@@ -697,7 +686,7 @@ export default function FitnessSetup({ onComplete, onBack, isEditing = false }) 
           />
         )}
         {step === 5 && (
-          <Step5 equipment={equipment} onSelect={handleEquipmentSelect} />
+          <Step5 selectedEquipment={selectedEquipment} onToggle={handleEquipmentToggle} />
         )}
         {step === 6 && (
           <Step6
@@ -715,7 +704,7 @@ export default function FitnessSetup({ onComplete, onBack, isEditing = false }) 
             weeklyDays={weeklyDays}
             sortedSelectedDays={sortedSelectedDays}
             dayTypes={dayTypes}
-            equipment={equipment}
+            selectedEquipment={selectedEquipment}
             startDate={startDate}
             phaseLabel={PHASE_LABELS[phaseKey]}
             weekNum={weekNum}
@@ -878,6 +867,40 @@ const sc = {
     borderRadius: 'var(--radius-pill)',
     fontSize:     '9px',
     fontWeight:   600,
+  },
+  equipmentGrid: {
+    display:             'grid',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    gap:                 '8px',
+  },
+  equipmentItem: {
+    display:        'flex',
+    alignItems:     'center',
+    gap:            '7px',
+    minHeight:      '42px',
+    padding:        '9px 10px',
+    borderRadius:   'var(--radius-sm)',
+    textAlign:      'left',
+    cursor:         'pointer',
+    transition:     'border-color 0.15s, background 0.15s',
+  },
+  equipmentCheckbox: {
+    display:        'flex',
+    alignItems:     'center',
+    justifyContent: 'center',
+    width:          '16px',
+    height:         '16px',
+    borderRadius:   '3px',
+    border:         '1px solid currentColor',
+    fontSize:       '11px',
+    fontWeight:     700,
+    flexShrink:     0,
+  },
+  equipmentLabel: {
+    flex:       1,
+    fontSize:   '12px',
+    fontWeight: 600,
+    lineHeight: 1.25,
   },
 
   // Count pills (step 2)

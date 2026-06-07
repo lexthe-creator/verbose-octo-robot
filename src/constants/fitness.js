@@ -16,6 +16,83 @@ export const GYM_ACCESS = {
   GYM:        'gym',
 }
 
+export const EQUIPMENT_OPTIONS = [
+  { value: 'dumbbells', label: 'Dumbbells' },
+  { value: 'barbell', label: 'Barbell' },
+  { value: 'bench', label: 'Bench' },
+  { value: 'squat_rack', label: 'Squat rack' },
+  { value: 'cable_machine', label: 'Cable machine' },
+  { value: 'treadmill', label: 'Treadmill' },
+  { value: 'rower', label: 'Rower' },
+  { value: 'ski_erg', label: 'Ski erg' },
+  { value: 'sled', label: 'Sled' },
+  { value: 'resistance_bands', label: 'Resistance bands' },
+  { value: 'kettlebells', label: 'Kettlebells' },
+  { value: 'medicine_balls', label: 'Medicine balls' },
+]
+
+const EQUIPMENT_VALUES = new Set(EQUIPMENT_OPTIONS.map(option => option.value))
+
+export const LEGACY_ACCESS_TO_EQUIPMENT = {
+  [GYM_ACCESS.BODYWEIGHT]: [],
+  [GYM_ACCESS.DUMBBELLS]: ['dumbbells', 'resistance_bands'],
+  [GYM_ACCESS.HOME_GYM]: [
+    'dumbbells',
+    'barbell',
+    'bench',
+    'squat_rack',
+    'cable_machine',
+    'resistance_bands',
+    'kettlebells',
+  ],
+  [GYM_ACCESS.FULL_GYM]: EQUIPMENT_OPTIONS.map(option => option.value),
+  [GYM_ACCESS.GYM]: EQUIPMENT_OPTIONS.map(option => option.value),
+}
+
+export function normalizeEquipmentProfile(equipmentProfile = []) {
+  if (!Array.isArray(equipmentProfile)) return []
+  return [...new Set(equipmentProfile.filter(item => EQUIPMENT_VALUES.has(item)))]
+}
+
+export function equipmentToGymAccess(selectedEquipment = []) {
+  const equipment = normalizeEquipmentProfile(selectedEquipment)
+  if (equipment.length === 0) return GYM_ACCESS.BODYWEIGHT
+
+  const fullGymSignals = ['treadmill', 'rower', 'ski_erg', 'sled']
+  if (fullGymSignals.some(item => equipment.includes(item))) {
+    return GYM_ACCESS.FULL_GYM
+  }
+
+  const homeGymSignals = ['barbell', 'bench', 'squat_rack', 'cable_machine', 'kettlebells', 'medicine_balls']
+  if (homeGymSignals.some(item => equipment.includes(item))) {
+    return GYM_ACCESS.HOME_GYM
+  }
+
+  if (equipment.includes('dumbbells') || equipment.includes('resistance_bands')) {
+    return GYM_ACCESS.DUMBBELLS
+  }
+
+  return GYM_ACCESS.BODYWEIGHT
+}
+
+export function getEquipmentProfileFromSettings(settingsState = {}) {
+  const savedProfile = normalizeEquipmentProfile(settingsState.equipmentProfile)
+  if (savedProfile.length > 0 || Array.isArray(settingsState.equipmentProfile)) {
+    return savedProfile
+  }
+  return LEGACY_ACCESS_TO_EQUIPMENT[settingsState.gymAccess] ?? LEGACY_ACCESS_TO_EQUIPMENT[GYM_ACCESS.BODYWEIGHT]
+}
+
+export function getEquipmentLabel(value) {
+  return EQUIPMENT_OPTIONS.find(option => option.value === value)?.label ?? value
+}
+
+export function formatEquipmentProfileLabels(equipmentProfile = []) {
+  const normalized = normalizeEquipmentProfile(equipmentProfile)
+  if (normalized.length === 0) return 'Bodyweight / no equipment selected'
+  return normalized.map(getEquipmentLabel).join(', ')
+}
+
 export const PHASES = {
   BASE:   'base',
   BUILD:  'build',

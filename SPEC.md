@@ -1121,7 +1121,8 @@ Action: `UPDATE_PROFILE { key, value }`.
 ```js
 {
   theme:             'dark',
-  gymAccess:         'bodyweight', // 'bodyweight' | 'dumbbells' | 'home_gym' | 'full_gym' | legacy 'gym'
+  equipmentProfile:  [],           // actual equipment values selected by the user
+  gymAccess:         'bodyweight', // derived compatibility only: 'bodyweight' | 'dumbbells' | 'home_gym' | 'full_gym' | legacy 'gym'
   plaidConnected:    false,
   calendarConnected: false,
   modules: {
@@ -1957,7 +1958,7 @@ Do not implement Calendar behavior beyond the approved read-only V1 scope until 
 **Nav:** Hidden (back arrow header only).
 
 - **Profile card** — text input for `profile.name`; onBlur dispatches `UPDATE_PROFILE { name }`.
-- **Training card** — general equipment profile toggle (Bodyweight / Dumbbells / Home gym / Full gym); dispatches `UPDATE_SETTING { key: 'gymAccess', value }`. Controls which exercise list `generateWorkout` selects. Home gym should be treated as barbell/rack/cable capable, not dumbbell-only. Legacy `gym` values remain readable as full-gym access.
+- **Training card** — shows the current Equipment Profile as actual selected equipment, not access tiers. It should display selected equipment labels or `Bodyweight / no equipment selected` and route to training setup for edits. `equipmentProfile` is the source-of-truth setting. `gymAccess` is derived compatibility only for generator call sites that still require legacy access tiers.
 - **Program card** — start date input → `UPDATE_FITNESS { key: 'programStartDate', value }` · goal date input → `UPDATE_FITNESS { key: 'programEndDate', value }`. Both ISO date strings or null.
 - **Connections card** — Plaid (bank & spending) and Google Calendar rows. Stub `StubSheet` bottom-sheet explains V2 timeline.
 - **About card** — shows app version, current training phase label (`PHASE_LABELS[getPhase(programStartDate, programEndDate)]`), and week number (`getWeekNumber(programStartDate)`).
@@ -2287,12 +2288,17 @@ Supported V1 training lanes:
 - `custom` — user-authored or manually configured training rhythm.
 
 Equipment profiles:
-- `bodyweight` — bodyweight movement, walking/running, mobility; progression through reps, tempo, range, and unilateral work.
-- `dumbbells` — dumbbells and bodyweight; bench only when enabled by mapped exercise metadata.
-- `home_gym` — squat rack, barbell, bench, cable machine, dumbbells, and bodyweight. Treat as close to full gym, not dumbbell-only.
-- `full_gym` / legacy `gym` — home gym plus machines/cardio/specialty items when mapped.
+Equipment setup is a general profile setting for all generated workouts. It must not be race-specific. FitnessSetup, Health setup, and Settings use the same `equipmentProfile` contract: an array of actual equipment values selected by the user. User-facing equipment choices are `dumbbells`, `barbell`, `bench`, `squat_rack`, `cable_machine`, `treadmill`, `rower`, `ski_erg`, `sled`, `resistance_bands`, `kettlebells`, and `medicine_balls`.
 
-Equipment setup is a general profile setting for all generated workouts. It must not be race-specific. Fitness setup may ask what equipment the user has, but the saved value belongs to Settings and should influence every generated training lane. Sled, rower, ski erg, wall ball, farmer handles, and treadmill are equipment or exercise options only, not program categories.
+Programs and equipment are separate concepts. Program options remain Strength, Running, Hybrid Training, Mobility / Recovery, General Fitness, and Custom. Equipment should not be presented as program choice or as primary access-tier cards.
+
+Legacy access values may remain only as migration inputs or internal compatibility values:
+- `bodyweight` — maps to an empty equipment profile.
+- `dumbbells` — maps to dumbbells and resistance bands.
+- `home_gym` — maps to reasonable home equipment defaults: dumbbells, barbell, bench, squat rack, cable machine, resistance bands, and kettlebells.
+- `full_gym` / legacy `gym` — maps to the full actual equipment list.
+
+`gymAccess` is derived from `equipmentProfile` only for generator compatibility. If it remains persisted for now, every write to `equipmentProfile` must also update `gymAccess` through the shared `equipmentToGymAccess()` helper so the two values cannot drift. Sled, rower, ski erg, wall ball, farmer handles, and treadmill are equipment or exercise options only, not program categories.
 
 Movement-pattern selection must happen before exercise selection. Primary patterns include horizontal push, vertical push, horizontal pull, vertical pull, squat, and hinge. Secondary patterns include unilateral, glute dominant, carry, conditioning, and core. Strength, hybrid, and mobility/recovery sessions must include actual core work, prioritizing anti-extension, anti-rotation, and lateral-stability core before flexion.
 

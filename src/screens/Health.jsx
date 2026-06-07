@@ -7,7 +7,11 @@ import {
   useNutrition,
 } from '../context/index.js'
 import { useSettings } from '../context/SettingsContext.jsx'
-import { GYM_ACCESS, WORKOUT_TYPES } from '../constants/fitness.js'
+import {
+  EQUIPMENT_OPTIONS,
+  WORKOUT_TYPES,
+  getEquipmentProfileFromSettings,
+} from '../constants/fitness.js'
 import { getPhase, getTypeForDay, getWeekDates, getWeekNumber } from '../utils/fitness.js'
 import { generateWorkout } from '../utils/workoutGenerator.js'
 import { getWorkoutPreviewSections } from '../utils/workoutDisplay.js'
@@ -38,51 +42,6 @@ const GOAL_OPTIONS = [
 ]
 
 const DAYS_OPTIONS = [3, 4, 5, 6]
-
-// User-facing equipment options (actual equipment, not access tiers)
-const EQUIPMENT_OPTIONS = [
-  { value: 'dumbbells', label: 'Dumbbells' },
-  { value: 'barbell', label: 'Barbell' },
-  { value: 'bench', label: 'Bench' },
-  { value: 'squat_rack', label: 'Squat rack' },
-  { value: 'cable_machine', label: 'Cable machine' },
-  { value: 'treadmill', label: 'Treadmill' },
-  { value: 'rower', label: 'Rower' },
-  { value: 'ski_erg', label: 'Ski erg' },
-  { value: 'sled', label: 'Sled' },
-  { value: 'resistance_bands', label: 'Resistance bands' },
-  { value: 'kettlebells', label: 'Kettlebells' },
-  { value: 'medicine_balls', label: 'Medicine balls' },
-]
-
-// Legacy migration: map old gym access tiers to equipment defaults
-const LEGACY_ACCESS_TO_EQUIPMENT = {
-  [GYM_ACCESS.BODYWEIGHT]: [],
-  [GYM_ACCESS.DUMBBELLS]: ['dumbbells', 'resistance_bands'],
-  [GYM_ACCESS.HOME_GYM]: ['dumbbells', 'barbell', 'bench', 'resistance_bands', 'kettlebells'],
-  [GYM_ACCESS.FULL_GYM]: ['dumbbells', 'barbell', 'bench', 'squat_rack', 'cable_machine', 'treadmill', 'rower', 'kettlebells', 'medicine_balls'],
-}
-
-// Helper: Convert selected equipment array to internal gym access profile for generator
-function equipmentToGymAccess(selectedEquipment = []) {
-  if (!selectedEquipment || selectedEquipment.length === 0) {
-    return GYM_ACCESS.BODYWEIGHT
-  }
-  // If user has selected full gym equipment, map to full gym
-  const fullGymEquipment = ['squat_rack', 'cable_machine', 'treadmill', 'rower', 'ski_erg', 'sled']
-  if (fullGymEquipment.some(e => selectedEquipment.includes(e))) {
-    return GYM_ACCESS.FULL_GYM
-  }
-  // If user has barbell, bench, or home gym combo
-  if (selectedEquipment.includes('barbell') || selectedEquipment.includes('bench')) {
-    return GYM_ACCESS.HOME_GYM
-  }
-  // If dumbbells selected
-  if (selectedEquipment.includes('dumbbells')) {
-    return GYM_ACCESS.DUMBBELLS
-  }
-  return GYM_ACCESS.BODYWEIGHT
-}
 
 const TRAINING_DAYS_BY_COUNT = {
   3: ['mon', 'wed', 'fri'],
@@ -827,24 +786,17 @@ function OptionGrid({ options, value, onChange }) {
   )
 }
 
-function getEquipmentChoice(gymAccess) {
-  // Legacy migration: convert old gym access tier to equipment array
-  return LEGACY_ACCESS_TO_EQUIPMENT[gymAccess] || []
-}
-
 function PlanSetupSheet({ onClose }) {
   const { fitnessDispatch } = useFitness()
   const { settingsState, settingsDispatch } = useSettings()
   const [step, setStep] = useState(1)
   const [goal, setGoal] = useState('general')
   const [daysPerWeek, setDaysPerWeek] = useState(4)
-  const [selectedEquipment, setSelectedEquipment] = useState(() => getEquipmentChoice(settingsState.gymAccess))
+  const [selectedEquipment, setSelectedEquipment] = useState(() => getEquipmentProfileFromSettings(settingsState))
 
   function finish() {
     const trainingDays = TRAINING_DAYS_BY_COUNT[daysPerWeek] ?? TRAINING_DAYS_BY_COUNT[4]
-    // Convert selected equipment to gym access profile for generator
-    const gymAccessProfile = equipmentToGymAccess(selectedEquipment)
-    settingsDispatch({ type: 'UPDATE_SETTING', payload: { key: 'gymAccess', value: gymAccessProfile } })
+    settingsDispatch({ type: 'UPDATE_SETTING', payload: { key: 'equipmentProfile', value: selectedEquipment } })
     fitnessDispatch({
       type: 'CONFIGURE_PROGRAM',
       payload: {
