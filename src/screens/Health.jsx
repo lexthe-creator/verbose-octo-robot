@@ -353,12 +353,12 @@ function buildDayTypes(goal, days) {
   return Object.fromEntries(days.map((day, index) => [day, defaults[index] ?? defaults[0]]))
 }
 
-function DailyWorkoutActions({ status, workout, onStartWorkout, onLogWorkout }) {
+function DailyWorkoutActions({ status, workout, onStartWorkout, onLogWorkout, date }) {
   const { fitnessDispatch } = useFitness()
-  const today = getTodayISO()
+  const workoutDate = date ?? getTodayISO()
 
   function startWorkout() {
-    fitnessDispatch({ type: 'SET_WORKOUT_DAY_STATUS', payload: { date: today, status: 'in_progress' } })
+    fitnessDispatch({ type: 'SET_WORKOUT_DAY_STATUS', payload: { date: workoutDate, status: 'in_progress' } })
     onStartWorkout?.(workout)
   }
 
@@ -366,7 +366,7 @@ function DailyWorkoutActions({ status, workout, onStartWorkout, onLogWorkout }) 
     fitnessDispatch({
       type: 'LOG_WORKOUT',
       payload: {
-        date: today,
+        date: workoutDate,
         type: workout.type,
         title: workout.title,
         duration: workout.durationEst || 30,
@@ -381,7 +381,7 @@ function DailyWorkoutActions({ status, workout, onStartWorkout, onLogWorkout }) 
   }
 
   function setStatus(nextStatus) {
-    fitnessDispatch({ type: 'SET_WORKOUT_DAY_STATUS', payload: { date: today, status: nextStatus } })
+    fitnessDispatch({ type: 'SET_WORKOUT_DAY_STATUS', payload: { date: workoutDate, status: nextStatus } })
   }
 
   if (status === 'in_progress') {
@@ -646,7 +646,6 @@ function WeeklyTrainingPlan({ onStartWorkout, onLogWorkout }) {
   const [selectedIso, setSelectedIso] = useState(today)
   const selectedDate = weekDates.find(date => toLocalISO(date) === selectedIso) ?? weekDates[0]
   const selectedPlan = getTrainingDayPlan(fitnessState, settingsState, selectedDate)
-  const isSelectedToday = selectedPlan.iso === today
 
   return (
     <section style={{ ...s.trainingBlock, ...s.trainingPlanner }}>
@@ -682,18 +681,13 @@ function WeeklyTrainingPlan({ onStartWorkout, onLogWorkout }) {
           <>
             <WorkoutHeader workout={selectedPlan.workout} date={selectedDate} status={selectedPlan.status} />
             <WorkoutPreview workout={selectedPlan.workout} />
-            {isSelectedToday ? (
-              <DailyWorkoutActions
-                status={selectedPlan.status}
-                workout={selectedPlan.workout}
-                onStartWorkout={onStartWorkout}
-                onLogWorkout={onLogWorkout}
-              />
-            ) : (
-              <InlineActions>
-                <ActionButton secondary onClick={onLogWorkout}>log workout</ActionButton>
-              </InlineActions>
-            )}
+            <DailyWorkoutActions
+              status={selectedPlan.status}
+              workout={selectedPlan.workout}
+              onStartWorkout={onStartWorkout}
+              onLogWorkout={onLogWorkout}
+              date={selectedPlan.iso}
+            />
           </>
         ) : (
           <>

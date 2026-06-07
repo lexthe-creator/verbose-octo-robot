@@ -67,7 +67,8 @@ function TodayCard({ workout, todayComplete, isToday, onStart }) {
   const [expanded, setExpanded] = useState(false)
 
   const workoutType = workout.dayType ?? workout.type
-  const canStart    = isToday && workoutType !== 'rest' && !todayComplete
+  const isCompletedToday = isToday && todayComplete
+  const canStart    = workoutType !== 'rest' && !isCompletedToday
   const hasPreview  = workoutType !== 'rest' && workout.segments.length > 0
   const abbr        = TYPE_ABBR[workoutType] || '?'
 
@@ -126,19 +127,19 @@ function TodayCard({ workout, todayComplete, isToday, onStart }) {
       </div>
 
       {/* Collapsed-state start / completed button */}
-      {isToday && workoutType !== 'rest' && !expanded && (
+      {workoutType !== 'rest' && !expanded && (
         <button
           style={{
             ...tc.startBtn,
-            background: todayComplete ? 'var(--color-success-bg)' : 'var(--color-accent)',
-            color:      todayComplete ? 'var(--color-success)'    : '#fff',
-            border:     todayComplete ? '0.5px solid var(--color-success)' : 'none',
+            background: isCompletedToday ? 'var(--color-success-bg)' : 'var(--color-accent)',
+            color:      isCompletedToday ? 'var(--color-success)'    : '#fff',
+            border:     isCompletedToday ? '0.5px solid var(--color-success)' : 'none',
             cursor:     canStart ? 'pointer' : 'default',
           }}
           onClick={canStart ? onStart : undefined}
           disabled={!canStart}
         >
-          {todayComplete ? 'Completed' : 'Start'}
+          {isCompletedToday ? 'Completed' : 'Start'}
         </button>
       )}
     </div>

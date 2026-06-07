@@ -1949,10 +1949,10 @@ Do not implement Calendar behavior beyond the approved read-only V1 scope until 
 
 - **Header** — phase label (terracotta, small caps) + "Training" title + "Week N" badge. When `programEndDate` is set: accent "X weeks to race" line below (or "Race week!" when 0).
 - **Today card** — generated via `generateWorkout(getTodayType(), gymAccess, weekNum)` where `weekNum = getWeekNumber(programStartDate)`. Card header is tappable: toggles full workout preview with 300ms max-height animation. Preview shows WARM UP / MAIN / COOL DOWN sections; each row: name left + `3×10` or `2:00` right in accent. Footer: `~Xmin` + "Start Workout" button. Collapsed state shows original Start/Completed button.
-- **Weekly strip** — 7-column grid (Mon–Sun) labeled `M T W T F S S`. Selecting a day updates the workout details below using the configured program and the new `workoutGenerator` path.
+- **Weekly strip** — 7-column grid (Mon–Sun) labeled `M T W T F S S`. Selecting a day updates the workout details below using the configured program and the new `workoutGenerator` path. Any selected scheduled non-rest workout should expose Start Workout so the WorkoutPlayer remains reachable from the planner preview; a completed current-day workout may still show Completed instead.
 - **Journal** — last 5 entries from `fitness.workoutLog` (reverse order). Rows render date, workout focus, duration, completion marker, and RPE when present, e.g. `Jun 2 | Strength | 40 min | ● | RPE 6/10`. Use `Journal`, not History or Recent, for logged workout rows.
 - Fitness owns the primary full workout experience. Health Today may mirror compact training status only and must not duplicate the full workout preview, weekly planner, or exercise details.
-- Health → Training is allowed to show the selected day's generated workout before start. It should use the same generated workout data, render a compact planner-style segment preview grouped by warm up / main / cool down, and keep actions unchanged. This preview must not create a separate Health workout generator or separate workout state.
+- Health → Training is allowed to show the selected day's generated workout before start. It should use the same generated workout data, render a compact planner-style segment preview grouped by warm up / main / cool down, and keep actions unchanged except that scheduled non-rest selected days must expose a Start Workout handoff to the global WorkoutPlayer. This preview must not create a separate Health workout generator or separate workout state.
 
 ---
 
