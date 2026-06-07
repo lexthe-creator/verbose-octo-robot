@@ -61,7 +61,7 @@ Product direction:
 **Goal:** Turn AIML from a planner into an intelligent execution system.
 
 Finalized priorities:
-- Complete HYROX/workout execution architecture
+- Complete training/workout execution architecture
 - Nutrition simplification layer
 - Recovery + wellness system
 - Focus ecosystem
@@ -806,6 +806,29 @@ Rules:
 - Avoid all-caps section headers unless the current surface pattern already establishes them.
 - Do not use typography to create pressure, urgency, or gamified productivity framing.
 
+#### Design Baseline: Tasks Screen
+
+Tasks screen is the visual baseline for all planner-style screens across AIML.
+
+Reference pattern:
+- Divider-based rows with subtle `borderBottom` instead of cards
+- Quiet uppercase section labels (10–11px, 700 weight, 0.1em letter-spacing, muted color)
+- Right-aligned section counts
+- Simple circular completion controls (18px diameter, thin border, no fill until done)
+- Large readable primary text (task titles)
+- Muted secondary metadata below titles
+- No card backgrounds, shadows, rounded container borders, or visual elevation
+- Minimal pills or badges; status shown through typography and subtle indicators
+
+All planner screens (Tasks, Fitness, Health Training, Calendar, Plan, Nutrition) should follow this pattern unless explicitly justified and documented in a later SPEC section.
+
+Exceptions:
+- WorkoutPlayer may be full-screen immersive, but must use planner-style typography, dividers, quiet metadata, and minimal cards. Avoid dashboard tiles, pills, badges, and heavy shadows unless functionally necessary (e.g., step progress rail).
+- Guided execution screens (routines, workouts, check-ins) may use centered layouts or modal presentation, but should preserve planner typography and quiet visual hierarchy.
+- Setup/configuration flows may use form-style layouts but should maintain planner aesthetic and avoid dense controls.
+
+This ensures visual cohesion across execution, review, and planning surfaces.
+
 #### Layout rhythm
 
 Planner pages should use consistent mobile rhythm.
@@ -1058,7 +1081,7 @@ There is no `AppContext` in the current architecture. State is split across eigh
 | `aiml_user` | UserContext | `{ version: 1, data }` | Migrates `profile` from legacy `aiml_state` when present. |
 | `aiml_settings` | SettingsContext | `{ version: 1, data }` | Migrates `settings` from legacy `aiml_state`; backfills `modules` defaults. |
 | `aiml_day` | DayContext | `{ version: 1, data: {...} }` |
-| `aiml_fitness` | FitnessContext | `{ version: 2, data }` | v1→v2 adds `program`, `programConfig`, and `sets[]` on log entries. |
+| `aiml_fitness` | FitnessContext | `{ version: 3, data }` | v1→v2 adds `program`, `programConfig`, and `sets[]` on log entries; v2→v3 normalizes legacy program values such as `hyrox` to `hybrid`. |
 | `aiml_inbox` | InboxContext | `{ version: 2, data }` | v1→v2 backfills task priority, calendar confirmed flag, and note pinned flag. |
 | `aiml_projects` | ProjectsContext | `{ version: 1, data }` | Migrates projects from `aiml_state`; also migrates legacy `sheStitches` into the generic projects array. |
 | `aiml_finance` | FinanceContext | `{ version: 1, data }` | Migrates `transactions` from legacy `aiml_state`. |
@@ -1162,7 +1185,7 @@ Actions: `SET_ENERGY`, `CONFIRM_TASK`, `CONFIRM_MEAL`, `CONFIRM_WORKOUT`, `LOCK_
 
 Helpers exposed via `useDay()`: `updateTaskTime(taskId, time)`, `updateMealWindow(slot, startTime, endTime)`.
 
-### 4.4 FitnessContext (`aiml_fitness`, schema v2)
+### 4.4 FitnessContext (`aiml_fitness`, schema v3)
 
 ```js
 {
@@ -1189,7 +1212,7 @@ Helpers exposed via `useDay()`: `updateTaskTime(taskId, time)`, `updateMealWindo
   todayComplete:  false,   // true only if workoutLog[last].date === today; resets automatically on new day
   focusSessions:  0,       // lifetime counter — never resets
   program: {
-    type:       null,      // 'strength' | 'endurance' | 'general' | 'fat_loss'
+    type:       null,      // 'strength' | 'running' | 'hybrid' | 'mobility_recovery' | 'general' | 'custom'
     configured: false,     // true after setup wizard completes
   },
   programConfig: {
@@ -1202,7 +1225,7 @@ Helpers exposed via `useDay()`: `updateTaskTime(taskId, time)`, `updateMealWindo
 }
 ```
 
-Migration v1→v2: adds `program`, `programConfig`, and `sets: []` on existing `workoutLog` entries. Non-destructive.
+Migration v1→v2: adds `program`, `programConfig`, and `sets: []` on existing `workoutLog` entries. Migration v2→v3 normalizes legacy program values without changing workout history, set logs, training days, or day status. Non-destructive.
 
 `todayComplete` is self-contained: on load, FitnessContext checks `workoutLog[last].date === getTodayISO()` — no cross-context dependency.
 
@@ -1935,7 +1958,7 @@ Do not implement Calendar behavior beyond the approved read-only V1 scope until 
 
 - **Profile card** — text input for `profile.name`; onBlur dispatches `UPDATE_PROFILE { name }`.
 - **Training card** — general equipment profile toggle (Bodyweight / Dumbbells / Home gym / Full gym); dispatches `UPDATE_SETTING { key: 'gymAccess', value }`. Controls which exercise list `generateWorkout` selects. Home gym should be treated as barbell/rack/cable capable, not dumbbell-only. Legacy `gym` values remain readable as full-gym access.
-- **Program card** — start date input → `UPDATE_FITNESS { key: 'programStartDate', value }` · race date input → `UPDATE_FITNESS { key: 'programEndDate', value }`. Both ISO date strings or null.
+- **Program card** — start date input → `UPDATE_FITNESS { key: 'programStartDate', value }` · goal date input → `UPDATE_FITNESS { key: 'programEndDate', value }`. Both ISO date strings or null.
 - **Connections card** — Plaid (bank & spending) and Google Calendar rows. Stub `StubSheet` bottom-sheet explains V2 timeline.
 - **About card** — shows app version, current training phase label (`PHASE_LABELS[getPhase(programStartDate, programEndDate)]`), and week number (`getWeekNumber(programStartDate)`).
 
@@ -1947,7 +1970,7 @@ Do not implement Calendar behavior beyond the approved read-only V1 scope until 
 **Props:** `onStartWorkout(workout)` — App.jsx manages global WorkoutPlayer overlay.
 **Nav:** Shown (Fitness tab in bottom nav).
 
-- **Header** — phase label (terracotta, small caps) + "Training" title + "Week N" badge. When `programEndDate` is set: accent "X weeks to race" line below (or "Race week!" when 0).
+- **Header** — phase label (terracotta, small caps) + "Training" title + "Week N" badge. When `programEndDate` is set: accent "X weeks to goal" line below (or "Goal week" when 0).
 - **Today card** — generated via `generateWorkout(getTodayType(), gymAccess, weekNum)` where `weekNum = getWeekNumber(programStartDate)`. Card header is tappable: toggles full workout preview with 300ms max-height animation. Preview shows WARM UP / MAIN / COOL DOWN sections; each row: name left + `3×10` or `2:00` right in accent. Footer: `~Xmin` + "Start Workout" button. Collapsed state shows original Start/Completed button.
 - **Weekly strip** — 7-column grid (Mon–Sun) labeled `M T W T F S S`. Selecting a day updates the workout details below using the configured program and the new `workoutGenerator` path. Any selected scheduled non-rest workout should expose Start Workout so the WorkoutPlayer remains reachable from the planner preview; a completed current-day workout may still show Completed instead.
 - **Journal** — last 5 entries from `fitness.workoutLog` (reverse order). Rows render date, workout focus, duration, completion marker, and RPE when present, e.g. `Jun 2 | Strength | 40 min | ● | RPE 6/10`. Use `Journal`, not History or Recent, for logged workout rows.
@@ -2090,6 +2113,22 @@ Navigation:
 
 WorkoutPlayer V1 is a guided workout playback system. It may reuse the visual language of the previous player, but the logic should be organized around safe step-by-step execution, not around patching the old segment UI.
 
+WorkoutPlayer should follow the current Planner Design System as its primary visual reference, with the Tasks screen as its closest visual baseline. It should feel like App in My Life's newer planner-style surfaces, not an isolated early prototype or a heavy workout dashboard.
+
+Visual direction:
+- Keep the new playback system; do not revert normalized steps, first-class rest, phase-local progress, autoplay, resume, or safe Previous/Next/Exit behavior.
+- Reduce heavy card stacking. The player should not feel like multiple boxed modules piled on top of each other.
+- Make the video/GIF placeholder the primary visual anchor, integrated into the active playback surface rather than inserted as a utility block.
+- Current exercise/rest/action is the clear primary focus.
+- Phase progress and Next Up remain visible but quiet. They should orient the user without competing with the active movement.
+- Equipment, substitutions, coach cues, and weight guidance belong in secondary expandable or visually quiet sections.
+- Bottom playback controls remain persistent and simple: Previous, Pause/Resume, Next, and Autoplay On/Off must stay reachable.
+- Use planner-style spacing, typography, dividers, and hierarchy. Avoid old quad/card-heavy styling.
+- Use planner rows, divider lines, quiet uppercase structural labels, muted metadata, and simple persistent controls.
+- Avoid dashboard cards, pills, tiles, chips, boxed metric modules, and heavy card stacks unless explicitly required for an alert or modal.
+- The current exercise should be the primary text focus; equipment, swaps, coach cues, and weight guidance should appear as secondary inline rows or collapsible details, not separate cards.
+- Uppercase labels are allowed in WorkoutPlayer only where they intentionally mirror Tasks-style structural labels.
+
 Full-screen `position: fixed` overlay (`z-index: 150`). It normalizes `workout.segments[]` into executable phase steps and flows through those steps sequentially.
 
 V1 priorities:
@@ -2149,7 +2188,7 @@ Step shape:
 | Kind | Renderer | Behavior |
 |---|---|---|
 | `timed` | `TimedSegment` | Countdown against target duration; pause/resume aware; can autoplay to next step when complete |
-| `text` | `TextSegment` | Static card with name + instruction detail |
+| `text` | `TextSegment` | Static planner step with name + instruction detail |
 | `sets_reps` / `exercise` | `ExerciseSegment` | Set rows (tap to mark done); set data persists while navigating previous/next |
 | `rest` | `RestSegment` | First-class countdown step with skip/next and autoplay behavior |
 
@@ -2169,8 +2208,20 @@ Rest should render its own `Next: [actual next exercise]` detail when the next e
 **Ladder-style execution layer:** after the basic playback controls are stable, WorkoutPlayer may add lightweight execution affordances without changing the saved workout schema:
 - Autoplay toggle should be visible and readable as `Autoplay On` / `Autoplay Off`.
 - The video/GIF placeholder area should stay visible as a future media slot.
-- Coach cues from exercise metadata should surface during exercise playback as short scannable cues.
-- Equipment-compatible substitutions may be shown as compact swap options. Choosing a substitution should preserve the current prescription and set-row structure while logging the substituted exercise name/id.
+- Coach cues from exercise metadata should surface during exercise playback as short scannable cues, but should remain collapsed or visually quiet behind secondary detail.
+- Equipment-compatible substitutions may be shown as compact swap options in secondary detail. Choosing a substitution should preserve the current prescription and set-row structure while logging the substituted exercise name/id.
+
+**Follow-up task:** Align Workout Player with planner-style design system.
+
+Acceptance criteria:
+- Uses the newer planner-style layout as the design reference.
+- Removes old quad/card-heavy styling from player.
+- Current exercise is the clear primary focus.
+- Video placeholder is visually integrated.
+- Secondary details are collapsed or visually quiet.
+- Bottom playback controls remain persistent.
+- Autoplay remains available.
+- Phase progress remains visible but not dominant.
 
 **Post-workout log:** (`PostWorkoutLog`) — elapsed timer, 5-emoji feel selector, workout-level RPE 1-10 selector, notes textarea, "Save workout" → calls `onComplete({ date, type, title, duration, feel, rpe, notes, exercises[], sets[] })`. App.jsx dispatches `LOG_WORKOUT` and clears `activeWorkout`.
 
@@ -2219,11 +2270,21 @@ It should generate workouts from:
 - exercise mapping
 - executable workout playback steps
 
+Training program language:
+- Programs are broad training styles, not race brands.
+- Program options are Strength, Running, Hybrid Training, Mobility / Recovery, General Fitness, and Custom.
+- AIML uses "Hybrid Training" as the general conditioning/strength-endurance program language.
+- AIML must not use race-brand-specific language in default setup, navigation, workout cards, player labels, generator names, or equipment setup.
+- Race/event-specific language may only appear if a future event-goal feature is explicitly enabled by the user.
+- Do not use HYROX, HYROX equipment, HYROX simulation, HYROX stations, a HYROX-specific generator, or race prep as default product language.
+
 Supported V1 training lanes:
 - `strength` — strength, muscle, body composition, joint health; roughly 80% strength and 20% conditioning/recovery.
-- `hybrid` — strength, conditioning, athleticism, and work capacity; roughly 60% strength and 40% conditioning.
+- `hybrid` — Hybrid Training: strength, conditioning, athleticism, and work capacity; roughly 60% strength and 40% conditioning.
 - `running` — aerobic capacity, running performance, and injury-risk reduction; roughly 70% running and 30% strength/mobility.
 - `mobility_recovery` — movement quality, low-intensity movement, core stability, and downshift work.
+- `general` — balanced general fitness using simple strength, conditioning, running, and recovery defaults.
+- `custom` — user-authored or manually configured training rhythm.
 
 Equipment profiles:
 - `bodyweight` — bodyweight movement, walking/running, mobility; progression through reps, tempo, range, and unilateral work.
@@ -2231,7 +2292,7 @@ Equipment profiles:
 - `home_gym` — squat rack, barbell, bench, cable machine, dumbbells, and bodyweight. Treat as close to full gym, not dumbbell-only.
 - `full_gym` / legacy `gym` — home gym plus machines/cardio/specialty items when mapped.
 
-Equipment setup is a general profile setting for all generated workouts. It must not be HYROX-specific. Fitness setup may ask what equipment the user has, but the saved value belongs to Settings and should influence every generated training lane.
+Equipment setup is a general profile setting for all generated workouts. It must not be race-specific. Fitness setup may ask what equipment the user has, but the saved value belongs to Settings and should influence every generated training lane. Sled, rower, ski erg, wall ball, farmer handles, and treadmill are equipment or exercise options only, not program categories.
 
 Movement-pattern selection must happen before exercise selection. Primary patterns include horizontal push, vertical push, horizontal pull, vertical pull, squat, and hinge. Secondary patterns include unilateral, glute dominant, carry, conditioning, and core. Strength, hybrid, and mobility/recovery sessions must include actual core work, prioritizing anti-extension, anti-rotation, and lateral-stability core before flexion.
 
@@ -2245,6 +2306,8 @@ Program structures:
 - Running 3 days: Run, Run, Run.
 - Running 4 days: Run, Run, Run, Run.
 - Running 5 days: Run, Run, Run, Run, Run.
+- General Fitness uses the Hybrid Training structure as a balanced default unless the user customizes days.
+- Custom uses user-selected day types without implying a generated race program.
 
 Duration rules:
 - 30 minutes: 4-5 movements, 2-3 sets, one core movement, minimal accessories.
@@ -2285,6 +2348,12 @@ Acceptance criteria:
 - Recovery workouts are easy, restorative, and not mislabeled workouts.
 - Training preview answers: "What am I doing today?"
 - WorkoutPlayer answers: "What am I doing right now?"
+- No user-facing HYROX language remains.
+- Program setup shows Hybrid Training, not HYROX.
+- Equipment setup is general and not race-specific.
+- Generator names and comments avoid race-brand assumptions where practical.
+- Existing stored `hyrox` values migrate safely to `hybrid`.
+- Tests use Hybrid Training naming rather than race-brand naming.
 
 Do not make AIML a generic fitness app. Build it as a planner-first training system with enough coaching structure to feel intentional, safe, and useful.
 
@@ -2306,7 +2375,7 @@ Do not make AIML a generic fitness app. Build it as a planner-first training sys
 `generateTrainingProgram(config)` may be used when a weekly structure is needed:
 ```js
 {
-  programType: 'strength' | 'hybrid' | 'running' | 'mobility_recovery',
+  programType: 'strength' | 'hybrid' | 'running' | 'mobility_recovery' | 'general' | 'custom',
   daysPerWeek: 3 | 4 | 5,
   equipment: string,
   durationMinutes: 30 | 45 | 60,
@@ -2597,6 +2666,7 @@ File: `.github/workflows/pages.yml`
 | 14b-i | Remove HYROX, fitness program schema v2, selectors, phase config | ✅ Done | `src/constants/fitness.js` (PHASES: base/build/peak/deload; PHASE_LABELS updated), `src/utils/fitness.js` (getPhase 13-week cycle, getPhaseConfig, getDayTypeLabel; hyroxStation removed; hyrox segment field removed), `src/utils/fitnessSelectors.js` (getExerciseHistory, getLastPerformance, getTodayWorkoutType, getWeekStrip), `src/context/FitnessContext.jsx` (schema v2 + v1→v2 migration; program/programConfig state; CONFIGURE_PROGRAM, UPDATE_PROGRAM_CONFIG, LOG_WORKOUT_SETS actions), `src/components/WorkoutPlayer.jsx` (HYROX station badge removed) |
 | 14b-ii | Exercise library data files | ✅ Done | `src/data/exercises.js` (EXERCISES: upper/lower/full_body/push/pull/mobility, 3 equipment tiers, 90+ exercises), `src/data/runSegments.js` (RUN_SEGMENTS: warmup/cooldown/main segments, pure data) |
 | 14b-iii | Workout generator — pure functions, progressive overload, run segments | ✅ Done | `src/utils/workoutGenerator.js` (getExercisePool, selectExercises, getLoadSuggestion, buildStrengthWorkout, buildRunWorkout, buildMobilityWorkout, generateWorkout — new config-based API), `src/utils/fitness.js` (@deprecated on old generateWorkout) |
+| 14b-iv | Hybrid Training product language cleanup | ✅ Done | `SPEC.md` (broad training-style language rule), `src/utils/fitnessMigration.js` + `src/context/FitnessContext.jsx` (schema v3 and legacy value normalization), `src/screens/FitnessSetup.jsx`, `src/screens/Health.jsx`, `src/screens/Fitness.jsx`, `src/screens/Settings.jsx`, `src/screens/Plan.jsx`, `src/utils/workoutGenerator.js`, tests |
 | 15 | Calendar V1 read-only capacity planner | ✅ Done | `src/screens/Calendar.jsx`, `src/App.jsx`, `SPEC.md` |
 | 16 | Tasks V1 committed-actions surface | ✅ Done | `src/screens/Tasks.jsx`, `src/App.jsx`, `SPEC.md` |
 

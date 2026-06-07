@@ -20,6 +20,27 @@ const DAILY_AFFIRMATIONS = [
   'the day is still yours',
 ]
 
+const TRAINING_LABELS = {
+  strength: 'Strength',
+  running: 'Running',
+  hybrid: 'Hybrid Training',
+  mobility_recovery: 'Mobility / Recovery',
+  general: 'General Fitness',
+  custom: 'Custom',
+  upper: 'Upper',
+  lower: 'Lower',
+  full_body: 'Full Body',
+  run: 'Run',
+  run_easy: 'Run',
+  run_tempo: 'Run',
+  run_long: 'Run',
+  mobility: 'Mobility',
+}
+
+function formatTrainingLabel(value) {
+  return TRAINING_LABELS[value] ?? String(value ?? 'workout').replaceAll('_', ' ')
+}
+
 export default function Plan({ onNavigate }) {
   const { planningState, planningDispatch } = usePlanning()
   const { dayState, dayDispatch, updateTaskTime } = useDay()
@@ -42,6 +63,7 @@ export default function Plan({ onNavigate }) {
   const workoutPlanned = dayState.workout?.time || dayState.workoutConfirmed || dayState.workout?.confirmed
   const trainingDayName = new Date().toLocaleDateString(undefined, { weekday: 'short' }).toLowerCase()
   const programType = fitnessState.programConfig?.dayTypes?.[trainingDayName] ?? fitnessState.program?.type
+  const programLabel = formatTrainingLabel(programType)
   const fitnessCount = workoutPlanned || programType ? 1 : 0
   const summaryRows = [
     { label: 'tasks', count: tasks.length },
@@ -155,7 +177,7 @@ export default function Plan({ onNavigate }) {
         <SectionHeader title="fitness" meta={fitnessState.todayComplete ? 'done' : 'planned'} />
         {workoutPlanned ? (
           <CommitmentRow
-            label={dayState.workout?.type ?? programType ?? 'workout'}
+            label={dayState.workout?.type ? formatTrainingLabel(dayState.workout.type) : programLabel}
             done={fitnessState.todayComplete}
             trailing={(
               <TimeEditor
@@ -171,7 +193,7 @@ export default function Plan({ onNavigate }) {
             )}
           />
         ) : (
-          <EmptyLine text={programType ? `${programType} available today` : 'no workout committed today'} />
+          <EmptyLine text={programType ? `${programLabel} available today` : 'no workout committed today'} />
         )}
       </section>
 

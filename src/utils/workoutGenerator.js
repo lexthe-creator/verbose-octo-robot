@@ -10,6 +10,8 @@ const PROGRAM_TYPES = {
   HYBRID:            'hybrid',
   RUNNING:           'running',
   MOBILITY_RECOVERY: 'mobility_recovery',
+  GENERAL:           'general',
+  CUSTOM:            'custom',
 }
 
 const EQUIPMENT_PROFILE = {
@@ -888,6 +890,46 @@ const PROGRAM_STRUCTURES = {
       { title: 'Stretch / Downshift', dayType: 'mobility', purpose: 'downshift' },
     ],
   },
+  [PROGRAM_TYPES.GENERAL]: {
+    3: [
+      { title: 'Full Body', dayType: 'full_body', purpose: 'balanced strength' },
+      { title: 'Run', dayType: 'run', purpose: 'conditioning' },
+      { title: 'Mobility', dayType: 'mobility', purpose: 'recovery' },
+    ],
+    4: [
+      { title: 'Upper', dayType: 'upper', purpose: 'upper strength' },
+      { title: 'Lower', dayType: 'lower', purpose: 'lower strength' },
+      { title: 'Run', dayType: 'run', purpose: 'conditioning' },
+      { title: 'Mobility', dayType: 'mobility', purpose: 'recovery' },
+    ],
+    5: [
+      { title: 'Upper', dayType: 'upper', purpose: 'upper strength' },
+      { title: 'Lower', dayType: 'lower', purpose: 'lower strength' },
+      { title: 'Run', dayType: 'run', purpose: 'conditioning' },
+      { title: 'Full Body', dayType: 'full_body', purpose: 'balanced strength' },
+      { title: 'Mobility', dayType: 'mobility', purpose: 'recovery' },
+    ],
+  },
+  [PROGRAM_TYPES.CUSTOM]: {
+    3: [
+      { title: 'Custom', dayType: 'custom', purpose: 'user planned' },
+      { title: 'Custom', dayType: 'custom', purpose: 'user planned' },
+      { title: 'Custom', dayType: 'custom', purpose: 'user planned' },
+    ],
+    4: [
+      { title: 'Custom', dayType: 'custom', purpose: 'user planned' },
+      { title: 'Custom', dayType: 'custom', purpose: 'user planned' },
+      { title: 'Custom', dayType: 'custom', purpose: 'user planned' },
+      { title: 'Custom', dayType: 'custom', purpose: 'user planned' },
+    ],
+    5: [
+      { title: 'Custom', dayType: 'custom', purpose: 'user planned' },
+      { title: 'Custom', dayType: 'custom', purpose: 'user planned' },
+      { title: 'Custom', dayType: 'custom', purpose: 'user planned' },
+      { title: 'Custom', dayType: 'custom', purpose: 'user planned' },
+      { title: 'Custom', dayType: 'custom', purpose: 'user planned' },
+    ],
+  },
 }
 
 export function getProgramStructure(programType, daysPerWeek) {
@@ -931,8 +973,9 @@ export function generateTrainingProgram(config = {}) {
 }
 
 function normalizeProgramType(programType) {
+  if (programType === 'hyrox') return PROGRAM_TYPES.HYBRID
   if (programType === 'endurance') return PROGRAM_TYPES.RUNNING
-  if (programType === 'general' || programType === 'fat_loss') return PROGRAM_TYPES.HYBRID
+  if (programType === 'fat_loss') return PROGRAM_TYPES.GENERAL
   if (programType === 'mobility' || programType === 'recovery') return PROGRAM_TYPES.MOBILITY_RECOVERY
   return programType || PROGRAM_TYPES.STRENGTH
 }

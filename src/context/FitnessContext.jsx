@@ -1,10 +1,11 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useReducer, useEffect } from 'react'
 import { getTodayISO } from '../utils/time.js'
+import { migrateFitnessStateToV3, normalizeFitnessProgramType } from '../utils/fitnessMigration.js'
 import { logWorkout, setWorkoutDayStatus } from './fitnessReducer.js'
 
 const FITNESS_STORAGE_KEY = 'aiml_fitness'
-const SCHEMA_VERSION      = 2
+const SCHEMA_VERSION      = 3
 
 /* ─── Initial state ───────────────────────────────────────────────────────── */
 const initialFitnessState = {
@@ -15,7 +16,7 @@ const initialFitnessState = {
   todayComplete:    false,
   focusSessions:    0,
   program: {
-    type:       null,  // 'strength' | 'endurance' | 'general' | 'fat_loss'
+    type:       null,
     configured: false,
   },
   programConfig: {
@@ -75,7 +76,8 @@ function migrateFitnessFromLegacy(legacyRaw) {
       workoutDayStatus: {},
       focusSessions,
     }
-    return { ...candidate, todayComplete: resolveTodayComplete(candidate) }
+    const migrated = migrateFitnessStateToV3(candidate, initialFitnessState)
+    return { ...migrated, todayComplete: resolveTodayComplete(migrated) }
   } catch {
     return initialFitnessState
   }
@@ -95,9 +97,17 @@ function loadFitnessState() {
           todayComplete: resolveTodayComplete(data),
         }
       }
+      if (stored.version === 2) {
+        const migrated = migrateFitnessStateToV3(stored.data, initialFitnessState)
+        return {
+          ...initialFitnessState,
+          ...migrated,
+          todayComplete: resolveTodayComplete(migrated),
+        }
+      }
       // v1 → v2: add program, programConfig, sets[] on log entries
       if (stored.version === 1) {
-        const migrated = migrateV1ToV2(stored.data)
+        const migrated = migrateFitnessStateToV3(migrateV1ToV2(stored.data), initialFitnessState)
         return {
           ...initialFitnessState,
           ...migrated,
@@ -152,13 +162,14 @@ export function fitnessReducer(state, action) {
 
     case 'CONFIGURE_PROGRAM': {
       const { type, trainingDays, dayTypes, goal, audioEnabled } = action.payload
+      const normalizedType = normalizeFitnessProgramType(type)
       return {
         ...state,
-        program: { type, configured: true },
+        program: { type: normalizedType, configured: true },
         programConfig: {
           trainingDays,
           dayTypes,
-          goal,
+          goal: normalizeFitnessProgramType(goal ?? normalizedType),
           audioEnabled,
           weeklyDays: trainingDays.length,
         },
@@ -167,9 +178,10 @@ export function fitnessReducer(state, action) {
 
     case 'UPDATE_PROGRAM_CONFIG': {
       const { key, value } = action.payload
+      const nextValue = key === 'goal' ? normalizeFitnessProgramType(value) : value
       return {
         ...state,
-        programConfig: { ...state.programConfig, [key]: value },
+        programConfig: { ...state.programConfig, [key]: nextValue },
       }
     }
 

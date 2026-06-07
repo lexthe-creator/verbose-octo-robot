@@ -29,22 +29,60 @@ const FEEL_OPTIONS = [
 ]
 
 const GOAL_OPTIONS = [
-  { value: 'general', label: 'General fitness' },
-  { value: 'fat_loss', label: 'Fat loss' },
   { value: 'strength', label: 'Strength' },
-  { value: 'endurance', label: 'Running' },
-  { value: 'hyrox', label: 'HYROX' },
+  { value: 'running', label: 'Running' },
+  { value: 'hybrid', label: 'Hybrid Training' },
+  { value: 'mobility_recovery', label: 'Mobility / Recovery' },
+  { value: 'general', label: 'General Fitness' },
   { value: 'custom', label: 'Custom' },
 ]
 
 const DAYS_OPTIONS = [3, 4, 5, 6]
 
+// User-facing equipment options (actual equipment, not access tiers)
 const EQUIPMENT_OPTIONS = [
-  { value: 'bodyweight', access: GYM_ACCESS.BODYWEIGHT, label: 'Bodyweight' },
-  { value: 'dumbbells', access: GYM_ACCESS.DUMBBELLS, label: 'Dumbbells' },
-  { value: 'home_gym', access: GYM_ACCESS.HOME_GYM, label: 'Home gym' },
-  { value: 'full_gym', access: GYM_ACCESS.FULL_GYM, label: 'Full gym' },
+  { value: 'dumbbells', label: 'Dumbbells' },
+  { value: 'barbell', label: 'Barbell' },
+  { value: 'bench', label: 'Bench' },
+  { value: 'squat_rack', label: 'Squat rack' },
+  { value: 'cable_machine', label: 'Cable machine' },
+  { value: 'treadmill', label: 'Treadmill' },
+  { value: 'rower', label: 'Rower' },
+  { value: 'ski_erg', label: 'Ski erg' },
+  { value: 'sled', label: 'Sled' },
+  { value: 'resistance_bands', label: 'Resistance bands' },
+  { value: 'kettlebells', label: 'Kettlebells' },
+  { value: 'medicine_balls', label: 'Medicine balls' },
 ]
+
+// Legacy migration: map old gym access tiers to equipment defaults
+const LEGACY_ACCESS_TO_EQUIPMENT = {
+  [GYM_ACCESS.BODYWEIGHT]: [],
+  [GYM_ACCESS.DUMBBELLS]: ['dumbbells', 'resistance_bands'],
+  [GYM_ACCESS.HOME_GYM]: ['dumbbells', 'barbell', 'bench', 'resistance_bands', 'kettlebells'],
+  [GYM_ACCESS.FULL_GYM]: ['dumbbells', 'barbell', 'bench', 'squat_rack', 'cable_machine', 'treadmill', 'rower', 'kettlebells', 'medicine_balls'],
+}
+
+// Helper: Convert selected equipment array to internal gym access profile for generator
+function equipmentToGymAccess(selectedEquipment = []) {
+  if (!selectedEquipment || selectedEquipment.length === 0) {
+    return GYM_ACCESS.BODYWEIGHT
+  }
+  // If user has selected full gym equipment, map to full gym
+  const fullGymEquipment = ['squat_rack', 'cable_machine', 'treadmill', 'rower', 'ski_erg', 'sled']
+  if (fullGymEquipment.some(e => selectedEquipment.includes(e))) {
+    return GYM_ACCESS.FULL_GYM
+  }
+  // If user has barbell, bench, or home gym combo
+  if (selectedEquipment.includes('barbell') || selectedEquipment.includes('bench')) {
+    return GYM_ACCESS.HOME_GYM
+  }
+  // If dumbbells selected
+  if (selectedEquipment.includes('dumbbells')) {
+    return GYM_ACCESS.DUMBBELLS
+  }
+  return GYM_ACCESS.BODYWEIGHT
+}
 
 const TRAINING_DAYS_BY_COUNT = {
   3: ['mon', 'wed', 'fri'],
@@ -55,10 +93,10 @@ const TRAINING_DAYS_BY_COUNT = {
 
 const DAY_TYPE_DEFAULTS = {
   general:   ['run', 'upper', 'lower', 'full_body', 'mobility', 'run'],
-  fat_loss:  ['run', 'full_body', 'upper', 'lower', 'mobility', 'run'],
   strength:  ['upper', 'lower', 'upper', 'lower', 'full_body', 'mobility'],
-  endurance: ['run', 'upper', 'run', 'lower', 'mobility', 'run'],
-  hyrox:     ['run', 'full_body', 'run', 'upper', 'lower', 'mobility'],
+  running:   ['run', 'upper', 'run', 'lower', 'mobility', 'run'],
+  hybrid:    ['run', 'full_body', 'run', 'upper', 'lower', 'mobility'],
+  mobility_recovery: ['mobility', 'mobility', 'mobility', 'mobility', 'run', 'mobility'],
   custom:    ['full_body', 'run', 'mobility', 'upper', 'lower', 'custom'],
 }
 
@@ -303,7 +341,8 @@ function workoutFocus(type, title = '') {
   if (type === WORKOUT_TYPES.STRENGTH_B) return 'lower'
   if (type === WORKOUT_TYPES.EASY_RUN || type === WORKOUT_TYPES.TEMPO_RUN || type === WORKOUT_TYPES.LONG_RUN) return 'run'
   if (type === WORKOUT_TYPES.STRETCH) return 'mobility'
-  if (String(type).toLowerCase() === 'hyrox' || title.toLowerCase().includes('hyrox')) return 'HYROX'
+  // Legacy migration: map old 'hyrox' program type to 'hybrid training' focus
+  if (String(type).toLowerCase() === 'hyrox' || title.toLowerCase().includes('hyrox')) return 'hybrid training'
   if (title.toLowerCase().includes('full')) return 'full'
   if (title.toLowerCase().includes('mobility')) return 'mobility'
   if (title.toLowerCase().includes('run')) return 'run'
@@ -789,10 +828,8 @@ function OptionGrid({ options, value, onChange }) {
 }
 
 function getEquipmentChoice(gymAccess) {
-  if (gymAccess === GYM_ACCESS.HOME_GYM) return 'home_gym'
-  if (gymAccess === GYM_ACCESS.FULL_GYM || gymAccess === GYM_ACCESS.GYM) return 'full_gym'
-  if (gymAccess === GYM_ACCESS.DUMBBELLS) return 'dumbbells'
-  return 'bodyweight'
+  // Legacy migration: convert old gym access tier to equipment array
+  return LEGACY_ACCESS_TO_EQUIPMENT[gymAccess] || []
 }
 
 function PlanSetupSheet({ onClose }) {
@@ -801,12 +838,13 @@ function PlanSetupSheet({ onClose }) {
   const [step, setStep] = useState(1)
   const [goal, setGoal] = useState('general')
   const [daysPerWeek, setDaysPerWeek] = useState(4)
-  const [equipment, setEquipment] = useState(() => getEquipmentChoice(settingsState.gymAccess))
+  const [selectedEquipment, setSelectedEquipment] = useState(() => getEquipmentChoice(settingsState.gymAccess))
 
   function finish() {
     const trainingDays = TRAINING_DAYS_BY_COUNT[daysPerWeek] ?? TRAINING_DAYS_BY_COUNT[4]
-    const equipmentAccess = EQUIPMENT_OPTIONS.find(option => option.value === equipment)?.access ?? GYM_ACCESS.BODYWEIGHT
-    settingsDispatch({ type: 'UPDATE_SETTING', payload: { key: 'gymAccess', value: equipmentAccess } })
+    // Convert selected equipment to gym access profile for generator
+    const gymAccessProfile = equipmentToGymAccess(selectedEquipment)
+    settingsDispatch({ type: 'UPDATE_SETTING', payload: { key: 'gymAccess', value: gymAccessProfile } })
     fitnessDispatch({
       type: 'CONFIGURE_PROGRAM',
       payload: {
@@ -819,6 +857,14 @@ function PlanSetupSheet({ onClose }) {
     })
     fitnessDispatch({ type: 'UPDATE_FITNESS', payload: { key: 'programStartDate', value: getTodayISO() } })
     onClose()
+  }
+
+  function toggleEquipment(equipmentValue) {
+    setSelectedEquipment(current =>
+      current.includes(equipmentValue)
+        ? current.filter(e => e !== equipmentValue)
+        : [...current, equipmentValue]
+    )
   }
 
   return (
@@ -839,7 +885,23 @@ function PlanSetupSheet({ onClose }) {
       {step === 3 && (
         <div style={s.sheetBody}>
           <SectionHeader eyebrow="equipment" title="What can workouts assume?" />
-          <OptionGrid options={EQUIPMENT_OPTIONS} value={equipment} onChange={setEquipment} />
+          <p style={s.equipmentHint}>Select all equipment available to you.</p>
+          <div style={s.equipmentGrid}>
+            {EQUIPMENT_OPTIONS.map(option => {
+              const isSelected = selectedEquipment.includes(option.value)
+              return (
+                <button
+                  key={option.value}
+                  style={{ ...s.equipmentItem, ...(isSelected ? s.equipmentItemSelected : {}) }}
+                  onClick={() => toggleEquipment(option.value)}
+                  type="button"
+                >
+                  <span style={s.equipmentCheckbox}>{isSelected ? '✓' : ''}</span>
+                  <span style={s.equipmentLabel}>{option.label}</span>
+                </button>
+              )
+            })}
+          </div>
         </div>
       )}
       <div style={s.sheetActions}>
@@ -1702,6 +1764,52 @@ const s = {
     borderColor: 'var(--color-accent)',
     background:  'var(--color-accent-bg)',
     color:       'var(--color-accent)',
+  },
+  equipmentHint: {
+    margin:    '0 0 8px',
+    color:     'var(--color-muted)',
+    fontSize:  '11px',
+    lineHeight: 1.3,
+  },
+  equipmentGrid: {
+    display:    'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    gap:        '8px',
+  },
+  equipmentItem: {
+    display:        'flex',
+    alignItems:     'center',
+    gap:            '6px',
+    padding:        '8px 10px',
+    border:         'var(--border)',
+    borderRadius:   'var(--radius-sm)',
+    background:     'transparent',
+    color:          'var(--color-text)',
+    fontSize:       '12px',
+    fontWeight:     500,
+    textAlign:      'left',
+    cursor:         'pointer',
+    transition:     'border-color 0.15s, background 0.15s',
+  },
+  equipmentItemSelected: {
+    borderColor: 'var(--color-accent)',
+    background:  'var(--color-accent-bg)',
+    color:       'var(--color-accent)',
+  },
+  equipmentCheckbox: {
+    display:        'flex',
+    alignItems:     'center',
+    justifyContent: 'center',
+    width:          '16px',
+    height:         '16px',
+    borderRadius:   '3px',
+    border:         '1px solid currentColor',
+    fontSize:       '11px',
+    fontWeight:     600,
+    flexShrink:     0,
+  },
+  equipmentLabel: {
+    flex: 1,
   },
   sheetActions: {
     display:        'flex',

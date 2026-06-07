@@ -148,21 +148,19 @@ function TodayCard({ workout, todayComplete, isToday, onStart }) {
 
 const tc = {
   wrap: {
-    background:    'var(--color-card)',
-    border:        'var(--border)',
-    borderRadius:  'var(--radius-card)',
-    padding:       '16px',
     display:       'flex',
     flexDirection: 'column',
-    gap:           '14px',
-    boxShadow:     '0 18px 50px rgba(0,0,0,0.08)',
-    transition:    'transform 0.2s ease',
+    gap:           '0',
+    padding:       '8px 0',
+    borderTop:     '0.5px solid color-mix(in srgb, var(--color-border) 50%, transparent)',
   },
   top: {
     display:    'flex',
     alignItems: 'center',
     gap:        '12px',
     userSelect: 'none',
+    padding:    '10px 0',
+    borderBottom: '0.5px solid color-mix(in srgb, var(--color-border) 40%, transparent)',
   },
   abbr: {
     width:          '40px',
@@ -376,7 +374,7 @@ const lr = {
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
-function getWeeksToRace(programEndDate) {
+function getWeeksToGoal(programEndDate) {
   if (!programEndDate) return null
   const end   = new Date(programEndDate)
   const today = new Date()
@@ -424,7 +422,7 @@ function UnconfiguredFitness({ onNavigate }) {
         <div style={s.titleRow}>
           <h1 style={s.title}>Training</h1>
         </div>
-        <p style={s.raceCountdown}>No training plan yet.</p>
+        <p style={s.goalCountdown}>No training plan yet.</p>
       </div>
       <section style={s.section}>
         <div style={s.todayCard}>
@@ -460,7 +458,7 @@ export default function Fitness({ onStartWorkout, onNavigate }) {
   const weekNum     = getWeekNumber(programStartDate)
   const phaseKey    = getPhase(programStartDate, programEndDate)
   const weekItems   = getWeekStrip(programConfig)
-  const weeksToRace = getWeeksToRace(programEndDate)
+  const weeksToGoal = getWeeksToGoal(programEndDate)
   const todayIdx    = todayWeekIndex()
 
   const viewingIndex   = selectedIndex ?? todayIdx
@@ -484,9 +482,9 @@ export default function Fitness({ onStartWorkout, onNavigate }) {
           <h1 style={s.title}>Training</h1>
           <span style={s.weekBadge}>Week {weekNum}</span>
         </div>
-        {weeksToRace !== null && (
-          <p style={s.raceCountdown}>
-            {weeksToRace === 0 ? 'Race week!' : `${weeksToRace} week${weeksToRace === 1 ? '' : 's'} to race`}
+        {weeksToGoal !== null && (
+          <p style={s.goalCountdown}>
+            {weeksToGoal === 0 ? 'Goal week' : `${weeksToGoal} week${weeksToGoal === 1 ? '' : 's'} to goal`}
           </p>
         )}
       </div>
@@ -575,7 +573,7 @@ const s = {
     color:      'var(--color-muted)',
     fontWeight: 500,
   },
-  raceCountdown: {
+  goalCountdown: {
     fontSize:   '12px',
     color:      'var(--color-accent)',
     fontWeight: 600,

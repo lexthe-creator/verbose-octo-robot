@@ -17,22 +17,34 @@ const PROGRAM_OPTIONS = [
     tags:  ['Upper', 'Lower', 'Full Body'],
   },
   {
-    id:    'hybrid',
-    title: 'Hybrid',
-    lines: ['Strength plus conditioning.', 'For athletic, usable work capacity.'],
-    tags:  ['Strength', 'Conditioning', 'Carry'],
-  },
-  {
     id:    'running',
     title: 'Running',
     lines: ['Aerobic base and run structure.', 'Strength support stays simple.'],
     tags:  ['Easy', 'Intervals', 'Long'],
   },
   {
+    id:    'hybrid',
+    title: 'Hybrid Training',
+    lines: ['Strength plus conditioning.', 'For athletic, usable work capacity.'],
+    tags:  ['Strength', 'Conditioning', 'Carry'],
+  },
+  {
     id:    'mobility_recovery',
     title: 'Mobility / Recovery',
     lines: ['Movement quality and downshift work.', 'Easy sessions for low-energy days.'],
     tags:  ['Mobility', 'Core', 'Walk'],
+  },
+  {
+    id:    'general',
+    title: 'General Fitness',
+    lines: ['Balanced strength, conditioning, and recovery.', 'For a steady weekly rhythm.'],
+    tags:  ['Strength', 'Run', 'Mobility'],
+  },
+  {
+    id:    'custom',
+    title: 'Custom',
+    lines: ['Choose your own weekly rhythm.', 'Use this for manual planning.'],
+    tags:  ['Flexible', 'Manual', 'Open'],
   },
 ]
 
@@ -67,6 +79,22 @@ const PROGRAM_DAY_TYPES = {
     { id: 'mobility',  label: 'Mobility'  },
     { id: 'custom',    label: 'Custom'    },
   ],
+  general: [
+    { id: 'upper',     label: 'Upper'     },
+    { id: 'lower',     label: 'Lower'     },
+    { id: 'full_body', label: 'Full Body' },
+    { id: 'run',       label: 'Run'       },
+    { id: 'mobility',  label: 'Mobility'  },
+    { id: 'custom',    label: 'Custom'    },
+  ],
+  custom: [
+    { id: 'custom',    label: 'Custom'    },
+    { id: 'upper',     label: 'Upper'     },
+    { id: 'lower',     label: 'Lower'     },
+    { id: 'full_body', label: 'Full Body' },
+    { id: 'run',       label: 'Run'       },
+    { id: 'mobility',  label: 'Mobility'  },
+  ],
   running: [
     { id: 'run',       label: 'Run'       },
     { id: 'upper',     label: 'Upper'     },
@@ -93,6 +121,16 @@ const SMART_DEFAULTS = {
     4: ['upper', 'lower', 'run', 'full_body'],
     5: ['upper', 'lower', 'run', 'full_body', 'mobility'],
   },
+  general: {
+    3: ['full_body', 'run', 'mobility'],
+    4: ['upper', 'lower', 'run', 'mobility'],
+    5: ['upper', 'lower', 'run', 'full_body', 'mobility'],
+  },
+  custom: {
+    3: ['custom', 'custom', 'custom'],
+    4: ['custom', 'custom', 'custom', 'custom'],
+    5: ['custom', 'custom', 'custom', 'custom', 'custom'],
+  },
   running: {
     3: ['run', 'run', 'run'],
     4: ['run', 'run', 'run', 'run'],
@@ -116,14 +154,17 @@ const TYPE_LABEL = {
 
 const PROGRAM_LABEL = {
   strength: 'Strength',
-  hybrid: 'Hybrid',
   running: 'Running',
+  hybrid: 'Hybrid Training',
   mobility_recovery: 'Mobility / Recovery',
+  general: 'General Fitness',
+  custom: 'Custom',
 }
 
 function normalizeProgramType(type) {
+  if (type === 'hyrox') return 'hybrid'
   if (type === 'endurance') return 'running'
-  if (type === 'general' || type === 'fat_loss') return 'hybrid'
+  if (type === 'fat_loss') return 'general'
   if (type === 'mobility' || type === 'recovery') return 'mobility_recovery'
   return type
 }
@@ -136,18 +177,18 @@ const EQUIPMENT_OPTIONS = [
   },
   {
     value: GYM_ACCESS.DUMBBELLS,
-    title: 'Dumbbells',
-    desc:  'Dumbbells and bodyweight.',
+    title: 'Dumbbells + bands',
+    desc:  'Home equipment bundle. Dumbbells, resistance bands, kettlebells.',
   },
   {
     value: GYM_ACCESS.HOME_GYM,
-    title: 'Home gym',
-    desc:  'Rack, barbell, bench, cables, dumbbells, and bodyweight.',
+    title: 'Full home setup',
+    desc:  'Barbell, bench, rack, dumbbells, cables, and resistance training.',
   },
   {
     value: GYM_ACCESS.FULL_GYM,
-    title: 'Full gym',
-    desc:  'Full equipment access. Barbells, cables, machines.',
+    title: 'Full gym access',
+    desc:  'Complete facility. All machines, platforms, and training tools.',
   },
 ]
 
@@ -378,7 +419,7 @@ function Step6({ startDate, goalDate, showGoalDate, onStartDateChange, onGoalDat
       {showGoalDate && (
         <div style={sc.dateField}>
           <label style={sc.dateLabel}>Goal date</label>
-          <p style={sc.dateHint}>A race, event, or milestone.</p>
+          <p style={sc.dateHint}>An event, milestone, or target date.</p>
           <input
             type="date"
             style={sc.dateInput}

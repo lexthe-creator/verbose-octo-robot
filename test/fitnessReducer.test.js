@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { logWorkout, setWorkoutDayStatus } from '../src/context/fitnessReducer.js'
+import { migrateFitnessStateToV3 } from '../src/utils/fitnessMigration.js'
 import { getTodayISO } from '../src/utils/time.js'
 
 const baseState = {
@@ -115,6 +116,56 @@ test('SET_WORKOUT_DAY_STATUS preserves skipped and in-progress status without wi
   assert.equal(inProgress.workoutDayStatus[today].status, 'in_progress')
   assert.equal(inProgress.todayComplete, false)
   assert.deepEqual(inProgress.workoutLog, logged.workoutLog)
+})
+
+test('fitness schema migration maps legacy hyrox program values to hybrid without data loss', () => {
+  const today = getTodayISO()
+  const legacyState = {
+    ...baseState,
+    programStartDate: '2026-06-01',
+    programEndDate:   '2026-09-01',
+    workoutLog: [
+      {
+        date:     `${today}T15:00:00.000Z`,
+        type:     'hyrox',
+        title:    'Legacy training session',
+        duration: 45,
+        feel:     3,
+        sets: [
+          {
+            exercise:    'Farmer Carry',
+            exerciseId:  'farmer_carry',
+            setNumber:   1,
+            plannedReps: 40,
+            reps:        40,
+            weight:      50,
+            rpe:         7,
+            note:        'steady',
+          },
+        ],
+      },
+    ],
+    workoutDayStatus: {
+      [today]: { status: 'completed', updatedAt: `${today}T15:45:00.000Z` },
+    },
+    program: { type: 'hyrox', configured: true },
+    programConfig: {
+      trainingDays: ['mon', 'wed', 'fri'],
+      dayTypes:     { mon: 'run', wed: 'full_body', fri: 'mobility' },
+      goal:         'hyrox',
+      audioEnabled: true,
+      weeklyDays:   3,
+    },
+  }
+
+  const migrated = migrateFitnessStateToV3(legacyState)
+
+  assert.equal(migrated.program.type, 'hybrid')
+  assert.equal(migrated.programConfig.goal, 'hybrid')
+  assert.deepEqual(migrated.programConfig.trainingDays, legacyState.programConfig.trainingDays)
+  assert.deepEqual(migrated.programConfig.dayTypes, legacyState.programConfig.dayTypes)
+  assert.deepEqual(migrated.workoutLog, legacyState.workoutLog)
+  assert.deepEqual(migrated.workoutDayStatus, legacyState.workoutDayStatus)
 })
 
 test('fitness workout history survives JSON persistence round trip', () => {

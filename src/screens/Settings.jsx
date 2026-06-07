@@ -9,9 +9,9 @@ import { THEMES } from '../constants/theme.js'
 
 const EQUIPMENT_OPTIONS = [
   { value: GYM_ACCESS.BODYWEIGHT, label: 'Bodyweight' },
-  { value: GYM_ACCESS.DUMBBELLS,  label: 'Dumbbells'  },
-  { value: GYM_ACCESS.HOME_GYM,   label: 'Home gym'   },
-  { value: GYM_ACCESS.FULL_GYM,   label: 'Full gym'   },
+  { value: GYM_ACCESS.DUMBBELLS,  label: 'Dumbbells + bands' },
+  { value: GYM_ACCESS.HOME_GYM,   label: 'Home setup' },
+  { value: GYM_ACCESS.FULL_GYM,   label: 'Full gym' },
 ]
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
@@ -116,7 +116,7 @@ export default function Settings({ onBack, onNavigate }) {
           />
         </div>
         <div style={s.field}>
-          <label style={s.fieldLabel}>Race date</label>
+          <label style={s.fieldLabel}>Goal date</label>
           <input
             type="date"
             style={s.input}

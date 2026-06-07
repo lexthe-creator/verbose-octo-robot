@@ -89,7 +89,7 @@ test('training generator supports strength 3/4/5-day split structures', () => {
   assert.deepEqual(getProgramStructure('strength', 5).map(day => day.title), ['Upper A', 'Lower A', 'Full Body', 'Upper B', 'Lower B'])
 })
 
-test('training generator supports hybrid 3/4/5-day split structures', () => {
+test('training generator supports Hybrid Training 3/4/5-day split structures', () => {
   for (const days of [3, 4, 5]) {
     const plan = generateTrainingProgram({
       programType: 'hybrid',
@@ -101,6 +101,12 @@ test('training generator supports hybrid 3/4/5-day split structures', () => {
     assert.ok(plan.every(day => ['upper', 'lower', 'full_body', 'run_easy', 'mobility'].includes(day.workout.dayType)))
     assert.ok(plan.some(day => day.workout.dayType === 'run_easy'))
   }
+})
+
+test('training generator supports General Fitness and Custom program structures', () => {
+  assert.deepEqual(getProgramStructure('general', 3).map(day => day.dayType), ['full_body', 'run', 'mobility'])
+  assert.deepEqual(getProgramStructure('custom', 4).map(day => day.dayType), ['custom', 'custom', 'custom', 'custom'])
+  assert.deepEqual(getProgramStructure('hyrox', 3).map(day => day.dayType), ['full_body', 'run', 'full_body'])
 })
 
 test('training generator supports running 3/4/5-day split structures', () => {

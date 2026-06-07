@@ -224,17 +224,11 @@ export default function WorkoutPlayer({ workout, onComplete, onClose }) {
         <div style={s.phaseLabel}>
           {phaseProgress.label} {phaseProgress.current} of {phaseProgress.total}
         </div>
-        <button
-          style={{ ...s.autoBtn, color: autoplay ? 'var(--color-accent)' : 'var(--color-muted)' }}
-          onClick={() => setAutoplay(value => !value)}
-        >
-          Autoplay {autoplay ? 'On' : 'Off'}
-        </button>
+        <span style={s.headerSpacer} />
       </header>
 
-      <NextUp step={steps[stepIndex + 1]} />
-
       <main style={s.body}>
+        <NextUp step={steps[stepIndex + 1]} />
         <MediaPlaceholder step={step} />
         {step?.type === 'timed' && (
           <TimedStep step={step} timer={timer} paused={paused} />
@@ -255,12 +249,12 @@ export default function WorkoutPlayer({ workout, onComplete, onClose }) {
         )}
       </main>
 
-      <div style={s.dots} aria-hidden="true">
+      <div style={s.stepRail} aria-hidden="true">
         {steps.map((item, index) => (
           <span
             key={item.id}
             style={{
-              ...s.dot,
+              ...s.railDot,
               background: index < stepIndex
                 ? 'var(--color-success)'
                 : index === stepIndex
@@ -281,6 +275,13 @@ export default function WorkoutPlayer({ workout, onComplete, onClose }) {
         <button style={s.primaryBtn} onClick={goNext}>
           {isLast ? 'Finish' : 'Next'}
         </button>
+        <button
+          style={{ ...s.autoControl, color: autoplay ? 'var(--color-accent)' : 'var(--color-muted)' }}
+          onClick={() => setAutoplay(value => !value)}
+          type="button"
+        >
+          Autoplay {autoplay ? 'On' : 'Off'}
+        </button>
       </footer>
     </div>
   )
@@ -300,7 +301,7 @@ function NextUp({ step }) {
   const equipment = getEquipmentNeededForSegment(step)
   return (
     <div style={s.nextUp}>
-      <span style={s.nextLabel}>next up</span>
+      <span style={s.nextLabel}>Next</span>
       <span style={s.nextName}>{step.name}</span>
       {detail && <span style={s.nextDetail}>{detail}</span>}
       {equipment.length > 0 && (
@@ -314,6 +315,7 @@ function MediaPlaceholder({ step }) {
   const kindLabel = step?.media?.kind === 'placeholder' ? 'video / gif placeholder' : step?.media?.kind
   return (
     <div style={s.media}>
+      <span style={s.mediaMark}>play</span>
       <span style={s.mediaKind}>{kindLabel ?? 'video / gif placeholder'}</span>
       <span style={s.mediaAlt}>{step?.media?.alt ?? 'movement preview placeholder'}</span>
     </div>
@@ -401,52 +403,65 @@ function ExerciseStep({ step, savedRows, onRowsChange }) {
       <h2 style={s.exerciseName}>{activeStep.name}</h2>
       <p style={s.prescription}>{formatSegmentPrescription(activeStep)}</p>
       {sideInstruction && <p style={s.sideHint}>{sideInstruction}</p>}
-      {equipment.length > 0 && <p style={s.equipment}>equipment · {equipment.join(' · ')}</p>}
-      {activeStep.loadSuggestion?.suggestion && <p style={s.loadHint}>{activeStep.loadSuggestion.suggestion}</p>}
-      {cues.length > 0 && (
-        <div style={s.cueList}>
-          <p style={s.cueLabel}>coach cues</p>
-          {cues.map(cue => <p key={cue} style={s.cueItem}>• {cue}</p>)}
-        </div>
-      )}
-      {(step.substitutions?.length ?? 0) > 0 && (
-        <div style={s.swapList}>
-          <p style={s.cueLabel}>equipment-ready swaps</p>
-          <div style={s.swapButtons}>
-            {substitutionId && (
-              <button style={s.swapBtn} onClick={chooseOriginal} type="button">
-                original
-              </button>
+
+      {(equipment.length > 0 || activeStep.loadSuggestion?.suggestion || cues.length > 0 || (step.substitutions?.length ?? 0) > 0) && (
+        <details style={s.detailDrawer}>
+          <summary style={s.detailSummary}>details, cues, swaps</summary>
+          <div style={s.detailContent}>
+            {equipment.length > 0 && <p style={s.detailLine}>equipment · {equipment.join(' · ')}</p>}
+            {activeStep.loadSuggestion?.suggestion && <p style={s.detailLine}>{activeStep.loadSuggestion.suggestion}</p>}
+            {cues.length > 0 && (
+              <div style={s.detailGroup}>
+                <p style={s.detailLabel}>coach cues</p>
+                {cues.map(cue => <p key={cue} style={s.cueItem}>• {cue}</p>)}
+              </div>
             )}
-            {step.substitutions.map(option => (
-              <button
-                key={option.exerciseId}
-                style={{
-                  ...s.swapBtn,
-                  ...(substitutionId === option.exerciseId ? s.swapBtnActive : {}),
-                }}
-                onClick={() => chooseSubstitution(option)}
-                type="button"
-              >
-                {option.name}
-              </button>
-            ))}
+            {(step.substitutions?.length ?? 0) > 0 && (
+              <div style={s.detailGroup}>
+                <p style={s.detailLabel}>equipment-ready swaps</p>
+                <div style={s.swapButtons}>
+                  {substitutionId && (
+                    <button style={s.swapBtn} onClick={chooseOriginal} type="button">
+                      original
+                    </button>
+                  )}
+                  {step.substitutions.map(option => (
+                    <button
+                      key={option.exerciseId}
+                      style={{
+                        ...s.swapBtn,
+                        ...(substitutionId === option.exerciseId ? s.swapBtnActive : {}),
+                      }}
+                      onClick={() => chooseSubstitution(option)}
+                      type="button"
+                    >
+                      {option.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-        </div>
+        </details>
       )}
 
       <div style={s.setList}>
         {rows.map((row, index) => (
           <div
             key={index}
-            style={{
-              ...s.setRow,
-              background: row.done ? 'var(--color-success-bg)' : 'var(--color-card)',
-              borderColor: row.done ? 'var(--color-success)' : 'var(--color-border)',
-            }}
+            style={s.setRow}
             onClick={() => toggleSet(index)}
           >
             <div style={s.setTop}>
+              <span
+                style={{
+                  ...s.setCheck,
+                  ...(row.done ? s.setCheckDone : {}),
+                }}
+                aria-hidden="true"
+              >
+                {row.done ? '✓' : ''}
+              </span>
               <span style={s.setName}>Set {index + 1}</span>
               <span style={s.setPlanned}>planned {row.plannedReps}{sideInstruction ? ` ${sideInstruction}` : ''}</span>
               <span style={{ ...s.setDone, color: row.done ? 'var(--color-success)' : 'var(--color-muted)' }}>
@@ -515,7 +530,7 @@ function PostWorkoutLog({ startedAt, onSave, onCancel, onPrevious }) {
       <p style={post.dur}>{durationMin} min · {fmtMMSS(elapsedSec)}</p>
 
       <div style={post.field}>
-        <label style={post.label}>How did it feel?</label>
+        <label style={post.label}>how did it feel?</label>
         <div style={post.feelRow}>
           {FEEL_OPTIONS.map(opt => (
             <button
@@ -523,7 +538,7 @@ function PostWorkoutLog({ startedAt, onSave, onCancel, onPrevious }) {
               onClick={() => setFeel(opt.value)}
               style={{
                 ...post.feelBtn,
-                background: feel === opt.value ? 'var(--color-accent-bg)' : 'var(--color-card)',
+                color: feel === opt.value ? 'var(--color-accent)' : 'var(--color-muted)',
                 borderColor: feel === opt.value ? 'var(--color-accent)' : 'var(--color-border)',
               }}
             >
@@ -534,7 +549,7 @@ function PostWorkoutLog({ startedAt, onSave, onCancel, onPrevious }) {
       </div>
 
       <div style={post.field}>
-        <label style={post.label}>Workout RPE</label>
+        <label style={post.label}>workout rpe</label>
         <div style={post.rpeRow}>
           {Array.from({ length: 10 }, (_, index) => index + 1).map(value => (
             <button
@@ -542,7 +557,6 @@ function PostWorkoutLog({ startedAt, onSave, onCancel, onPrevious }) {
               onClick={() => setRpe(value)}
               style={{
                 ...post.rpeBtn,
-                background: rpe === value ? 'var(--color-accent-bg)' : 'transparent',
                 borderColor: rpe === value ? 'var(--color-accent)' : 'var(--color-border)',
                 color: rpe === value ? 'var(--color-accent)' : 'var(--color-muted)',
               }}
@@ -554,7 +568,7 @@ function PostWorkoutLog({ startedAt, onSave, onCancel, onPrevious }) {
       </div>
 
       <div style={post.field}>
-        <label style={post.label}>Notes</label>
+        <label style={post.label}>notes</label>
         <textarea
           style={post.notes}
           value={notes}
@@ -581,8 +595,8 @@ const s = {
     zIndex: 150,
     display: 'flex',
     flexDirection: 'column',
-    paddingTop: 'calc(var(--safe-top) + 12px)',
-    paddingBottom: 'calc(var(--safe-bottom) + 16px)',
+    paddingTop: 'calc(var(--safe-top) + 14px)',
+    paddingBottom: 'calc(var(--safe-bottom) + 14px)',
     paddingLeft: '20px',
     paddingRight: '20px',
     maxWidth: 'var(--max-width)',
@@ -593,7 +607,7 @@ const s = {
     gridTemplateColumns: '1fr auto 1fr',
     alignItems: 'center',
     gap: '10px',
-    marginBottom: '12px',
+    marginBottom: '8px',
   },
   exitBtn: {
     justifySelf: 'start',
@@ -602,57 +616,47 @@ const s = {
     color: 'var(--color-muted)',
     fontSize: '13px',
     fontWeight: 650,
-    padding: 0,
+    padding: '4px 0',
   },
-  autoBtn: {
-    justifySelf: 'end',
-    background: 'none',
-    border: 'none',
-    fontSize: '11px',
-    fontWeight: 700,
-    padding: 0,
-  },
+  headerSpacer: { minWidth: 1 },
   phaseLabel: {
     color: 'var(--color-muted)',
-    fontSize: '11px',
-    fontWeight: 750,
-    letterSpacing: '0.08em',
+    fontSize: '12px',
+    fontWeight: 650,
+    letterSpacing: 0,
   },
   nextUp: {
     display: 'grid',
     gridTemplateColumns: 'auto minmax(0, 1fr) auto',
     alignItems: 'baseline',
     gap: '4px 8px',
-    padding: '10px 0 12px',
-    borderTop: '0.5px solid color-mix(in srgb, var(--color-border) 48%, transparent)',
-    borderBottom: '0.5px solid color-mix(in srgb, var(--color-border) 48%, transparent)',
-    marginBottom: '12px',
+    padding: '4px 0 8px',
+    borderBottom: '0.5px solid color-mix(in srgb, var(--color-border) 42%, transparent)',
   },
   nextLabel: {
     color: 'var(--color-muted)',
-    fontSize: '10px',
-    fontWeight: 700,
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
+    fontSize: '11px',
+    fontWeight: 650,
+    letterSpacing: 0,
   },
   nextName: {
     minWidth: 0,
-    color: 'var(--color-text)',
-    fontSize: '13px',
-    fontWeight: 650,
+    color: 'var(--color-muted)',
+    fontSize: '12px',
+    fontWeight: 500,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
   },
   nextDetail: {
-    color: 'var(--color-accent)',
-    fontSize: '12px',
-    fontWeight: 650,
+    color: 'var(--color-muted)',
+    fontSize: '11px',
+    fontWeight: 500,
   },
   nextEquipment: {
     gridColumn: '1 / 4',
     color: 'var(--color-muted)',
-    fontSize: '11px',
+    fontSize: '10px',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
@@ -661,27 +665,40 @@ const s = {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    gap: '14px',
+    gap: '16px',
     overflowY: 'auto',
-    paddingTop: '4px',
+    paddingTop: '2px',
+    paddingBottom: '8px',
   },
   media: {
-    minHeight: '118px',
-    border: '0.5px dashed color-mix(in srgb, var(--color-border) 72%, transparent)',
-    borderRadius: 'var(--radius-sm)',
+    minHeight: '190px',
+    border: '0.5px solid color-mix(in srgb, var(--color-border) 62%, transparent)',
+    borderRadius: '10px',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
     gap: '6px',
-    background: 'color-mix(in srgb, var(--color-card) 62%, transparent)',
+    background: 'color-mix(in srgb, var(--color-bg) 86%, var(--color-border))',
+  },
+  mediaMark: {
+    width: '46px',
+    height: '46px',
+    borderRadius: '50%',
+    border: '0.5px solid color-mix(in srgb, var(--color-accent) 45%, var(--color-border))',
+    color: 'var(--color-accent)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '10px',
+    fontWeight: 650,
+    letterSpacing: 0,
   },
   mediaKind: {
-    color: 'var(--color-accent)',
-    fontSize: '10px',
-    fontWeight: 750,
-    letterSpacing: '0.08em',
-    textTransform: 'uppercase',
+    color: 'var(--color-muted)',
+    fontSize: '11px',
+    fontWeight: 650,
+    letterSpacing: 0,
   },
   mediaAlt: {
     color: 'var(--color-muted)',
@@ -694,25 +711,27 @@ const s = {
     flexDirection: 'column',
     alignItems: 'center',
     textAlign: 'center',
-    gap: '8px',
-    paddingTop: '10px',
+    gap: '7px',
+    paddingTop: '2px',
   },
   stepKind: {
     color: 'var(--color-muted)',
-    fontSize: '10px',
-    fontWeight: 750,
-    letterSpacing: '0.08em',
+    fontSize: '11px',
+    fontWeight: 650,
+    letterSpacing: 0,
     textTransform: 'uppercase',
   },
   stepName: {
     fontFamily: 'var(--font-display)',
     color: 'var(--color-text)',
-    fontSize: '24px',
+    fontSize: '28px',
     fontWeight: 600,
+    lineHeight: 1.08,
+    textAlign: 'center',
   },
   timer: {
     fontFamily: 'var(--font-display)',
-    fontSize: '72px',
+    fontSize: '68px',
     color: 'var(--color-text)',
     lineHeight: 1,
     letterSpacing: 0,
@@ -740,23 +759,21 @@ const s = {
     fontWeight: 650,
   },
   textStep: {
-    background: 'var(--color-card)',
-    border: 'var(--border)',
-    borderRadius: 'var(--radius-card)',
-    padding: '22px 18px',
+    padding: '8px 0 0',
     textAlign: 'center',
   },
   exercise: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'stretch',
-    gap: '8px',
+    gap: '7px',
   },
   exerciseName: {
     fontFamily: 'var(--font-display)',
-    fontSize: '22px',
+    fontSize: '28px',
     color: 'var(--color-text)',
     textAlign: 'center',
+    lineHeight: 1.08,
   },
   prescription: {
     fontSize: '18px',
@@ -770,85 +787,104 @@ const s = {
     fontWeight: 650,
     textAlign: 'center',
   },
-  equipment: {
-    fontSize: '11px',
-    color: 'var(--color-muted)',
-    textAlign: 'center',
-  },
-  loadHint: {
-    fontSize: '12px',
-    color: 'var(--color-muted)',
-    textAlign: 'center',
-    lineHeight: 1.35,
-  },
-  cueList: {
+  detailDrawer: {
     borderTop: '0.5px solid color-mix(in srgb, var(--color-border) 58%, transparent)',
     borderBottom: '0.5px solid color-mix(in srgb, var(--color-border) 58%, transparent)',
-    padding: '9px 0',
-    marginTop: '4px',
+    padding: '8px 0',
+    marginTop: '6px',
+  },
+  detailSummary: {
+    color: 'var(--color-muted)',
+    fontSize: '12px',
+    fontWeight: 650,
+    cursor: 'pointer',
+    listStyle: 'none',
+  },
+  detailContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
+    paddingTop: '10px',
+  },
+  detailGroup: {
     display: 'flex',
     flexDirection: 'column',
     gap: '4px',
   },
-  cueLabel: {
+  detailLabel: {
     color: 'var(--color-muted)',
     fontSize: '10px',
     fontWeight: 750,
     letterSpacing: '0.08em',
     textTransform: 'uppercase',
   },
+  detailLine: {
+    color: 'var(--color-muted)',
+    fontSize: '12px',
+    lineHeight: 1.35,
+  },
   cueItem: {
     color: 'var(--color-text)',
     fontSize: '12px',
     lineHeight: 1.35,
   },
-  swapList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '6px',
-    marginTop: '2px',
-  },
   swapButtons: {
     display: 'flex',
-    flexWrap: 'wrap',
-    gap: '6px',
+    flexDirection: 'column',
+    borderTop: '0.5px solid color-mix(in srgb, var(--color-border) 58%, transparent)',
   },
   swapBtn: {
-    border: '0.5px solid var(--color-border)',
-    borderRadius: 'var(--radius-pill)',
-    background: 'var(--color-card)',
+    border: 'none',
+    borderBottom: '0.5px solid color-mix(in srgb, var(--color-border) 58%, transparent)',
+    background: 'transparent',
     color: 'var(--color-muted)',
-    fontSize: '11px',
+    fontSize: '12px',
     fontWeight: 650,
-    padding: '7px 10px',
+    padding: '8px 0',
+    textAlign: 'left',
   },
   swapBtnActive: {
-    borderColor: 'var(--color-accent)',
-    background: 'var(--color-accent-bg)',
     color: 'var(--color-accent)',
   },
   setList: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px',
-    marginTop: '8px',
+    gap: '6px',
+    marginTop: '10px',
   },
   setRow: {
     display: 'flex',
     flexDirection: 'column',
     gap: '8px',
-    padding: '12px',
-    borderRadius: 'var(--radius-sm)',
-    border: '0.5px solid',
+    padding: '11px 0',
+    borderRadius: 0,
+    border: 'none',
+    borderBottom: 'var(--border)',
     cursor: 'pointer',
     fontSize: '14px',
     fontWeight: 500,
   },
   setTop: {
     display: 'grid',
-    gridTemplateColumns: '1fr auto auto',
+    gridTemplateColumns: '22px minmax(0, 1fr) auto auto',
     gap: '8px',
     alignItems: 'center',
+  },
+  setCheck: {
+    width: '18px',
+    height: '18px',
+    borderRadius: '50%',
+    border: '1px solid var(--color-faint)',
+    color: 'var(--color-success)',
+    fontSize: '11px',
+    lineHeight: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  setCheckDone: {
+    borderColor: 'var(--color-success)',
+    background: 'var(--color-success-bg)',
   },
   setName: { fontSize: '13px', fontWeight: 650, color: 'var(--color-text)' },
   setPlanned: { fontSize: '11px', color: 'var(--color-muted)' },
@@ -872,12 +908,13 @@ const s = {
   },
   setInput: {
     width: '100%',
-    border: '0.5px solid var(--color-border)',
-    borderRadius: '8px',
-    padding: '8px',
+    border: 'none',
+    borderBottom: '0.5px solid var(--color-border)',
+    borderRadius: 0,
+    padding: '6px 0',
     font: 'inherit',
     color: 'var(--color-text)',
-    background: 'var(--color-bg)',
+    background: 'transparent',
   },
   noteInput: {
     width: '100%',
@@ -889,23 +926,24 @@ const s = {
     color: 'var(--color-text)',
     background: 'transparent',
   },
-  dots: {
+  stepRail: {
     display: 'flex',
     justifyContent: 'center',
-    gap: '4px',
+    gap: '3px',
     flexWrap: 'wrap',
-    padding: '10px 0',
+    padding: '7px 0 5px',
   },
-  dot: {
-    width: '5px',
-    height: '5px',
-    borderRadius: '50%',
+  railDot: {
+    width: '10px',
+    height: '2px',
+    borderRadius: '2px',
   },
   controls: {
     display: 'grid',
     gridTemplateColumns: '1fr 1.15fr 1fr',
     gap: '8px',
     paddingTop: '8px',
+    borderTop: '0.5px solid color-mix(in srgb, var(--color-border) 42%, transparent)',
   },
   primaryBtn: {
     border: 'none',
@@ -928,11 +966,19 @@ const s = {
   secondaryBtn: {
     border: '0.5px solid var(--color-border)',
     borderRadius: 'var(--radius-sm)',
-    background: 'var(--color-card)',
+    background: 'transparent',
     color: 'var(--color-muted)',
     fontSize: '13px',
     fontWeight: 700,
     padding: '13px 8px',
+  },
+  autoControl: {
+    gridColumn: '1 / 4',
+    border: 'none',
+    background: 'transparent',
+    fontSize: '12px',
+    fontWeight: 650,
+    padding: '2px 0 0',
   },
 }
 
@@ -969,18 +1015,23 @@ const post = {
     display: 'flex',
     flexDirection: 'column',
     gap: '8px',
+    borderTop: 'var(--border)',
+    paddingTop: '10px',
   },
   label: {
     color: 'var(--color-muted)',
-    fontSize: '12px',
-    fontWeight: 650,
+    fontSize: '10px',
+    fontWeight: 750,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
   },
   feelRow: { display: 'flex', gap: '8px' },
   feelBtn: {
     flex: 1,
-    height: '44px',
+    height: '38px',
     border: '0.5px solid',
-    borderRadius: 'var(--radius-sm)',
+    borderRadius: '8px',
+    background: 'transparent',
     fontSize: '20px',
   },
   rpeRow: {
@@ -992,18 +1043,20 @@ const post = {
     height: '34px',
     border: '0.5px solid',
     borderRadius: '8px',
+    background: 'transparent',
     fontSize: '13px',
     fontWeight: 700,
   },
   notes: {
     width: '100%',
     resize: 'vertical',
-    border: 'var(--border)',
-    borderRadius: 'var(--radius-sm)',
-    padding: '12px',
+    border: 'none',
+    borderBottom: 'var(--border)',
+    borderRadius: 0,
+    padding: '8px 0',
     font: 'inherit',
     color: 'var(--color-text)',
-    background: 'var(--color-card)',
+    background: 'transparent',
   },
   saveBtn: {
     border: 'none',
@@ -1017,7 +1070,7 @@ const post = {
   secondaryBtn: {
     border: '0.5px solid var(--color-border)',
     borderRadius: 'var(--radius-sm)',
-    background: 'var(--color-card)',
+    background: 'transparent',
     color: 'var(--color-muted)',
     fontSize: '14px',
     fontWeight: 700,
