@@ -5,7 +5,11 @@ import { SCREENS } from '../constants/navigation.js'
 import { getPhase, getWeekNumber } from '../utils/fitness.js'
 import { generateWorkout } from '../utils/workoutGenerator.js'
 import { getWeekStrip } from '../utils/fitnessSelectors.js'
-import { getJournalRow } from '../utils/workoutDisplay.js'
+import {
+  getJournalRow,
+  getWorkoutDetailSections,
+  getWorkoutSummary,
+} from '../utils/workoutDisplay.js'
 import { PHASE_LABELS } from '../constants/fitness.js'
 
 const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
@@ -33,115 +37,117 @@ function todayWeekIndex() {
   return (new Date().getDay() + 6) % 7
 }
 
-// ─── Workout preview helpers ──────────────────────────────────────────────────
-
-function fmtSegDetail(seg) {
-  if (seg.type === 'sets_reps' || seg.kind === 'exercise') return `${seg.sets}×${seg.reps}`
-  if (seg.sets && seg.reps) return `${seg.sets}×${seg.reps}`
-  if (seg.duration) {
-    const m = Math.floor(seg.duration / 60)
-    const s = seg.duration % 60
-    return s > 0 ? `${m}:${String(s).padStart(2, '0')}` : `${m} min`
-  }
-  if (seg.reps) return seg.reps
-  return ''
+function formatFitnessSelectedDay(index, isToday) {
+  return isToday ? 'today' : DAY_NAMES[index].toLowerCase()
 }
 
-function PreviewSection({ title, segs }) {
-  return (
-    <div style={tc.prevSection}>
-      <p style={tc.prevSectionTitle}>{title}</p>
-      {segs.map((seg, i) => (
-        <div key={i} style={tc.prevRow}>
-          <span style={tc.prevName}>{seg.name}</span>
-          <span style={tc.prevDetail}>{fmtSegDetail(seg)}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
+// ─── Selected training commitment ─────────────────────────────────────────────
 
-// ─── Today card ──────────────────────────────────────────────────────────────
-
-function TodayCard({ workout, todayComplete, isToday, onStart }) {
-  const [expanded, setExpanded] = useState(false)
+function TrainingCommitment({ workout, todayComplete, isToday, selectedDay, onStart }) {
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [expandedSections, setExpandedSections] = useState({})
 
   const workoutType = workout.dayType ?? workout.type
   const isCompletedToday = isToday && todayComplete
   const canStart    = workoutType !== 'rest' && !isCompletedToday
-  const hasPreview  = workoutType !== 'rest' && workout.segments.length > 0
-  const abbr        = TYPE_ABBR[workoutType] || '?'
-
-  const warmupSegs = workout.segments.filter(s => s.section === 'warmup')
-  const mainSegs   = workout.segments.filter(s => s.section === 'main' || s.section === 'core' || !s.section)
-  const finisherSegs = workout.segments.filter(s => s.section === 'finisher')
-  const coolSegs   = workout.segments.filter(s => s.section === 'cooldown')
+  const status = isCompletedToday ? 'completed' : 'planned'
+  const summary = getWorkoutSummary(workout, workoutType === 'rest' ? 'open' : status)
+  const sections = getWorkoutDetailSections(workout)
+  const hasDetails = workoutType !== 'rest' && sections.length > 0
 
   return (
     <div style={tc.wrap}>
-      {/* Header — tap to toggle preview */}
-      <div
-        style={{ ...tc.top, cursor: hasPreview ? 'pointer' : 'default' }}
-        onClick={() => hasPreview && setExpanded(e => !e)}
-      >
-        <span style={tc.abbr}>{abbr}</span>
-        <div style={tc.info}>
-          <p style={tc.name}>{workout.title}</p>
-          <p style={tc.sub}>{workout.subtitle}</p>
+      <div style={tc.summary}>
+        <p style={tc.selectedDay}>{selectedDay}</p>
+        <h2 style={tc.title}>{summary.title}</h2>
+        <div style={tc.metaGrid}>
+          <span style={tc.metaLabel}>status</span>
+          <span style={{ ...tc.metaValue, ...(isCompletedToday ? tc.doneText : {}) }}>{summary.statusMarker}</span>
+          <span style={tc.metaLabel}>duration</span>
+          <span style={tc.metaValue}>{summary.duration}</span>
+          <span style={tc.metaLabel}>focus</span>
+          <span style={tc.metaValue}>{summary.focusLabel}</span>
         </div>
-        {isToday && todayComplete && (
-          <span style={tc.doneBadge}>Done</span>
+      </div>
+
+      <div style={tc.actions}>
+        {workoutType !== 'rest' && (
+          <button
+            style={{
+              ...tc.primaryAction,
+              ...(isCompletedToday ? tc.completedAction : {}),
+              cursor: canStart ? 'pointer' : 'default',
+            }}
+            onClick={canStart ? onStart : undefined}
+            disabled={!canStart}
+            type="button"
+          >
+            {isCompletedToday ? 'Completed' : 'Start Workout'}
+          </button>
         )}
-        {hasPreview && (
-          <span style={{
-            ...tc.chevron,
-            transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
-          }}>▾</span>
+        {hasDetails && (
+          <button
+            style={tc.secondaryAction}
+            onClick={() => setDetailsOpen(value => !value)}
+            type="button"
+          >
+            {detailsOpen ? 'Hide Details' : 'View Details'}
+          </button>
         )}
       </div>
 
-      {/* Expandable workout preview */}
-      <div style={{
-        overflow:   'hidden',
-        maxHeight:  expanded ? '900px' : '0',
-        transition: 'max-height 300ms ease',
-      }}>
-        <div style={tc.prevWrap}>
-          {warmupSegs.length > 0 && <PreviewSection title="WARM UP"   segs={warmupSegs} />}
-          {mainSegs.length   > 0 && <PreviewSection title="MAIN"      segs={mainSegs}   />}
-          {finisherSegs.length > 0 && <PreviewSection title="FINISHER" segs={finisherSegs} />}
-          {coolSegs.length   > 0 && <PreviewSection title="COOL DOWN" segs={coolSegs}   />}
+      {detailsOpen && (
+        <TrainingDetails
+          sections={sections}
+          expandedSections={expandedSections}
+          onToggle={section => setExpandedSections(current => ({
+            ...current,
+            [section]: !current[section],
+          }))}
+        />
+      )}
+    </div>
+  )
+}
 
-          <div style={tc.prevFooter}>
-            <span style={tc.prevTotal}>~{workout.estimatedMinutes ?? workout.durationEst} min</span>
-            {canStart && (
-              <button style={tc.startInPreview} onClick={onStart}>
-                Start Workout
-              </button>
-            )}
-            {isToday && todayComplete && (
-              <span style={tc.completedLabel}>✓ Completed</span>
+function TrainingDetails({ sections, expandedSections, onToggle }) {
+  return (
+    <div style={tc.details}>
+      {sections.map(section => {
+        const expanded = !!expandedSections[section.section]
+        return (
+          <div key={section.section} style={tc.detailGroup}>
+            <button style={tc.detailToggle} onClick={() => onToggle(section.section)} type="button">
+              <span style={tc.detailTitle}>{section.title}</span>
+              <span style={tc.detailCount}>{section.countLabel}</span>
+            </button>
+            {expanded && (
+              <DetailRows section={section} />
             )}
           </div>
-        </div>
-      </div>
+        )
+      })}
+    </div>
+  )
+}
 
-      {/* Collapsed-state start / completed button */}
-      {workoutType !== 'rest' && !expanded && (
-        <button
-          style={{
-            ...tc.startBtn,
-            background: isCompletedToday ? 'var(--color-success-bg)' : 'var(--color-accent)',
-            color:      isCompletedToday ? 'var(--color-success)'    : '#fff',
-            border:     isCompletedToday ? '0.5px solid var(--color-success)' : 'none',
-            cursor:     canStart ? 'pointer' : 'default',
-          }}
-          onClick={canStart ? onStart : undefined}
-          disabled={!canStart}
-        >
-          {isCompletedToday ? 'Completed' : 'Start'}
-        </button>
+function DetailRows({ section }) {
+  const showRowEquipment = !section.equipmentSummary
+
+  return (
+    <div style={tc.detailRows}>
+      {section.equipmentSummary && (
+        <p style={tc.equipmentLine}>equipment · {section.equipmentSummary}</p>
       )}
+      {section.rows.map((row, index) => (
+        <div key={`${row.name}-${index}`} style={tc.detailRow}>
+          <span style={tc.detailName}>{row.name}</span>
+          <span style={tc.detailPrescription}>{row.prescription}</span>
+          {showRowEquipment && row.equipment.length > 0 && (
+            <span style={tc.rowEquipment}>{row.equipment.join(' · ')}</span>
+          )}
+        </div>
+      ))}
     </div>
   )
 }
@@ -150,126 +156,161 @@ const tc = {
   wrap: {
     display:       'flex',
     flexDirection: 'column',
-    gap:           '0',
+    gap:           '10px',
     padding:       '8px 0',
     borderTop:     '0.5px solid color-mix(in srgb, var(--color-border) 50%, transparent)',
   },
-  top: {
-    display:    'flex',
-    alignItems: 'center',
-    gap:        '12px',
-    userSelect: 'none',
-    padding:    '10px 0',
-    borderBottom: '0.5px solid color-mix(in srgb, var(--color-border) 40%, transparent)',
-  },
-  abbr: {
-    width:          '40px',
-    height:         '40px',
-    borderRadius:   'var(--radius-sm)',
-    background:     'var(--color-accent-bg)',
-    border:         '0.5px solid var(--color-accent)',
-    color:          'var(--color-accent)',
-    fontSize:       '13px',
-    fontWeight:     700,
-    letterSpacing:  '0.04em',
-    display:        'flex',
-    alignItems:     'center',
-    justifyContent: 'center',
-    flexShrink:     0,
-  },
-  info: {
-    flex:          1,
+  summary: {
     display:       'flex',
     flexDirection: 'column',
-    gap:           '2px',
+    gap:           '7px',
+    padding:       '4px 0 2px',
   },
-  name: { fontSize: '17px', fontWeight: 600, color: 'var(--color-text)' },
-  sub:  { fontSize: '12px', color: 'var(--color-muted)' },
-  doneBadge: {
-    padding:      '4px 10px',
-    borderRadius: 'var(--radius-pill)',
-    background:   'var(--color-success-bg)',
-    color:        'var(--color-success)',
-    border:       '0.5px solid var(--color-success)',
-    fontSize:     '11px',
-    fontWeight:   600,
-    flexShrink:   0,
-  },
-  chevron: {
-    fontSize:   '18px',
+  selectedDay: {
+    margin:     0,
     color:      'var(--color-muted)',
-    flexShrink: 0,
-    transition: 'transform 300ms ease',
-    lineHeight: 1,
+    fontSize:   '12px',
+    fontWeight: 600,
   },
-
-  // Preview sections
-  prevWrap: {
-    display:       'flex',
-    flexDirection: 'column',
-    gap:           '12px',
-    paddingTop:    '4px',
+  title: {
+    margin:      0,
+    color:       'var(--color-text)',
+    fontFamily: 'var(--font-display)',
+    fontSize:    '24px',
+    fontWeight:  520,
+    lineHeight:  1.08,
   },
-  prevSection: {
+  metaGrid: {
+    display:             'grid',
+    gridTemplateColumns: '76px minmax(0, 1fr)',
+    alignItems:          'baseline',
+    gap:                 '3px 8px',
+  },
+  metaLabel: {
+    color:      'var(--color-muted)',
+    fontSize:   '11px',
+    fontWeight: 560,
+  },
+  metaValue: {
+    minWidth:   0,
+    color:      'var(--color-text)',
+    fontSize:   '12px',
+    fontWeight: 560,
+    overflow:   'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  doneText: {
+    color: 'var(--color-success)',
+  },
+  actions: {
+    display:  'flex',
+    flexWrap: 'wrap',
+    gap:      '6px',
+  },
+  primaryAction: {
+    minHeight:    '32px',
+    borderRadius: 'var(--radius-sm)',
+    border:       'none',
+    background:   'var(--color-accent)',
+    color:        '#fff',
+    fontSize:     '13px',
+    fontWeight:   650,
+    padding:      '7px 13px',
+  },
+  secondaryAction: {
+    minHeight:    '32px',
+    borderRadius: 'var(--radius-sm)',
+    border:       'var(--border)',
+    background:   'transparent',
+    color:        'var(--color-text)',
+    fontSize:     '13px',
+    fontWeight:   650,
+    padding:      '7px 13px',
+  },
+  completedAction: {
+    background: 'var(--color-success-bg)',
+    color:      'var(--color-success)',
+    border:     '0.5px solid var(--color-success)',
+  },
+  details: {
     display:       'flex',
     flexDirection: 'column',
     gap:           '4px',
+    padding:       '6px 0 1px',
+    borderTop:     '0.5px solid color-mix(in srgb, var(--color-border) 42%, transparent)',
   },
-  prevSectionTitle: {
-    fontSize:      '9px',
-    fontWeight:    700,
-    letterSpacing: '0.1em',
-    textTransform: 'uppercase',
+  detailGroup: {
+    display:       'flex',
+    flexDirection: 'column',
+    gap:           '3px',
+  },
+  detailToggle: {
+    display:             'grid',
+    gridTemplateColumns: 'minmax(0, 1fr) auto',
+    alignItems:          'baseline',
+    gap:                 '10px',
+    width:               '100%',
+    padding:             '5px 0',
+    background:          'transparent',
+    border:       'none',
+    color:        'inherit',
+    textAlign:    'left',
+  },
+  detailTitle: {
     color:         'var(--color-muted)',
-    marginBottom:  '4px',
+    fontSize:      '10px',
+    fontWeight:    720,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
   },
-  prevRow: {
-    display:        'flex',
-    justifyContent: 'space-between',
-    alignItems:     'center',
-    padding:        '5px 0',
-    borderBottom:   '0.5px solid var(--color-border)',
+  detailCount: {
+    color:      'var(--color-muted)',
+    fontSize:   '10px',
+    fontWeight: 540,
+    whiteSpace: 'nowrap',
   },
-  prevName:   { fontSize: '13px', color: 'var(--color-text)', fontWeight: 500 },
-  prevDetail: { fontSize: '13px', color: 'var(--color-accent)', fontWeight: 600 },
-
-  prevFooter: {
-    display:        'flex',
-    alignItems:     'center',
-    justifyContent: 'space-between',
-    paddingTop:     '4px',
-    gap:            '12px',
+  detailRows: {
+    display:       'flex',
+    flexDirection: 'column',
+    gap:           '1px',
+    paddingBottom: '4px',
   },
-  prevTotal: {
-    fontSize:  '12px',
-    color:     'var(--color-muted)',
-    fontWeight: 500,
+  equipmentLine: {
+    margin:     '0 0 2px',
+    color:      'var(--color-muted)',
+    fontSize:   '10px',
+    fontWeight: 520,
   },
-  startInPreview: {
-    padding:      '10px 18px',
-    borderRadius: 'var(--radius-sm)',
-    background:   'var(--color-accent)',
-    color:        '#fff',
-    fontSize:     '14px',
-    fontWeight:   600,
-    border:       'none',
-    cursor:       'pointer',
+  detailRow: {
+    display:             'grid',
+    gridTemplateColumns: 'minmax(0, 1fr) auto',
+    gap:                 '6px',
+    alignItems:          'baseline',
+    minHeight:           '21px',
+    padding:             '1px 0',
   },
-  completedLabel: {
-    fontSize:   '13px',
-    color:      'var(--color-success)',
-    fontWeight: 600,
+  detailName: {
+    minWidth:   0,
+    color:      'var(--color-text)',
+    fontSize:   '12px',
+    fontWeight: 560,
+    overflow:   'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   },
-
-  startBtn: {
-    width:        '100%',
-    padding:      '14px',
-    borderRadius: 'var(--radius-sm)',
-    fontSize:     '15px',
-    fontWeight:   600,
-    transition:   'background 0.15s, color 0.15s',
-    border:       'none',
-    cursor:       'pointer',
+  detailPrescription: {
+    color:      'var(--color-accent)',
+    fontSize:   '11px',
+    fontWeight: 650,
+    whiteSpace: 'nowrap',
+  },
+  rowEquipment: {
+    gridColumn: '1 / 3',
+    color:      'var(--color-muted)',
+    fontSize:   '10px',
+    fontWeight: 520,
+    lineHeight: 1.25,
   },
 }
 
@@ -509,10 +550,11 @@ export default function Fitness({ onStartWorkout, onNavigate }) {
             </button>
           )}
         </div>
-        <TodayCard
+        <TrainingCommitment
           workout={viewedWorkout}
           todayComplete={todayComplete}
           isToday={isViewingToday}
+          selectedDay={formatFitnessSelectedDay(viewingIndex, isViewingToday)}
           onStart={() => onStartWorkout && onStartWorkout(viewedWorkout)}
         />
       </section>

@@ -14,7 +14,10 @@ import {
 } from '../constants/fitness.js'
 import { getPhase, getTypeForDay, getWeekDates, getWeekNumber } from '../utils/fitness.js'
 import { generateWorkout } from '../utils/workoutGenerator.js'
-import { getWorkoutPreviewSections } from '../utils/workoutDisplay.js'
+import {
+  getWorkoutDetailSections,
+  getWorkoutSummary,
+} from '../utils/workoutDisplay.js'
 import { getTodayISO } from '../utils/time.js'
 import Nutrition from './Nutrition.jsx'
 
@@ -317,15 +320,8 @@ function entryRpe(entry) {
   return null
 }
 
-function trainingStatusMarker(status) {
-  if (status === 'completed') return '● Completed'
-  if (status === 'skipped') return '○ Skipped'
-  if (status === 'in_progress') return '◐ In progress'
-  return '○ Planned'
-}
-
 function workoutTypeLabel(workout) {
-  const focus = workoutFocus(workout?.type, workout?.title)
+  const focus = getWorkoutSummary(workout).focus.toLowerCase()
   if (focus === 'run') return 'Run'
   if (focus === 'mobility') return 'Recovery'
   if (focus === 'strength') return 'Strength'
@@ -333,10 +329,6 @@ function workoutTypeLabel(workout) {
   if (focus === 'push') return 'Upper'
   if (focus === 'lower') return 'Lower'
   return workout?.title?.replace(' + Core', '') ?? 'Workout'
-}
-
-function displayExerciseName(name) {
-  return String(name ?? '').replace(/^DB\b/, 'Dumbbell')
 }
 
 function getReadiness(energy, soreness) {
@@ -577,55 +569,78 @@ function getTrainingDayPlan(fitnessState, settingsState, date) {
   return { iso, scheduled: true, workout, status }
 }
 
-function WorkoutHeader({ workout, date, status }) {
+function TrainingCommitment({ workout, date, status, children }) {
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [expandedSections, setExpandedSections] = useState({})
+  const summary = getWorkoutSummary(workout, status)
+  const sections = getWorkoutDetailSections(workout)
+  const hasDetails = sections.length > 0
+
   return (
-    <div style={s.workoutHeader}>
-      <h2 style={s.workoutTitle}>{workout.title.replace(' + Core', '')}</h2>
-      <p style={s.workoutMeta}>{formatTrainingHeaderDate(date)} · ~{workout.durationEst} min</p>
-      <p style={{ ...s.workoutStatus, ...(status === 'completed' ? s.workoutStatusDone : {}) }}>
-        {trainingStatusMarker(status)}
-      </p>
-    </div>
+    <>
+      <div style={s.workoutHeader}>
+        <p style={s.workoutMeta}>{formatTrainingHeaderDate(date).toLowerCase()}</p>
+        <h2 style={s.workoutTitle}>{summary.title}</h2>
+        <PlannerRow label="status" value={summary.statusMarker} />
+        <PlannerRow label="duration" value={summary.duration} />
+        <PlannerRow label="focus" value={summary.focusLabel} />
+      </div>
+      {children}
+      {hasDetails && (
+        <div style={s.detailActions}>
+          <ActionButton secondary onClick={() => setDetailsOpen(value => !value)}>
+            {detailsOpen ? 'hide details' : 'view details'}
+          </ActionButton>
+        </div>
+      )}
+      {detailsOpen && (
+        <WorkoutDetails
+          sections={sections}
+          expandedSections={expandedSections}
+          onToggle={section => setExpandedSections(current => ({
+            ...current,
+            [section]: !current[section],
+          }))}
+        />
+      )}
+    </>
   )
 }
 
-function WorkoutPreview({ workout }) {
-  const [expandedSections, setExpandedSections] = useState({ main: true })
-  const groups = getWorkoutPreviewSections(workout)
-  if (groups.length === 0) return null
-
+function WorkoutDetails({ sections, expandedSections, onToggle }) {
   return (
     <div style={s.workoutPreview}>
-      {groups.map(group => (
-        <div key={group.section} style={s.previewGroup}>
-          <button
-            style={s.previewToggle}
-            onClick={() => setExpandedSections(current => ({ ...current, [group.section]: !current[group.section] }))}
-            type="button"
-          >
-            <span style={s.previewTitle}>{group.section === 'main' ? 'main workout' : group.title}</span>
-            <span style={s.previewCount}>{group.rows.length} movement{group.rows.length === 1 ? '' : 's'}</span>
-          </button>
-          {expandedSections[group.section] && (
-            <PreviewRows rows={group.rows} />
-          )}
-        </div>
-      ))}
+      {sections.map(section => {
+        const expanded = !!expandedSections[section.section]
+        return (
+          <div key={section.section} style={s.previewGroup}>
+            <button
+              style={s.previewToggle}
+              onClick={() => onToggle(section.section)}
+              type="button"
+            >
+              <span style={s.previewTitle}>{section.title}</span>
+              <span style={s.previewCount}>{section.countLabel}</span>
+            </button>
+            {expanded && (
+              <PreviewRows section={section} />
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
 
-function PreviewRows({ rows }) {
-  const equipmentKeys = [...new Set(rows.map(row => row.equipment.join(' · ')).filter(Boolean))]
-  const commonEquipment = equipmentKeys.length === 1 ? equipmentKeys[0] : ''
-  const showRowEquipment = equipmentKeys.length > 1
+function PreviewRows({ section }) {
+  const showRowEquipment = !section.equipmentSummary
 
   return (
     <div style={s.previewRows}>
-      {commonEquipment && <p style={s.previewCommonEquipment}>equipment · {commonEquipment}</p>}
-      {rows.map((row, index) => (
+      {section.equipmentSummary && <p style={s.previewCommonEquipment}>equipment · {section.equipmentSummary}</p>}
+      {section.rows.map((row, index) => (
         <div key={`${row.name}-${index}`} style={s.previewRow}>
-          <span style={s.previewName}>{displayExerciseName(row.name)}</span>
+          <span style={s.previewName}>{row.name}</span>
           <span style={s.previewPrescription}>{row.prescription}</span>
           {showRowEquipment && row.equipment.length > 0 && (
             <span style={s.previewEquipment}>{row.equipment.join(' · ')}</span>
@@ -676,9 +691,7 @@ function WeeklyTrainingPlan({ onStartWorkout, onLogWorkout }) {
 
       <div style={s.selectedTraining}>
         {selectedPlan.scheduled ? (
-          <>
-            <WorkoutHeader workout={selectedPlan.workout} date={selectedDate} status={selectedPlan.status} />
-            <WorkoutPreview workout={selectedPlan.workout} />
+          <TrainingCommitment workout={selectedPlan.workout} date={selectedDate} status={selectedPlan.status}>
             <DailyWorkoutActions
               status={selectedPlan.status}
               workout={selectedPlan.workout}
@@ -686,7 +699,7 @@ function WeeklyTrainingPlan({ onStartWorkout, onLogWorkout }) {
               onLogWorkout={onLogWorkout}
               date={selectedPlan.iso}
             />
-          </>
+          </TrainingCommitment>
         ) : (
           <>
             <PlannerRow label="day" value={formatSelectedDay(selectedDate)} />

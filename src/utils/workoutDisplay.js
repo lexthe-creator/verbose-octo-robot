@@ -109,6 +109,10 @@ function getPreviewSection(segment) {
 }
 
 export function getWorkoutPreviewSections(workout) {
+  return getWorkoutDetailSections(workout)
+}
+
+export function getWorkoutDetailSections(workout) {
   return ['warmup', 'main', 'finisher', 'cooldown']
     .map(section => ({
       section,
@@ -116,12 +120,71 @@ export function getWorkoutPreviewSections(workout) {
       rows: (workout?.segments ?? [])
         .filter(segment => getPreviewSection(segment) === section)
         .map(segment => ({
-          name:         segment.name,
+          name:         displayExerciseName(segment.name),
           prescription: formatSegmentPrescription(segment),
           equipment:    getEquipmentNeededForSegment(segment),
         })),
     }))
+    .map(group => ({
+      ...group,
+      count: group.rows.length,
+      countLabel: `${group.rows.length} movement${group.rows.length === 1 ? '' : 's'}`,
+      equipmentSummary: getCommonEquipment(group.rows),
+    }))
     .filter(group => group.rows.length > 0)
+}
+
+export function getWorkoutSummary(workout = {}, status = 'planned') {
+  const duration = workout.estimatedMinutes ?? workout.durationEst ?? workout.duration
+  const sections = getWorkoutDetailSections(workout)
+  const movementCount = sections.reduce((total, section) => total + section.count, 0)
+  const title = cleanWorkoutTitle(workout.title ?? workout.name ?? 'Workout')
+  const focus = getWorkoutFocus(workout)
+
+  return {
+    title,
+    status,
+    statusLabel: getWorkoutStatusLabel(status),
+    statusMarker: getWorkoutStatusMarker(status),
+    duration: duration ? `${duration} min` : 'open',
+    durationValue: duration ?? 0,
+    focus,
+    focusLabel: focus ? `${focus.toLowerCase()} focus` : 'workout focus',
+    movementCount,
+    detailLabel: movementCount > 0
+      ? `${movementCount} movement${movementCount === 1 ? '' : 's'}`
+      : 'details available in workout',
+    sectionSummary: sections.map(section => `${section.title} ${section.count}`).join(' · '),
+  }
+}
+
+export function getWorkoutStatusLabel(status = 'planned') {
+  if (status === 'completed') return 'completed'
+  if (status === 'skipped') return 'skipped'
+  if (status === 'in_progress') return 'in progress'
+  if (status === 'open' || status === 'none') return 'open'
+  return 'planned'
+}
+
+export function getWorkoutStatusMarker(status = 'planned') {
+  if (status === 'completed') return '☑ completed'
+  if (status === 'skipped') return '○ skipped'
+  if (status === 'in_progress') return '◐ in progress'
+  if (status === 'open' || status === 'none') return '○ open'
+  return '○ planned'
+}
+
+function cleanWorkoutTitle(title) {
+  return String(title).replace(/\s+\+\s+Core\b/i, '').trim()
+}
+
+function displayExerciseName(name) {
+  return String(name ?? '').replace(/^DB\b/, 'Dumbbell')
+}
+
+function getCommonEquipment(rows) {
+  const equipmentKeys = [...new Set(rows.map(row => row.equipment.join(' · ')).filter(Boolean))]
+  return equipmentKeys.length === 1 ? equipmentKeys[0] : ''
 }
 
 export function hasExplicitCore(workout) {
@@ -140,6 +203,8 @@ export function workoutNeedsCore(workout) {
 export function getWorkoutFocus(entry = {}) {
   const type = String(entry.dayType ?? entry.type ?? '').toLowerCase()
   const title = String(entry.title ?? '').toLowerCase()
+  if (type.includes('hybrid') || title.includes('hybrid')) return 'Hybrid'
+  if (type.includes('hyrox') || title.includes('hyrox')) return 'Hybrid'
   if (type.includes('strength') || title.includes('strength')) return 'Strength'
   if (type.includes('push') || title.includes('push')) return 'Push'
   if (type.includes('lower') || title.includes('lower')) return 'Lower'

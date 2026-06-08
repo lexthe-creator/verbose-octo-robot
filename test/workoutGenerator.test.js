@@ -7,7 +7,9 @@ import {
   getJournalRow,
   getNextUp,
   getSideInstruction,
+  getWorkoutDetailSections,
   getWorkoutPreviewSections,
+  getWorkoutSummary,
   hasExplicitCore,
   workoutNeedsCore,
 } from '../src/utils/workoutDisplay.js'
@@ -345,6 +347,29 @@ test('workout preview sections expose grouped prescriptions and equipment', () =
   assert.ok(main)
   assert.ok(main.rows.some(row => row.prescription.includes('x')))
   assert.ok(main.rows.some(row => row.equipment.length > 0))
+})
+
+test('workout summary exposes planner-first metadata without exercise rows', () => {
+  const workout = workoutFor('upper')
+  const summary = getWorkoutSummary(workout, 'planned')
+
+  assert.equal(summary.title, 'Upper Body')
+  assert.equal(summary.statusMarker, '○ planned')
+  assert.match(summary.duration, /^\d+ min$/)
+  assert.equal(summary.focus, 'Upper')
+  assert.equal(summary.movementCount, workout.segments.length)
+  assert.equal(Object.hasOwn(summary, 'rows'), false)
+})
+
+test('workout detail sections summarize collapsed groups before rows are rendered', () => {
+  const workout = workoutFor('upper')
+  const sections = getWorkoutDetailSections(workout)
+  const main = sections.find(section => section.section === 'main')
+
+  assert.ok(main)
+  assert.equal(main.count, main.rows.length)
+  assert.match(main.countLabel, /movement/)
+  assert.ok(typeof main.equipmentSummary === 'string')
 })
 
 test('side-based movements expose each-side instruction', () => {
