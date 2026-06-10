@@ -123,6 +123,7 @@ export default function App() {
         {screen === SCREENS.HEALTH && (
           <Health
             onStartWorkout={handleStartWorkout}
+            onNavigate={navigate}
           />
         )}
         {screen === SCREENS.FITNESS && (

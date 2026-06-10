@@ -1,17 +1,21 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useFitness } from '../context/index.js'
+import { SCREENS } from '../constants/navigation.js'
 import HealthInsights from './health/HealthInsights.jsx'
 import HealthNutrition from './health/HealthNutrition.jsx'
 import { LogWorkoutSheet, PlanSetupSheet } from './health/HealthSheets.jsx'
 import HealthToday from './health/HealthToday.jsx'
 import HealthTraining from './health/HealthTraining.jsx'
-import { SECTION_LABELS, SECTIONS } from './health/healthUtils.js'
 import { healthStyles as s } from './health/healthStyles.js'
 
-export default function Health({ onStartWorkout }) {
-  const [section, setSection] = useState('today')
+export default function Health({ onStartWorkout, onNavigate }) {
   const [sheet, setSheet] = useState(null)
+  const weeklyRef = useRef(null)
   const { fitnessState } = useFitness()
+
+  function scrollToSection(ref) {
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   return (
     <div style={s.screen}>
@@ -19,39 +23,29 @@ export default function Health({ onStartWorkout }) {
         <header style={s.topHeader}>
           <p style={s.topEyebrow}>health</p>
         </header>
-        <div style={s.tabs} aria-label="health sections">
-          {SECTIONS.map(item => (
-            <button
-              key={item}
-              style={{ ...s.tab, ...(section === item ? s.tabActive : {}) }}
-              onClick={() => setSection(item)}
-              type="button"
-              aria-current={section === item ? 'page' : undefined}
-            >
-              <span style={{ ...s.tabDot, ...(section === item ? s.tabDotActive : {}) }} aria-hidden="true" />
-              <span>{SECTION_LABELS[item]}</span>
-            </button>
-          ))}
-        </div>
       </div>
 
-      {section === 'today' && (
-        <HealthToday
-          onSectionChange={setSection}
-          onStartWorkout={onStartWorkout}
-          onLogWorkout={() => setSheet('log')}
-        />
-      )}
-      {section === 'training' && (
+      <div style={s.healthPage}>
         <HealthTraining
+          variant="today"
           configured={fitnessState.program.configured}
           onCreatePlan={() => setSheet('plan')}
           onLogWorkout={() => setSheet('log')}
           onStartWorkout={onStartWorkout}
+          onOpenWeekly={() => scrollToSection(weeklyRef)}
         />
-      )}
-      {section === 'nutrition' && <HealthNutrition />}
-      {section === 'insights' && <HealthInsights />}
+        <HealthNutrition onOpenNutrition={() => onNavigate?.(SCREENS.NUTRITION)} />
+        <HealthToday />
+        <div ref={weeklyRef} style={s.sectionAnchor}>
+          <HealthTraining
+            configured={fitnessState.program.configured}
+            onCreatePlan={() => setSheet('plan')}
+            onLogWorkout={() => setSheet('log')}
+            onStartWorkout={onStartWorkout}
+          />
+        </div>
+        <HealthInsights />
+      </div>
       {sheet === 'plan' && <PlanSetupSheet onClose={() => setSheet(null)} />}
       {sheet === 'log' && <LogWorkoutSheet onClose={() => setSheet(null)} />}
     </div>

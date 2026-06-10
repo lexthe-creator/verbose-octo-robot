@@ -1980,7 +1980,7 @@ Do not implement Calendar behavior beyond the approved read-only V1 scope until 
 - Fitness owns the primary full workout experience. Health Today may mirror compact training status only and must not duplicate the full workout preview, weekly planner, or exercise details.
 - Health → Training is allowed to show the selected day's generated workout before start. It should use the same generated workout data and the same planner-summary/detail helpers as Fitness. Health Training must open with the planner item only; workout structure appears only after `View Details`; Warm Up / Main / Finisher / Cool Down groups remain collapsed by default. This preview must not create a separate Health workout generator, separate workout state, or separate exercise-library surface.
 - Health Training should read like planner commitments, not a standalone fitness app. The weekly strip should make day/date, workout type, status, and active day clear. The selected workout should prioritize title, status plus duration, focus, one primary action, and quieter secondary actions. Journal rows should stay compact planner rows, not a workout-history dashboard.
-- Health architecture should use shared planner primitives for row, action, section-header, option-grid, and bottom-sheet patterns instead of Health-only duplicates. Health's route shell should stay thin: internal section state, tab rendering, and sheet selection only. Today, Training, Nutrition, Insights, setup, and logging flows should live in focused components/modules. This modularization does not by itself remove Health internal tabs or the current weekly training strip; navigation and hierarchy changes require a later product pass.
+- Health architecture should use shared planner primitives for row, action, section-header, option-grid, and bottom-sheet patterns instead of Health-only duplicates. Health's route shell should stay thin: it renders one continuous planner page, owns sheet selection, and passes route actions into compact section summaries. Health should answer "what should I do today?" before "what Health features exist?" Its daily hierarchy is Training, Nutrition, Recovery, then Weekly Commitments as supporting navigation. Today, Training, Nutrition, Insights, setup, and logging flows should live in focused components/modules.
 
 ---
 
@@ -2546,7 +2546,7 @@ Used in the future Nutrition screen or logging flow.
 
 **Persistent module utilities** (`src/App.jsx`):
 - Inbox and Settings appear as shared top-right utility actions on standard app modules: Home, Calendar, Tasks, Health, direct Fitness, Nutrition, Plan, More, Projects, and Finance.
-- Health uses internal sections for Today, Training, Nutrition, and Insights; the shared utility actions remain visible while switching between those Health sections.
+- Health renders one continuous planner page rather than a nested tabbed sub-app; daily Training, Nutrition, and Recovery sections come before Weekly Commitments and lightweight Insights. The shared utility actions remain visible on the Health route.
 - The actions use the same quiet circular icon-button treatment established by the Home header.
 - Do not duplicate these actions manually inside every sub-screen when the shared app shell can render them.
 - Do not show these actions on full-screen or focused execution surfaces: Morning Ignition, Focus Timer, Fitness Setup, EOD Reflection, Weekly Planning, Settings, Inbox, or any active WorkoutPlayer overlay.

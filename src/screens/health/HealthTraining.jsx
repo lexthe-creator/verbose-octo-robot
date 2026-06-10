@@ -120,7 +120,7 @@ function WeeklyTrainingStrip({
         <p style={s.weekStripLabel}>this week</p>
         <p style={s.weekStripRange}>{formatWeekRange(weekDates)}</p>
       </div>
-      <div style={s.trainingWeekList}>
+      <div style={s.weekPlannerRow}>
         {weekDates.map(date => {
           const iso = toLocalISO(date)
           const dayPlan = getDayPlan?.(date)
@@ -133,26 +133,26 @@ function WeeklyTrainingStrip({
             <button
               key={iso}
               style={{
-                ...s.trainingWeekDay,
-                ...(selected ? s.trainingWeekDaySelected : {}),
-                ...(isToday ? s.trainingWeekDayToday : {}),
+                ...s.weekPlannerCell,
+                ...(selected ? s.weekPlannerCellSelected : {}),
+                ...(isToday ? s.weekPlannerCellToday : {}),
               }}
               onClick={() => onSelect(iso)}
               type="button"
               aria-pressed={selected}
             >
-              <span style={s.trainingDayTop}>
-                <span style={s.trainingDayName}>
+              <span style={s.weekCellDate}>
+                <span style={s.weekCellDay}>
                   {date.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 3)}
                 </span>
-                <span style={s.trainingDayNumber}>{date.getDate()}</span>
+                <span style={s.weekCellNumber}>{date.getDate()}</span>
               </span>
-              <span style={s.trainingDayType}>
+              <span style={s.weekCellType}>
                 {dayType}
               </span>
-              <span style={s.trainingDayStatus}>
-                <span aria-hidden="true">{status.symbol}</span>
-                <span>{status.label}</span>
+              <span style={s.weekCellStatus}>
+                <span style={s.weekCellStatusMark} aria-hidden="true">{status.symbol}</span>
+                <span style={s.weekCellStatusLabel}>{status.label}</span>
               </span>
             </button>
           )
@@ -162,7 +162,70 @@ function WeeklyTrainingStrip({
   )
 }
 
-function EmptyTraining({ onCreatePlan, onLogWorkout }) {
+function OpenTrainingCommitment({ date, onCreatePlan, onLogWorkout, showPlanAction = false, children }) {
+  return (
+    <div style={s.block}>
+      <div style={s.openTrainingItem}>
+        <p style={s.workoutMeta}>{formatSelectedDay(date)}</p>
+        <h3 style={s.openTrainingTitle}>open day</h3>
+        <PlannerRow label="status" value="unscheduled" detail={showPlanAction ? 'plan not created' : undefined} />
+      </div>
+      {children}
+      <PlannerActionRow style={s.actions}>
+        {showPlanAction && <PlannerActionButton onClick={onCreatePlan}>create plan</PlannerActionButton>}
+        <PlannerActionButton secondary onClick={onLogWorkout}>log workout</PlannerActionButton>
+      </PlannerActionRow>
+    </div>
+  )
+}
+
+function TodayTraining({ configured, onCreatePlan, onLogWorkout, onStartWorkout, onOpenWeekly }) {
+  const { fitnessState } = useFitness()
+  const { settingsState } = useSettings()
+  const today = getTodayISO()
+  const todayDate = new Date(`${today}T00:00:00`)
+  const todayPlan = getTrainingDayPlan(fitnessState, settingsState, todayDate)
+
+  return (
+    <section style={s.healthSection} aria-labelledby="health-training-title">
+      <header style={s.sectionHeader}>
+        <p style={s.sectionLabel}>training</p>
+        <h2 id="health-training-title" style={s.sectionTitle}>today</h2>
+      </header>
+
+      {configured && todayPlan.scheduled ? (
+        <section style={s.block}>
+          <TrainingCommitment workout={todayPlan.workout} date={todayDate} status={todayPlan.status}>
+            <DailyWorkoutActions
+              status={todayPlan.status}
+              workout={todayPlan.workout}
+              onStartWorkout={onStartWorkout}
+              onLogWorkout={onLogWorkout}
+              date={todayPlan.iso}
+            />
+            <PlannerActionRow style={s.secondaryActions}>
+              <PlannerActionButton secondary onClick={onOpenWeekly}>view week</PlannerActionButton>
+            </PlannerActionRow>
+          </TrainingCommitment>
+        </section>
+      ) : (
+        <OpenTrainingCommitment
+          date={todayDate}
+          onCreatePlan={onCreatePlan}
+          onLogWorkout={onLogWorkout}
+          showPlanAction={!configured}
+        >
+          {!configured && <p style={s.emptyCopy}>No training plan yet.</p>}
+          <PlannerActionRow style={s.secondaryActions}>
+            <PlannerActionButton secondary onClick={onOpenWeekly}>view week</PlannerActionButton>
+          </PlannerActionRow>
+        </OpenTrainingCommitment>
+      )}
+    </section>
+  )
+}
+
+function EmptyWeeklyTraining({ onCreatePlan, onLogWorkout }) {
   const [showTypes, setShowTypes] = useState(false)
   const weekDates = useMemo(() => getWeekDates(), [])
   const today = getTodayISO()
@@ -170,36 +233,35 @@ function EmptyTraining({ onCreatePlan, onLogWorkout }) {
   const selectedDate = weekDates.find(date => toLocalISO(date) === selectedIso) ?? weekDates[0]
 
   return (
-    <main style={s.simpleScreen}>
+    <section style={s.healthSection} aria-labelledby="health-weekly-title">
+      <header style={s.sectionHeader}>
+        <p style={s.sectionLabel}>weekly commitments</p>
+        <h2 id="health-weekly-title" style={s.sectionTitle}>training week</h2>
+      </header>
       <WeeklyTrainingStrip
         weekDates={weekDates}
         selectedIso={selectedIso}
         onSelect={setSelectedIso}
       />
-      <header style={s.header}>
-        <p style={s.eyebrow}>training</p>
-        <h1 style={s.title}>open day</h1>
-      </header>
-      <section style={s.block}>
-        <PlannerRow label="day" value={formatSelectedDay(selectedDate)} />
-        <PlannerRow label="plan" value="not created" detail="optional" />
-        <PlannerRow label="schedule" value="open" detail="choose later" />
-        <PlannerRow label="journal" value="available" detail="log any session" />
+      <OpenTrainingCommitment
+        date={selectedDate}
+        onCreatePlan={onCreatePlan}
+        onLogWorkout={onLogWorkout}
+        showPlanAction
+      >
         <p style={s.emptyCopy}>No training plan yet.</p>
-        <PlannerActionRow style={s.actions}>
-          <PlannerActionButton onClick={onCreatePlan}>create plan</PlannerActionButton>
-          <PlannerActionButton secondary onClick={onLogWorkout}>log workout</PlannerActionButton>
-          <PlannerActionButton secondary onClick={() => setShowTypes(value => !value)}>browse types</PlannerActionButton>
-        </PlannerActionRow>
-        {showTypes && (
-          <div style={s.typeList}>
-            <PlannerRow label="strength" value="upper / lower" detail="simple split" />
-            <PlannerRow label="running" value="easy / tempo / long" detail="weekly rhythm" />
-            <PlannerRow label="mobility" value="stretch / recovery" detail="low friction" />
-          </div>
-        )}
-      </section>
-    </main>
+      </OpenTrainingCommitment>
+      <PlannerActionRow style={s.actions}>
+        <PlannerActionButton secondary onClick={() => setShowTypes(value => !value)}>browse types</PlannerActionButton>
+      </PlannerActionRow>
+      {showTypes && (
+        <div style={s.typeList}>
+          <PlannerRow label="strength" value="upper / lower" detail="simple split" />
+          <PlannerRow label="running" value="easy / tempo / long" detail="weekly rhythm" />
+          <PlannerRow label="mobility" value="stretch / recovery" detail="low friction" />
+        </div>
+      )}
+    </section>
   )
 }
 
@@ -375,25 +437,45 @@ function WorkoutJournal() {
   )
 }
 
-function ConfiguredTraining({ onStartWorkout, onLogWorkout }) {
+function ConfiguredWeeklyTraining({ onStartWorkout, onLogWorkout }) {
   return (
-    <div style={s.trainingScreen}>
-      <header style={{ ...s.header, ...s.trainingHeader }}>
-        <p style={s.eyebrow}>training</p>
+    <section style={s.healthSection} aria-labelledby="health-weekly-title">
+      <header style={s.sectionHeader}>
+        <p style={s.sectionLabel}>weekly commitments</p>
+        <h2 id="health-weekly-title" style={s.sectionTitle}>training week</h2>
       </header>
       <WeeklyTrainingPlan onStartWorkout={onStartWorkout} onLogWorkout={onLogWorkout} />
       <WorkoutJournal />
-    </div>
+    </section>
   )
 }
 
-export default function HealthTraining({ configured, onCreatePlan, onLogWorkout, onStartWorkout }) {
+export default function HealthTraining({
+  configured,
+  onCreatePlan,
+  onLogWorkout,
+  onStartWorkout,
+  onOpenWeekly,
+  variant = 'weekly',
+}) {
+  if (variant === 'today') {
+    return (
+      <TodayTraining
+        configured={configured}
+        onCreatePlan={onCreatePlan}
+        onLogWorkout={onLogWorkout}
+        onStartWorkout={onStartWorkout}
+        onOpenWeekly={onOpenWeekly}
+      />
+    )
+  }
+
   if (configured) {
-    return <ConfiguredTraining onStartWorkout={onStartWorkout} onLogWorkout={onLogWorkout} />
+    return <ConfiguredWeeklyTraining onStartWorkout={onStartWorkout} onLogWorkout={onLogWorkout} />
   }
 
   return (
-    <EmptyTraining
+    <EmptyWeeklyTraining
       onCreatePlan={onCreatePlan}
       onLogWorkout={onLogWorkout}
     />

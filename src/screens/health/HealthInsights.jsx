@@ -20,10 +20,10 @@ export default function HealthInsights() {
   ).length
 
   return (
-    <main style={s.simpleScreen}>
-      <header style={s.header}>
-        <p style={s.eyebrow}>insights</p>
-        <h1 style={s.title}>Light trends</h1>
+    <section style={s.healthSection} aria-labelledby="health-insights-title">
+      <header style={s.sectionHeader}>
+        <p style={s.sectionLabel}>insights</p>
+        <h2 id="health-insights-title" style={s.sectionTitle}>light trends</h2>
       </header>
       <section style={s.block}>
         <PlannerRow label="sleep" value="pending" detail="source later" />
@@ -33,6 +33,6 @@ export default function HealthInsights() {
         <PlannerRow label="weight" value="pending" detail="metric later" />
         <PlannerRow label="recovery" value="check-ins" detail="expands later" />
       </section>
-    </main>
+    </section>
   )
 }
