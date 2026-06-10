@@ -54,8 +54,9 @@ function DailyWorkoutActions({ status, workout, onStartWorkout, onLogWorkout, da
 
   if (status === 'in_progress') {
     return (
-      <PlannerActionRow style={s.actions}>
+      <PlannerActionRow style={s.primaryActions}>
         <PlannerActionButton onClick={completeWorkout}>complete workout</PlannerActionButton>
+        <span style={s.actionDivider} />
         <PlannerActionButton secondary onClick={() => setStatus('planned')}>cancel</PlannerActionButton>
       </PlannerActionRow>
     )
@@ -63,7 +64,7 @@ function DailyWorkoutActions({ status, workout, onStartWorkout, onLogWorkout, da
 
   if (status === 'completed') {
     return (
-      <PlannerActionRow style={s.actions}>
+      <PlannerActionRow style={s.secondaryActions}>
         <PlannerActionButton secondary onClick={onLogWorkout}>edit log</PlannerActionButton>
       </PlannerActionRow>
     )
@@ -71,16 +72,18 @@ function DailyWorkoutActions({ status, workout, onStartWorkout, onLogWorkout, da
 
   if (status === 'skipped') {
     return (
-      <PlannerActionRow style={s.actions}>
+      <PlannerActionRow style={s.primaryActions}>
         <PlannerActionButton disabled>skipped</PlannerActionButton>
+        <span style={s.actionDivider} />
         <PlannerActionButton secondary onClick={() => setStatus('planned')}>undo skip</PlannerActionButton>
       </PlannerActionRow>
     )
   }
 
   return (
-    <PlannerActionRow style={s.actions}>
+    <PlannerActionRow style={s.primaryActions}>
       <PlannerActionButton onClick={startWorkout}>start workout</PlannerActionButton>
+      <span style={s.actionDivider} />
       <PlannerActionButton secondary onClick={completeWorkout}>mark complete</PlannerActionButton>
       <PlannerActionButton secondary onClick={() => setStatus('skipped')}>skip</PlannerActionButton>
     </PlannerActionRow>
@@ -93,6 +96,14 @@ function formatWeekRange(weekDates) {
   const startLabel = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toLowerCase()
   const endLabel = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toLowerCase()
   return `${startLabel} - ${endLabel}`
+}
+
+function statusMeta(status) {
+  if (status === 'completed') return { symbol: '●', label: 'done' }
+  if (status === 'in_progress') return { symbol: '◐', label: 'active' }
+  if (status === 'skipped') return { symbol: '○', label: 'skipped' }
+  if (status === 'open') return { symbol: '–', label: 'open' }
+  return { symbol: '○', label: 'planned' }
 }
 
 function WeeklyTrainingStrip({
@@ -115,8 +126,8 @@ function WeeklyTrainingStrip({
           const dayPlan = getDayPlan?.(date)
           const isToday = iso === today
           const selected = iso === selectedIso
-          const completed = dayPlan?.status === 'completed'
           const dayType = dayPlan?.scheduled ? workoutTypeLabel(dayPlan.workout) : 'Open'
+          const status = statusMeta(dayPlan?.scheduled ? dayPlan.status : 'open')
 
           return (
             <button
@@ -130,12 +141,18 @@ function WeeklyTrainingStrip({
               type="button"
               aria-pressed={selected}
             >
-              <span style={s.trainingDayName}>
-                {date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()}
+              <span style={s.trainingDayTop}>
+                <span style={s.trainingDayName}>
+                  {date.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 3)}
+                </span>
+                <span style={s.trainingDayNumber}>{date.getDate()}</span>
               </span>
-              <span style={s.trainingDayNumber}>{date.getDate()}</span>
               <span style={s.trainingDayType}>
-                {dayType}{completed ? ' ✓' : ''}
+                {dayType}
+              </span>
+              <span style={s.trainingDayStatus}>
+                <span aria-hidden="true">{status.symbol}</span>
+                <span>{status.label}</span>
               </span>
             </button>
           )
@@ -198,9 +215,16 @@ function TrainingCommitment({ workout, date, status, children }) {
       <div style={s.workoutHeader}>
         <p style={s.workoutMeta}>{formatTrainingHeaderDate(date).toLowerCase()}</p>
         <h2 style={s.workoutTitle}>{summary.title}</h2>
-        <PlannerRow label="status" value={summary.statusMarker} />
-        <PlannerRow label="duration" value={summary.duration} />
-        <PlannerRow label="focus" value={summary.focusLabel} />
+        <div style={s.workoutSummaryRows}>
+          <div style={s.workoutSummaryRow}>
+            <span style={s.workoutSummaryLabel}>status</span>
+            <span style={s.workoutSummaryValue}>{summary.statusMarker} · {summary.duration}</span>
+          </div>
+          <div style={s.workoutSummaryRow}>
+            <span style={s.workoutSummaryLabel}>focus</span>
+            <span style={s.workoutSummaryValue}>{summary.focusLabel}</span>
+          </div>
+        </div>
       </div>
       {children}
       {hasDetails && (
@@ -299,10 +323,12 @@ function WeeklyTrainingPlan({ onStartWorkout, onLogWorkout }) {
           </TrainingCommitment>
         ) : (
           <>
-            <PlannerRow label="day" value={formatSelectedDay(selectedDate)} />
-            <PlannerRow label="workout" value="open day" />
-            <PlannerRow label="status" value="unscheduled" />
-            <PlannerActionRow>
+            <div style={s.openTrainingItem}>
+              <p style={s.workoutMeta}>{formatSelectedDay(selectedDate)}</p>
+              <h2 style={s.openTrainingTitle}>open day</h2>
+              <PlannerRow label="status" value="unscheduled" />
+            </div>
+            <PlannerActionRow style={s.secondaryActions}>
               <PlannerActionButton secondary onClick={onLogWorkout}>log workout</PlannerActionButton>
             </PlannerActionRow>
           </>
@@ -332,11 +358,12 @@ function WorkoutJournal() {
           {journal.map((entry, index) => (
             <div key={`${entry.date}-${index}`} style={s.journalRow}>
               <span style={s.journalDate}>{formatWorkoutDate(entry.date)}</span>
+              <span style={s.journalTitle}>{entry.title || workoutFocus(entry.type, entry.title)}</span>
               <span style={s.journalMeta}>
                 {[
+                  entry.status === 'completed' ? '●' : '○',
                   workoutFocus(entry.type, entry.title),
                   entry.duration ? `${entry.duration} min` : null,
-                  entry.status === 'completed' ? '●' : '○',
                   entryRpe(entry) ? `RPE ${entryRpe(entry)}/10` : null,
                 ].filter(Boolean).join(' · ')}
               </span>

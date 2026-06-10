@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useFitness } from '../context/index.js'
-import Nutrition from './Nutrition.jsx'
 import HealthInsights from './health/HealthInsights.jsx'
+import HealthNutrition from './health/HealthNutrition.jsx'
 import { LogWorkoutSheet, PlanSetupSheet } from './health/HealthSheets.jsx'
 import HealthToday from './health/HealthToday.jsx'
 import HealthTraining from './health/HealthTraining.jsx'
@@ -50,7 +50,7 @@ export default function Health({ onStartWorkout }) {
           onStartWorkout={onStartWorkout}
         />
       )}
-      {section === 'nutrition' && <Nutrition />}
+      {section === 'nutrition' && <HealthNutrition />}
       {section === 'insights' && <HealthInsights />}
       {sheet === 'plan' && <PlanSetupSheet onClose={() => setSheet(null)} />}
       {sheet === 'log' && <LogWorkoutSheet onClose={() => setSheet(null)} />}
