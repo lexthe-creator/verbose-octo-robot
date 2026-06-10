@@ -19,38 +19,6 @@ function formatHeaderDate(date) {
   return `${weekday} ${monthDay}`
 }
 
-function InboxIcon() {
-  return (
-    <svg style={icon.svg} viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M4 6.5h16v11H4z" />
-      <path d="m4 8 8 5 8-5" />
-      <path d="M4 17.5h16" />
-    </svg>
-  )
-}
-
-function SettingsIcon() {
-  return (
-    <svg style={icon.svg} viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="3.25" />
-      <path d="M12 3.5v2.25M12 18.25v2.25M4.65 7.75l1.95 1.12M17.4 15.13l1.95 1.12M4.65 16.25l1.95-1.12M17.4 8.87l1.95-1.12" />
-    </svg>
-  )
-}
-
-const icon = {
-  svg: {
-    width:       '15px',
-    height:      '15px',
-    display:     'block',
-    fill:        'none',
-    stroke:      'currentColor',
-    strokeWidth: 1.8,
-    strokeLinecap:'round',
-    strokeLinejoin:'round',
-  },
-}
-
 // 30-min slots 06:00 – 22:00
 const TIME_OPTIONS = Array.from({ length: 33 }, (_, i) => {
   const total = 360 + i * 30
@@ -551,8 +519,6 @@ const tr = {
 function TodayHeader({
   now,
   name,
-  onOpenSettings,
-  onOpenInbox,
   onOpenJournal,
   onOpenNutrition,
   onOpenPlan,
@@ -571,10 +537,6 @@ function TodayHeader({
         <div>
           <p style={th.greeting}>{greeting(now, name)}</p>
           <h1 style={th.title}>{dateParts}</h1>
-        </div>
-        <div style={th.headerActions}>
-          <button style={th.iconBtn} onClick={onOpenInbox} aria-label="Inbox"><InboxIcon /></button>
-          <button style={th.iconBtn} onClick={onOpenSettings} aria-label="Settings"><SettingsIcon /></button>
         </div>
       </div>
       <div style={th.tabRow}>
@@ -659,22 +621,6 @@ const th = {
     lineHeight: 1.1,
     color:      'var(--color-text)',
     whiteSpace: 'nowrap',
-  },
-  headerActions: {
-    display: 'flex',
-    gap:     '8px',
-  },
-  iconBtn: {
-    width:          '30px',
-    height:         '30px',
-    borderRadius:   '50%',
-    border:         '0.5px solid color-mix(in srgb, var(--color-border) 62%, transparent)',
-    background:     'transparent',
-    color:          'var(--color-muted)',
-    display:        'flex',
-    alignItems:     'center',
-    justifyContent: 'center',
-    flexShrink:     0,
   },
   summaryGrid: {
     display:             'grid',
@@ -811,8 +757,6 @@ export default function Home({ onNavigate }) {
         <TodayHeader
           now={now}
           name={userState.name}
-          onOpenSettings={() => onNavigate(SCREENS.SETTINGS)}
-          onOpenInbox={() => onNavigate(SCREENS.INBOX)}
           onOpenJournal={() => onNavigate(SCREENS.EOD)}
           onOpenNutrition={() => onNavigate(SCREENS.HEALTH)}
           onOpenPlan={() => onNavigate(SCREENS.PLAN)}

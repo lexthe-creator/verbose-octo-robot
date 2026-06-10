@@ -21,6 +21,7 @@ import Settings        from './screens/Settings.jsx'
 import Fitness         from './screens/Fitness.jsx'
 import FitnessSetup    from './screens/FitnessSetup.jsx'
 import WorkoutPlayer   from './components/WorkoutPlayer.jsx'
+import ModuleHeaderActions from './components/ModuleHeaderActions.jsx'
 import EodReflection   from './screens/EodReflection.jsx'
 import WeeklyPlanning  from './screens/WeeklyPlanning.jsx'
 
@@ -30,6 +31,19 @@ function getInitialScreen(dayLockedAt) {
   if (lockedDate !== new Date().toDateString()) return SCREENS.HOME
   return SCREENS.HOME
 }
+
+const MODULE_ACTION_SCREENS = new Set([
+  SCREENS.HOME,
+  SCREENS.PLAN,
+  SCREENS.CALENDAR,
+  SCREENS.TASKS,
+  SCREENS.HEALTH,
+  SCREENS.FITNESS,
+  SCREENS.MORE,
+  SCREENS.NUTRITION,
+  SCREENS.PROJECTS,
+  SCREENS.FINANCE,
+])
 
 export default function App() {
   const { dayState }                      = useDay()
@@ -88,10 +102,16 @@ export default function App() {
 
   const showNav = shouldShowNav(screen)
   const navTabs = getEnabledNavTabs(settingsState.modules)
+  const showModuleHeaderActions = MODULE_ACTION_SCREENS.has(screen) && !activeWorkout
+  const moduleHeaderActionOffset = screen === SCREENS.FINANCE ? 'belowHeader' : 'default'
 
   return (
     <div style={styles.root}>
       <div style={{ ...styles.screenWrap, paddingBottom: showNav ? 'var(--nav-height)' : 0 }}>
+        {showModuleHeaderActions && (
+          <ModuleHeaderActions onNavigate={navigate} offset={moduleHeaderActionOffset} />
+        )}
+
         {screen === SCREENS.IGNITION && (
           <MorningIgnition onComplete={() => navigate(SCREENS.HOME)} />
         )}

@@ -1142,7 +1142,7 @@ Actions:
 - `UPDATE_SETTING { key, value }`
 - `UPDATE_MODULE { module, enabled }`
 
-**Current module gating behavior:** `settings.modules` is persisted and migration-safe. `App.jsx` uses the fixed bottom-nav order Calendar, Tasks, Home, Fitness, More so Home remains centered. Inbox and Settings remain globally accessible from the Home top-right utility cluster rather than the bottom nav. Finance and Projects are reachable from More when their modules or existing screens are available. Home keeps Daily Flow and task visibility as core planner behavior.
+**Current module gating behavior:** `settings.modules` is persisted and migration-safe. `App.jsx` uses the fixed bottom-nav order Calendar, Tasks, Home, Health, Finance so Home remains centered. Inbox and Settings remain globally accessible as persistent module-header utilities on standard planner/module screens rather than the bottom nav. Finance and Projects are reachable from standard navigation surfaces when their modules or existing screens are available. Home keeps Daily Flow and task visibility as core planner behavior.
 
 ### 4.3 DayContext (`aiml_day`, schema v1)
 
@@ -1551,7 +1551,7 @@ Project stats are exposed by `getProjectStats(project)`, not by `useApp()`.
 
 Layout zones top to bottom:
 
-1. **Daily Execution header** — compact planner header, not a dashboard hero. The visual hierarchy is greeting, date, planner status, then Daily Flow. The date should be roughly 20-25% smaller than the previous hero-like date treatment and should feel like a planner page heading, not a dashboard headline. Inbox and Settings sit together in the top-right utility cluster and remain globally accessible from Home.
+1. **Daily Execution header** — compact planner header, not a dashboard hero. The visual hierarchy is greeting, date, planner status, then Daily Flow. The date should be roughly 20-25% smaller than the previous hero-like date treatment and should feel like a planner page heading, not a dashboard headline. Inbox and Settings sit together in the shared top-right module utility cluster and remain globally accessible from standard modules.
 2. **Greeting and date** — greeting line ("GOOD MORNING/AFTERNOON/EVENING, {name}") from `UserContext`, with date below in planner-style title case, e.g. `Friday May 29`.
 3. **Planner status tabs** — compact monochrome horizontal row under the date: `○ Journal`, `○ Nutrition`, `○ Plan`. These visually match the existing Inbox and Settings icon style: low-density, no labels above them, no emojis, no colorful badges, no cards, and 15-20% tighter spacing than the first implementation. Plan is a planner workspace and AI guidance surface. It is not a duplicate Tasks view. Tasks stores work. Plan helps the user decide what to do with that work.
 4. **Daily summary grid** — compact two-row aligned grid beneath the tabs. Tasks and Morning share the first row. Events and Evening share the second row. Use a true grid so the left side grows naturally and the right column has a fixed width and right alignment. Example:
@@ -2535,12 +2535,20 @@ Used in the future Nutrition screen or logging flow.
 
 **Bottom nav** (`src/App.jsx`):
 - 60px height, `#1A1A14` bg, `0.5px` top border
-- Tabs come from `getEnabledNavTabs(settings.modules)`: Calendar, Tasks, Home, Fitness, More. Home remains centered.
-- Inbox is removed from bottom navigation and remains globally accessible from the Home top-right utility cluster beside Settings.
-- Finance is removed from bottom navigation and routes through More.
+- Tabs come from `getEnabledNavTabs(settings.modules)`: Calendar, Tasks, Home, Health, Finance. Home remains centered.
+- Inbox is removed from bottom navigation and remains globally accessible from the shared top-right module utility cluster beside Settings.
+- Finance remains a standard module route and may also be reachable from secondary navigation surfaces.
 - Active: label + icon color → `#C17B56`, small 4px pip dot below icon
 - Fixed to bottom of the 393px column, `z-index: 100`
-- Hidden by `navigation/router.js` for `fitness-setup`, `settings`, `ignition`, `focus`, `eod`, and `weekly`. The current route map shows nav on `calendar`, `tasks`, `home`, `fitness`, `more`, `projects`, and `finance`.
+- Hidden by `navigation/router.js` for `fitness-setup`, `settings`, `ignition`, `focus`, `eod`, and `weekly`. The current route map shows nav on `calendar`, `tasks`, `home`, `health`, `fitness`, `more`, `nutrition`, `projects`, and `finance`.
+
+**Persistent module utilities** (`src/App.jsx`):
+- Inbox and Settings appear as shared top-right utility actions on standard app modules: Home, Calendar, Tasks, Health, direct Fitness, Nutrition, Plan, More, Projects, and Finance.
+- Health uses internal sections for Today, Training, Nutrition, and Insights; the shared utility actions remain visible while switching between those Health sections.
+- The actions use the same quiet circular icon-button treatment established by the Home header.
+- Do not duplicate these actions manually inside every sub-screen when the shared app shell can render them.
+- Do not show these actions on full-screen or focused execution surfaces: Morning Ignition, Focus Timer, Fitness Setup, EOD Reflection, Weekly Planning, Settings, Inbox, or any active WorkoutPlayer overlay.
+- WorkoutPlayer is a full-screen guided execution mode and should keep only workout execution controls.
 
 **Global overlays** (rendered above nav in `App.jsx`):
 - `WorkoutPlayer` (z-index 150): shown when `activeWorkout !== null`; cleared on save or close
@@ -2550,8 +2558,8 @@ Used in the future Nutrition screen or logging flow.
 | From | To | Trigger |
 |---|---|---|
 | `ignition` | `home` | `onComplete()` inside MorningIgnition Step 3 |
-| `home` | `inbox` | Inbox icon in the Home top-right utility cluster |
-| `home` | `settings` | Settings icon in the Home top-right utility cluster |
+| any standard module | `inbox` | Inbox icon in the shared top-right module utility cluster |
+| any standard module | `settings` | Settings icon in the shared top-right module utility cluster |
 | `home` | `plan` | Plan tab in the Home planner status bar |
 | `home` | `focus` | `onOpenFocus()` prop |
 | `home` | `projects` | `onNavigate('projects')` via focus-project goal card tap |
@@ -2624,7 +2632,7 @@ File: `.github/workflows/pages.yml`
 - LocalStorage persistence with eight domain keys and daily reset scoped to DayContext
 - PWA manifest + GitHub Pages deploy
 
-**Module defaults in V1:** `settings.modules.fitness`, `settings.modules.finance`, and `settings.modules.focus` default to enabled. `nutrition`, `goals`, `reflection`, `habits`, and `sleep` default to disabled. App nav uses the fixed order Calendar, Tasks, Home, Fitness, More. Inbox and Settings are Home top-right utilities. Finance and Projects are reachable from More when their routes are available. Home keeps Daily Flow, task tally, and planner status available regardless of module flags.
+**Module defaults in V1:** `settings.modules.fitness`, `settings.modules.finance`, and `settings.modules.focus` default to enabled. `nutrition`, `goals`, `reflection`, `habits`, and `sleep` default to disabled. App nav uses the fixed order Calendar, Tasks, Home, Health, Finance. Inbox and Settings are persistent shared module-header utilities on standard app modules. Finance and Projects are reachable from standard navigation surfaces when their routes are available. Home keeps Daily Flow, task tally, and planner status available regardless of module flags.
 
 ### Deferred (V2+)
 
