@@ -87,16 +87,84 @@ function DailyWorkoutActions({ status, workout, onStartWorkout, onLogWorkout, da
   )
 }
 
+function formatWeekRange(weekDates) {
+  const start = weekDates[0]
+  const end = weekDates[weekDates.length - 1]
+  const startLabel = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toLowerCase()
+  const endLabel = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toLowerCase()
+  return `${startLabel} - ${endLabel}`
+}
+
+function WeeklyTrainingStrip({
+  weekDates,
+  selectedIso,
+  onSelect,
+  getDayPlan,
+}) {
+  const today = getTodayISO()
+
+  return (
+    <section style={s.weekStrip} aria-label="this week">
+      <div style={s.weekStripHeader}>
+        <p style={s.weekStripLabel}>this week</p>
+        <p style={s.weekStripRange}>{formatWeekRange(weekDates)}</p>
+      </div>
+      <div style={s.trainingWeekList}>
+        {weekDates.map(date => {
+          const iso = toLocalISO(date)
+          const dayPlan = getDayPlan?.(date)
+          const isToday = iso === today
+          const selected = iso === selectedIso
+          const completed = dayPlan?.status === 'completed'
+          const dayType = dayPlan?.scheduled ? workoutTypeLabel(dayPlan.workout) : 'Open'
+
+          return (
+            <button
+              key={iso}
+              style={{
+                ...s.trainingWeekDay,
+                ...(selected ? s.trainingWeekDaySelected : {}),
+                ...(isToday ? s.trainingWeekDayToday : {}),
+              }}
+              onClick={() => onSelect(iso)}
+              type="button"
+              aria-pressed={selected}
+            >
+              <span style={s.trainingDayName}>
+                {date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase()}
+              </span>
+              <span style={s.trainingDayNumber}>{date.getDate()}</span>
+              <span style={s.trainingDayType}>
+                {dayType}{completed ? ' ✓' : ''}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
 function EmptyTraining({ onCreatePlan, onLogWorkout }) {
   const [showTypes, setShowTypes] = useState(false)
+  const weekDates = useMemo(() => getWeekDates(), [])
+  const today = getTodayISO()
+  const [selectedIso, setSelectedIso] = useState(today)
+  const selectedDate = weekDates.find(date => toLocalISO(date) === selectedIso) ?? weekDates[0]
 
   return (
     <main style={s.simpleScreen}>
+      <WeeklyTrainingStrip
+        weekDates={weekDates}
+        selectedIso={selectedIso}
+        onSelect={setSelectedIso}
+      />
       <header style={s.header}>
         <p style={s.eyebrow}>training</p>
         <h1 style={s.title}>open day</h1>
       </header>
       <section style={s.block}>
+        <PlannerRow label="day" value={formatSelectedDay(selectedDate)} />
         <PlannerRow label="plan" value="not created" detail="optional" />
         <PlannerRow label="schedule" value="open" detail="choose later" />
         <PlannerRow label="journal" value="available" detail="log any session" />
@@ -211,32 +279,12 @@ function WeeklyTrainingPlan({ onStartWorkout, onLogWorkout }) {
 
   return (
     <section style={{ ...s.trainingBlock, ...s.trainingPlanner }}>
-      <div style={s.trainingWeekList}>
-        {weekDates.map(date => {
-          const dayPlan = getTrainingDayPlan(fitnessState, settingsState, date)
-          const isToday = dayPlan.iso === today
-          const selected = dayPlan.iso === selectedIso
-          const completed = dayPlan.status === 'completed'
-
-          return (
-            <button
-              key={dayPlan.iso}
-              style={{
-                ...s.trainingWeekDay,
-                ...(selected ? s.trainingWeekDaySelected : {}),
-                ...(isToday ? s.trainingWeekDayToday : {}),
-              }}
-              onClick={() => setSelectedIso(dayPlan.iso)}
-              type="button"
-            >
-              <span style={s.trainingDayName}>{date.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 1).toUpperCase()}</span>
-              <span style={s.trainingDayType}>
-                {dayPlan.scheduled ? workoutTypeLabel(dayPlan.workout) : 'Open'}{completed ? ' ✓' : ''}
-              </span>
-            </button>
-          )
-        })}
-      </div>
+      <WeeklyTrainingStrip
+        weekDates={weekDates}
+        selectedIso={selectedIso}
+        onSelect={setSelectedIso}
+        getDayPlan={date => getTrainingDayPlan(fitnessState, settingsState, date)}
+      />
 
       <div style={s.selectedTraining}>
         {selectedPlan.scheduled ? (

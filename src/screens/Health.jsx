@@ -26,8 +26,10 @@ export default function Health({ onStartWorkout }) {
               style={{ ...s.tab, ...(section === item ? s.tabActive : {}) }}
               onClick={() => setSection(item)}
               type="button"
+              aria-current={section === item ? 'page' : undefined}
             >
-              {SECTION_LABELS[item]}
+              <span style={{ ...s.tabDot, ...(section === item ? s.tabDotActive : {}) }} aria-hidden="true" />
+              <span>{SECTION_LABELS[item]}</span>
             </button>
           ))}
         </div>
