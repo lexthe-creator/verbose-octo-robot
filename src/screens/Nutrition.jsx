@@ -6,6 +6,7 @@ import {
   getNutritionTotals,
   useNutrition,
 } from '../context/index.js'
+import { PlannerBottomSheet as BottomSheet } from '../components/planner/PlannerPrimitives.jsx'
 import { getTodayISO } from '../utils/time.js'
 
 const EMPTY_FORM = {
@@ -168,18 +169,12 @@ function MealSection({
   )
 }
 
-function BottomSheet({ title, children, onClose }) {
-  return (
-    <div style={styles.sheetBackdrop}>
-      <div style={styles.sheet}>
-        <div style={styles.sheetHeader}>
-          <h2 style={styles.sheetTitle}>{title}</h2>
-          <button style={styles.closeAction} onClick={onClose} type="button">close</button>
-        </div>
-        {children}
-      </div>
-    </div>
-  )
+const nutritionSheetProps = {
+  backdropStyle: { background: 'rgba(26, 26, 20, 0.24)' },
+  sheetStyle:    { boxShadow: '0 -12px 34px rgba(26, 26, 20, 0.12)' },
+  headerStyle:   { gap: '14px', marginBottom: '14px' },
+  titleStyle:    { fontSize: '20px', lineHeight: 1.1 },
+  closeStyle:    { fontWeight: 700, padding: 0 },
 }
 
 export default function Nutrition() {
@@ -404,21 +399,21 @@ export default function Nutrition() {
       </details>
 
       {sheet?.type === 'add' && (
-        <BottomSheet title={`add to ${form.mealSlot}`} onClose={closeSheet}>
+        <BottomSheet title={`add to ${form.mealSlot}`} onClose={closeSheet} {...nutritionSheetProps}>
           <FoodFields form={form} onChange={setForm} />
           <button style={styles.sheetPrimary} onClick={addFood} type="button">add food</button>
         </BottomSheet>
       )}
 
       {sheet?.type === 'edit' && (
-        <BottomSheet title="edit food" onClose={closeSheet}>
+        <BottomSheet title="edit food" onClose={closeSheet} {...nutritionSheetProps}>
           <FoodFields form={form} onChange={setForm} />
           <button style={styles.sheetPrimary} onClick={updateFood} type="button">save food</button>
         </BottomSheet>
       )}
 
       {sheet?.type === 'saveMeal' && (
-        <BottomSheet title={`save ${sheet.slot}`} onClose={closeSheet}>
+        <BottomSheet title={`save ${sheet.slot}`} onClose={closeSheet} {...nutritionSheetProps}>
           <label style={styles.nameField}>
             <span style={styles.fieldLabel}>meal name</span>
             <input
@@ -433,7 +428,7 @@ export default function Nutrition() {
       )}
 
       {sheet?.type === 'addSavedFood' && (
-        <BottomSheet title={sheet.food.name} onClose={closeSheet}>
+        <BottomSheet title={sheet.food.name} onClose={closeSheet} {...nutritionSheetProps}>
           <MealPicker value={sheet.mealSlot} onChange={mealSlot => setSheet({ ...sheet, mealSlot })} />
           <p style={styles.sheetMeta}>{macroLine(sheet.food)}</p>
           <button
@@ -453,7 +448,7 @@ export default function Nutrition() {
       )}
 
       {sheet?.type === 'addSavedMeal' && (
-        <BottomSheet title={sheet.meal.name} onClose={closeSheet}>
+        <BottomSheet title={sheet.meal.name} onClose={closeSheet} {...nutritionSheetProps}>
           <MealPicker value={sheet.mealSlot} onChange={mealSlot => setSheet({ ...sheet, mealSlot })} />
           <p style={styles.sheetMeta}>{sheet.meal.entries.length} foods · {macroLine(getNutritionTotals(sheet.meal.entries))}</p>
           <button
@@ -473,7 +468,7 @@ export default function Nutrition() {
       )}
 
       {sheet?.type === 'targets' && (
-        <BottomSheet title="targets" onClose={closeSheet}>
+        <BottomSheet title="targets" onClose={closeSheet} {...nutritionSheetProps}>
           <div style={styles.numberGrid}>
             {['calories', 'protein', 'carbs', 'fat'].map(key => (
               <label key={key} style={styles.numberField}>
@@ -706,45 +701,6 @@ const styles = {
     gap:            '12px',
     padding:        '9px 0',
     borderTop:      '0.5px solid color-mix(in srgb, var(--color-border) 44%, transparent)',
-  },
-  sheetBackdrop: {
-    position:        'fixed',
-    inset:           0,
-    zIndex:          180,
-    background:      'rgba(26, 26, 20, 0.24)',
-    display:         'flex',
-    alignItems:      'flex-end',
-    justifyContent:  'center',
-  },
-  sheet: {
-    width:        '100%',
-    maxWidth:     'var(--max-width)',
-    background:   'var(--color-bg)',
-    borderTop:    'var(--border)',
-    padding:      '16px 20px calc(var(--safe-bottom) + 18px)',
-    boxShadow:    '0 -12px 34px rgba(26, 26, 20, 0.12)',
-  },
-  sheetHeader: {
-    display:        'flex',
-    alignItems:     'center',
-    justifyContent: 'space-between',
-    gap:            '14px',
-    marginBottom:   '14px',
-  },
-  sheetTitle: {
-    margin:      0,
-    fontFamily: 'var(--font-display)',
-    fontSize:   '20px',
-    fontWeight: 500,
-    lineHeight: 1.1,
-  },
-  closeAction: {
-    border:     'none',
-    background: 'transparent',
-    color:      'var(--color-muted)',
-    fontSize:   '12px',
-    fontWeight: 700,
-    padding:    0,
   },
   form: {
     display:       'flex',

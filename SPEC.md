@@ -913,6 +913,54 @@ Rules:
 - Avoid large create/edit screens unless the workflow cannot remain readable without them.
 - Avoid multi-field setup experiences when editable defaults or progressive setup can work.
 
+#### Planner primitive authority
+
+PlannerPrimitives is the authority module for normal planner-screen primitives.
+The intended authority set is:
+- PageHeader
+- SectionHeader
+- PlannerRow
+- ActionGroup
+- BottomSheet
+- SwipeRow
+- EmptyState
+
+Phase 1A alignment is a platform-authority phase, not a feature phase or screen
+redesign phase. Before consolidating BottomSheet or SwipeRow implementations,
+produce a Component Inventory that documents each implementation's file
+location, consumers, behavioral differences, accessibility behavior, and
+migration risk.
+
+If two implementations are not functionally equivalent, document the delta and
+obtain approval before consolidation. Shared-component migration must not hide
+workflow, animation, close behavior, gesture threshold, accessibility, or
+screen-hierarchy changes.
+
+One BottomSheet system and one SwipeRow system are the target end state, but a
+migration is complete only when the consumer is migrated, tests pass, the old
+implementation is removed, and no remaining imports or local definitions
+reference obsolete code.
+
+Before closing a primitive consolidation phase, run a dead-code audit for unused
+imports, obsolete exports, orphaned styles, legacy sheet implementations, and
+legacy swipe implementations. No duplicate implementation should remain solely
+for historical reasons.
+
+Phase 1C may expand `PlannerBottomSheet` only with generic sheet capabilities
+needed by deferred local sheets: animation, backdrop-close behavior, controlled
+close timing, z-index/style variants, and callback-safe close helpers. Consumer
+migration still requires proven parity. SwipeRow consolidation, Finance
+redesign, and Health structural changes remain out of scope.
+
+Finance is not being redesigned in Phase 1A. Only component-level migrations are
+allowed: shared headers, shared rows, shared sheets, and shared swipe actions.
+Removal of KPI cards, charts, summaries, dashboards, or financial hierarchy
+changes is deferred to a future Finance-specific phase.
+
+Health structural changes are out of scope for Phase 1A. Health findings should
+be recorded in the audit report and converted into a future Health boundary
+phase.
+
 #### Empty states and helper copy
 
 Planner pages should rely on structure before explanation.

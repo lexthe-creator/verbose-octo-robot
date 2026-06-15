@@ -1,3 +1,5 @@
+import { useCallback, useEffect, useId, useState } from 'react'
+
 export function PlannerRow({ label, value, detail, percent }) {
   const detailIsLong = typeof detail === 'string' && detail.length > 18
 
@@ -45,15 +47,82 @@ export function PlannerActionRow({ children, style }) {
   return <div style={{ ...styles.inlineActions, ...style }}>{children}</div>
 }
 
-export function PlannerBottomSheet({ title, children, onClose }) {
+export function PlannerBottomSheet({
+  title,
+  children,
+  onClose,
+  animated = false,
+  closeDelayMs = 250,
+  closeOnBackdrop = false,
+  closeOnEscape = false,
+  zIndex,
+  backdropStyle,
+  sheetStyle,
+  headerStyle,
+  titleStyle,
+  closeStyle,
+}) {
+  const titleId = useId()
+  const [closing, setClosing] = useState(false)
+
+  const close = useCallback((afterClose = onClose) => {
+    if (animated) {
+      if (closing) return
+      setClosing(true)
+      window.setTimeout(afterClose, closeDelayMs)
+      return
+    }
+
+    afterClose()
+  }, [animated, closeDelayMs, closing, onClose])
+
+  useEffect(() => {
+    if (!closeOnEscape) return undefined
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') close()
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [close, closeOnEscape])
+
+  const renderedChildren = typeof children === 'function' ? children({ close }) : children
+
+  const animatedBackdropStyle = animated ? {
+    opacity:    closing ? 0 : 1,
+    transition: `opacity ${closeDelayMs}ms ease`,
+    animation:  closing ? undefined : `planner-sheet-backdrop-in ${closeDelayMs}ms ease`,
+  } : null
+
+  const animatedSheetStyle = animated ? {
+    transform:  closing ? 'translateY(100%)' : 'translateY(0)',
+    transition: `transform ${closeDelayMs}ms var(--ease-out)`,
+    animation:  closing ? undefined : `planner-sheet-enter ${closeDelayMs}ms var(--ease-out)`,
+  } : null
+
   return (
-    <div style={styles.sheetBackdrop}>
-      <div style={styles.sheet}>
-        <div style={styles.sheetHeader}>
-          <h2 style={styles.sheetTitle}>{title}</h2>
-          <button style={styles.closeButton} onClick={onClose} type="button">close</button>
+    <div
+      onClick={closeOnBackdrop ? () => close() : undefined}
+      style={{
+        ...styles.sheetBackdrop,
+        ...(zIndex ? { zIndex } : {}),
+        ...animatedBackdropStyle,
+        ...backdropStyle,
+      }}
+    >
+      <div
+        aria-labelledby={titleId}
+        aria-modal="true"
+        onClick={event => event.stopPropagation()}
+        role="dialog"
+        style={{ ...styles.sheet, ...animatedSheetStyle, ...sheetStyle }}
+      >
+        <div style={{ ...styles.sheetHeader, ...headerStyle }}>
+          <h2 id={titleId} style={{ ...styles.sheetTitle, ...titleStyle }}>{title}</h2>
+          <button style={{ ...styles.closeButton, ...closeStyle }} onClick={() => close()} type="button">close</button>
         </div>
-        {children}
+        {renderedChildren}
       </div>
     </div>
   )
