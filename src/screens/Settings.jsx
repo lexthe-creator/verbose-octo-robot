@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useUser } from '../context/UserContext.jsx'
 import { useSettings } from '../context/SettingsContext.jsx'
 import { useFitness } from '../context/index.js'
+import { PlannerBottomSheet } from '../components/planner/PlannerPrimitives.jsx'
 import { getPhase, getWeekNumber } from '../utils/fitness.js'
 import {
   PHASE_LABELS,
@@ -33,6 +34,7 @@ export default function Settings({ onBack, onNavigate }) {
   const DENSITY_OPTIONS = ['minimal', 'balanced', 'detailed']
   const equipmentProfile = getEquipmentProfileFromSettings(settingsState)
   const equipmentDisplay = formatEquipmentProfileLabels(equipmentProfile)
+  const connectionStubCopy = getConnectionStubCopy(sheetKind)
 
   return (
     <div style={s.screen}>
@@ -226,8 +228,27 @@ export default function Settings({ onBack, onNavigate }) {
         </button>
       </section>
 
-      {sheetKind && (
-        <StubSheet kind={sheetKind} onClose={() => setSheetKind(null)} />
+      {connectionStubCopy && (
+        <PlannerBottomSheet
+          animated
+          closeDelayMs={250}
+          closeOnBackdrop
+          onClose={() => setSheetKind(null)}
+          title={connectionStubCopy.title}
+          zIndex={200}
+          backdropStyle={stubSheet.backdrop}
+          sheetStyle={stubSheet.box}
+          headerStyle={stubSheet.header}
+          titleStyle={stubSheet.title}
+          closeStyle={stubSheet.hiddenClose}
+        >
+          {({ close }) => (
+            <>
+              <p style={stubSheet.body}>{connectionStubCopy.body}</p>
+              <button style={stubSheet.closeBtn} onClick={() => close()} type="button">Close</button>
+            </>
+          )}
+        </PlannerBottomSheet>
       )}
     </div>
   )
@@ -251,53 +272,24 @@ function ConnectionRow({ title, subtitle, connected, onConnect }) {
   )
 }
 
-// ─── Stub bottom sheet (Plaid / Calendar V2 placeholder) ─────────────────────
+// ─── Connection stub copy (Plaid / Calendar V2 placeholder) ──────────────────
 
-function StubSheet({ kind, onClose }) {
-  const [visible, setVisible] = useState(false)
-
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setVisible(true))
-    return () => cancelAnimationFrame(id)
-  }, [])
-
-  function handleClose() {
-    setVisible(false)
-    setTimeout(onClose, 250)
+function getConnectionStubCopy(kind) {
+  if (kind === 'plaid') {
+    return {
+      title: 'Connect Plaid',
+      body:  'Plaid integration coming in V2. Your spending data will sync automatically once connected.',
+    }
   }
 
-  const copy = kind === 'plaid'
-    ? {
-        title: 'Connect Plaid',
-        body:  'Plaid integration coming in V2. Your spending data will sync automatically once connected.',
-      }
-    : {
-        title: 'Connect Google Calendar',
-        body:  'Calendar integration coming in V2. Items sent to "Calendar" from your inbox will create events once connected.',
-      }
+  if (kind === 'calendar') {
+    return {
+      title: 'Connect Google Calendar',
+      body:  'Calendar integration coming in V2. Items sent to "Calendar" from your inbox will create events once connected.',
+    }
+  }
 
-  return (
-    <div
-      style={{
-        ...sheet.backdrop,
-        opacity:       visible ? 1 : 0,
-        pointerEvents: visible ? 'auto' : 'none',
-      }}
-      onClick={handleClose}
-    >
-      <div
-        style={{
-          ...sheet.box,
-          transform: visible ? 'translateY(0)' : 'translateY(100%)',
-        }}
-        onClick={e => e.stopPropagation()}
-      >
-        <h3 style={sheet.title}>{copy.title}</h3>
-        <p style={sheet.body}>{copy.body}</p>
-        <button style={sheet.closeBtn} onClick={handleClose}>Close</button>
-      </div>
-    </div>
-  )
+  return null
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
@@ -509,35 +501,38 @@ const s = {
   },
 }
 
-const sheet = {
+const stubSheet = {
   backdrop: {
-    position:       'fixed',
-    inset:          0,
     background:     'rgba(0,0,0,0.6)',
-    zIndex:         200,
-    transition:     'opacity 250ms ease',
-    display:        'flex',
-    alignItems:     'flex-end',
-    justifyContent: 'center',
   },
   box: {
     width:                '100%',
     maxWidth:             'var(--max-width)',
+    maxHeight:            'none',
+    overflowY:            'visible',
     background:           'var(--color-card)',
+    borderTop:            'none',
     borderTopLeftRadius:  '20px',
     borderTopRightRadius: '20px',
     padding:              '24px',
     paddingBottom:        'calc(24px + var(--safe-bottom))',
-    transition:           'transform 250ms var(--ease-out)',
     display:              'flex',
     flexDirection:        'column',
     gap:                  '14px',
+    boxShadow:            'none',
+  },
+  header: {
+    display:      'block',
+    marginBottom: 0,
   },
   title: {
     fontFamily: 'var(--font-display)',
     fontSize:   '20px',
     color:      'var(--color-text)',
     lineHeight: 1.2,
+  },
+  hiddenClose: {
+    display: 'none',
   },
   body: {
     fontSize:   '13px',

@@ -112,7 +112,7 @@ Final agreed scope:
 | `FuelEditSheet` | `src/components/FuelEditSheet.jsx` | `MorningIgnition.jsx` meal window editor | Own opacity and slide animation, backdrop click close, delayed save/close callback, z-index 200, card background, rounded top corners, two native time inputs. | Labels for inputs are visible. No dialog role, aria-modal, Escape close, focus trap, or explicit heading association. | Medium. Save/close timing and native time input behavior must be preserved. Approval required before consolidation. |
 | `Nutrition` local `BottomSheet` | `src/screens/Nutrition.jsx` | Add food, edit food, save meal, add saved food, add saved meal, targets | Similar static sheet shell to PlannerBottomSheet, z-index 180, no animation, no backdrop close, multiple forms reuse one local shell. | Visible title and close button. No dialog role, aria-modal, Escape close, focus trap, or labelled-by wiring before migration. | Migrated in Phase 1B after shared style hooks preserved shell parity. Local implementation and orphaned styles removed. |
 | `Finance` `TransactionSheet` | `src/screens/Finance.jsx` | Add transaction flow | Own opacity and slide animation, backdrop click close, delayed close after save, z-index 200, rounded card surface, finance-specific form controls. | Visible labels. No dialog role, aria-modal, Escape close, focus trap, or heading association. | Medium. Component-level migration only; no Finance dashboard or hierarchy redesign. Approval required before consolidation. |
-| `Settings` `StubSheet` | `src/screens/Settings.jsx` | Plaid and Google Calendar connection stubs | Own opacity and slide animation, backdrop click close, delayed close, z-index 200, rounded card surface. | Visible title/body/close. No dialog role, aria-modal, Escape close, focus trap, or heading association. | Medium. Stub timing and close behavior must remain. Approval required before consolidation. |
+| `Settings` `StubSheet` | `src/screens/Settings.jsx` | Plaid and Google Calendar connection stubs | Own opacity and slide animation, backdrop click close, delayed close, z-index 200, rounded card surface. | Visible title/body/close. No dialog role, aria-modal, Escape close, focus trap, or heading association before migration. | Migrated in Phase 1D after shared animation, backdrop-close, delay, z-index, and layout override parity were proven. Local implementation and orphaned shell styles removed. |
 
 BottomSheet stop-gate conclusion:
 - The implementations are not fully equivalent.
@@ -165,6 +165,29 @@ Phase 1C migration decision:
 - SwipeRow was not touched.
 - Finance redesign remains rejected.
 - Health structural changes remain rejected.
+
+Phase 1D Settings parity review:
+- Existing behavior: Plaid and Google Calendar connection rows open a
+  bottom-aligned sheet with a 250ms opacity/slide animation, backdrop click
+  close, full-width `Close` action, z-index 200, card background, 20px rounded
+  top corners, unchanged title/body copy, and delayed close callback.
+- Shared capability match: `PlannerBottomSheet` supports `animated`,
+  `closeDelayMs={250}`, `closeOnBackdrop`, `zIndex={200}`, style overrides for
+  the card surface, and render-function children that can call the shared
+  delayed `close` helper.
+- Parity result: approved for migration. The migration preserves Settings
+  layout, content, controls, and workflows. The only accessibility delta is an
+  improvement from shared dialog semantics and heading association.
+
+Phase 1D migration decision:
+- `Settings` `StubSheet`: migrate now. Local animation/backdrop/sheet shell
+  removed; Settings now consumes `PlannerBottomSheet` with Settings-specific
+  style overrides and unchanged Plaid/Calendar copy.
+- `FuelEditSheet`: still deferred.
+- `Finance` `TransactionSheet`: still deferred; Finance redesign remains
+  rejected.
+- SwipeRow: untouched.
+- Health structure: untouched.
 
 ### SwipeRow Implementations
 
@@ -228,7 +251,7 @@ Phase 1B decision:
 | SectionHeader | Planned `PlannerSectionHeader`/`SectionHeader` in `PlannerPrimitives.jsx` | Local section headers in Plan, Tasks, Calendar, Nutrition, Health styles | Partially canonical for Health; broader migration deferred. |
 | PlannerRow | `PlannerRow` in `PlannerPrimitives.jsx` | Local task/commitment/transaction/project rows | Partially canonical for Health; broader migration deferred. |
 | ActionGroup | Planned in `PlannerPrimitives.jsx` | Local action clusters in Nutrition, Health, Plan, Finance, Settings | Deferred. |
-| BottomSheet | `PlannerBottomSheet` in `PlannerPrimitives.jsx` | FuelEditSheet, Finance TransactionSheet, Settings StubSheet | Nutrition migrated in Phase 1B; remaining duplicates blocked by non-equivalent behavior and require approval. |
+| BottomSheet | `PlannerBottomSheet` in `PlannerPrimitives.jsx` | FuelEditSheet, Finance TransactionSheet | Nutrition migrated in Phase 1B; Settings migrated in Phase 1D; remaining duplicates blocked by non-equivalent behavior and require approval. |
 | SwipeRow | Planned in `PlannerPrimitives.jsx` | Morning SwipeRow, Inbox SwipeDeleteRow, EOD RemoveSwipeRow, Finance TxRow swipe, Weekly GroceryRow | Blocked by non-equivalent behavior; approval required. |
 | EmptyState | Planned in `PlannerPrimitives.jsx` | Local empty states in Nutrition, Inbox, Finance, Tasks, Plan, Calendar | Deferred. |
 
@@ -328,7 +351,8 @@ Current status against metrics:
 - One SwipeRow implementation remains: not complete.
 - No orphaned duplicate implementations: not complete.
 - No user-facing workflow changes: maintained for the Phase 1B equivalent
-  Nutrition sheet migration and Phase 1C shared primitive expansion.
+  Nutrition sheet migration, Phase 1C shared primitive expansion, and Phase 1D
+  Settings sheet migration.
 
 ## Final Review
 
@@ -346,6 +370,10 @@ Completed:
 - Shared `PlannerBottomSheet` expanded with generic animation, delayed close,
   optional backdrop/Escape close, z-index, style variants, and callback-safe
   close support.
+- Phase 1D proved Settings StubSheet parity and migrated it to
+  `PlannerBottomSheet`.
+- Settings local `StubSheet` animation/backdrop/sheet shell and orphaned shell
+  styles removed.
 - Finance redesign rejected for Phase 1A.
 - Health structural changes rejected for Phase 1A.
 
@@ -354,8 +382,6 @@ Deferred:
   time input behavior and delayed save timing.
 - Finance TransactionSheet consolidation pending consumer-level parity proof;
   Finance redesign remains rejected.
-- Settings StubSheet consolidation pending consumer-level parity proof for the
-  current title/body/action layout and close timing.
 - SwipeRow consolidation pending support for all current gesture variants and
   accessibility equivalents.
 - PageHeader, SectionHeader, ActionGroup, and EmptyState migration pending
