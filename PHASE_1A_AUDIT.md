@@ -109,7 +109,7 @@ Final agreed scope:
 | Implementation | File location | Consumers | Behavioral differences | Accessibility behavior | Migration risk |
 |---|---|---|---|---|---|
 | `PlannerBottomSheet` | `src/components/planner/PlannerPrimitives.jsx` | `PlanSetupSheet`, `LogWorkoutSheet` in `src/screens/health/HealthSheets.jsx` | Fixed bottom sheet, no enter/exit animation, no backdrop click close, z-index 180, planner background and border. | Visible title and close button. No `role="dialog"`, `aria-modal`, Escape close, focus trap, or labelled-by wiring. | Low for Health because it already consumes this primitive. Medium as a target because accessibility and animation must be added without breaking Health. |
-| `FuelEditSheet` | `src/components/FuelEditSheet.jsx` | `MorningIgnition.jsx` meal window editor | Own opacity and slide animation, backdrop click close, delayed save/close callback, z-index 200, card background, rounded top corners, two native time inputs. | Labels for inputs are visible. No dialog role, aria-modal, Escape close, focus trap, or explicit heading association. | Medium. Save/close timing and native time input behavior must be preserved. Approval required before consolidation. |
+| `FuelEditSheet` | `src/components/FuelEditSheet.jsx` | `MorningIgnition.jsx` meal window editor | Own opacity and slide animation, backdrop click close, delayed save/close callback, z-index 200, card background, rounded top corners, two native time inputs. | Labels for inputs are visible. No dialog role, aria-modal, Escape close, focus trap, or explicit heading association before migration. | Migrated in Phase 1E after save timing, close timing, backdrop behavior, animation, z-index, and native time input parity were proven. Local animation/backdrop/sheet shell removed. |
 | `Nutrition` local `BottomSheet` | `src/screens/Nutrition.jsx` | Add food, edit food, save meal, add saved food, add saved meal, targets | Similar static sheet shell to PlannerBottomSheet, z-index 180, no animation, no backdrop close, multiple forms reuse one local shell. | Visible title and close button. No dialog role, aria-modal, Escape close, focus trap, or labelled-by wiring before migration. | Migrated in Phase 1B after shared style hooks preserved shell parity. Local implementation and orphaned styles removed. |
 | `Finance` `TransactionSheet` | `src/screens/Finance.jsx` | Add transaction flow | Own opacity and slide animation, backdrop click close, delayed close after save, z-index 200, rounded card surface, finance-specific form controls. | Visible labels. No dialog role, aria-modal, Escape close, focus trap, or heading association. | Medium. Component-level migration only; no Finance dashboard or hierarchy redesign. Approval required before consolidation. |
 | `Settings` `StubSheet` | `src/screens/Settings.jsx` | Plaid and Google Calendar connection stubs | Own opacity and slide animation, backdrop click close, delayed close, z-index 200, rounded card surface. | Visible title/body/close. No dialog role, aria-modal, Escape close, focus trap, or heading association before migration. | Migrated in Phase 1D after shared animation, backdrop-close, delay, z-index, and layout override parity were proven. Local implementation and orphaned shell styles removed. |
@@ -189,6 +189,37 @@ Phase 1D migration decision:
 - SwipeRow: untouched.
 - Health structure: untouched.
 
+Phase 1E FuelEditSheet parity review:
+- Existing behavior: Morning Ignition meal-window editing opens a bottom-aligned
+  sheet with 250ms opacity/slide animation, backdrop click close, z-index 200,
+  rounded card surface, two native `type="time"` inputs, full-width `Save
+  window`, full-width transparent `Cancel`, delayed close callback, and delayed
+  `onSave(start, end)` without separately calling `onClose`.
+- Shared capability match: `PlannerBottomSheet` supports `animated`,
+  `closeDelayMs={250}`, `closeOnBackdrop`, `zIndex={200}`, card-surface style
+  overrides, and render-function children that can call `close(() =>
+  onSave(start, end))` after the exit transition.
+- Escape behavior: existing `FuelEditSheet` did not close on Escape. Migration
+  keeps `closeOnEscape` disabled, so Escape behavior does not change.
+- Content/layout parity: native time inputs, labels, button labels, button
+  order, callback ownership, z-index, backdrop color, sheet width, padding,
+  safe-area padding, rounded top corners, and action spacing are preserved.
+  The only accessibility delta is an improvement from shared dialog semantics
+  and heading association.
+
+Phase 1E migration decision:
+- `FuelEditSheet`: migrate now. The component remains the same consumer-facing
+  API, but its local animation/backdrop/sheet shell now comes from
+  `PlannerBottomSheet`.
+- Local FuelEditSheet `useEffect`, `requestAnimationFrame`, `visible` state,
+  local timeout close shell, and obsolete backdrop/sheet transition styles were
+  removed.
+- `Finance` `TransactionSheet`: still deferred; Finance redesign remains
+  rejected.
+- SwipeRow: untouched.
+- Health structure: untouched.
+- Workout behavior: untouched.
+
 ### SwipeRow Implementations
 
 | Implementation | File location | Consumers | Behavioral differences | Accessibility behavior | Migration risk |
@@ -251,7 +282,7 @@ Phase 1B decision:
 | SectionHeader | Planned `PlannerSectionHeader`/`SectionHeader` in `PlannerPrimitives.jsx` | Local section headers in Plan, Tasks, Calendar, Nutrition, Health styles | Partially canonical for Health; broader migration deferred. |
 | PlannerRow | `PlannerRow` in `PlannerPrimitives.jsx` | Local task/commitment/transaction/project rows | Partially canonical for Health; broader migration deferred. |
 | ActionGroup | Planned in `PlannerPrimitives.jsx` | Local action clusters in Nutrition, Health, Plan, Finance, Settings | Deferred. |
-| BottomSheet | `PlannerBottomSheet` in `PlannerPrimitives.jsx` | FuelEditSheet, Finance TransactionSheet | Nutrition migrated in Phase 1B; Settings migrated in Phase 1D; remaining duplicates blocked by non-equivalent behavior and require approval. |
+| BottomSheet | `PlannerBottomSheet` in `PlannerPrimitives.jsx` | Finance TransactionSheet | Nutrition migrated in Phase 1B; Settings migrated in Phase 1D; FuelEditSheet migrated in Phase 1E; remaining duplicate blocked by non-equivalent behavior and requires approval. |
 | SwipeRow | Planned in `PlannerPrimitives.jsx` | Morning SwipeRow, Inbox SwipeDeleteRow, EOD RemoveSwipeRow, Finance TxRow swipe, Weekly GroceryRow | Blocked by non-equivalent behavior; approval required. |
 | EmptyState | Planned in `PlannerPrimitives.jsx` | Local empty states in Nutrition, Inbox, Finance, Tasks, Plan, Calendar | Deferred. |
 
@@ -352,7 +383,7 @@ Current status against metrics:
 - No orphaned duplicate implementations: not complete.
 - No user-facing workflow changes: maintained for the Phase 1B equivalent
   Nutrition sheet migration, Phase 1C shared primitive expansion, and Phase 1D
-  Settings sheet migration.
+  Settings sheet migration, and Phase 1E FuelEditSheet migration.
 
 ## Final Review
 
@@ -374,12 +405,14 @@ Completed:
   `PlannerBottomSheet`.
 - Settings local `StubSheet` animation/backdrop/sheet shell and orphaned shell
   styles removed.
+- Phase 1E proved FuelEditSheet parity and migrated its shell to
+  `PlannerBottomSheet`.
+- FuelEditSheet local animation/backdrop/sheet shell and orphaned shell styles
+  removed.
 - Finance redesign rejected for Phase 1A.
 - Health structural changes rejected for Phase 1A.
 
 Deferred:
-- FuelEditSheet consolidation pending consumer-level parity proof for native
-  time input behavior and delayed save timing.
 - Finance TransactionSheet consolidation pending consumer-level parity proof;
   Finance redesign remains rejected.
 - SwipeRow consolidation pending support for all current gesture variants and

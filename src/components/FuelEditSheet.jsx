@@ -1,102 +1,91 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import { PlannerBottomSheet } from './planner/PlannerPrimitives.jsx'
 
 export default function FuelEditSheet({ meal, onClose, onSave }) {
-  const [visible, setVisible] = useState(false)
   const [start, setStart] = useState(meal.startTime)
   const [end,   setEnd]   = useState(meal.endTime)
 
-  // Mount-trigger slide-up animation
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setVisible(true))
-    return () => cancelAnimationFrame(id)
-  }, [])
-
-  function handleClose() {
-    setVisible(false)
-    setTimeout(onClose, 250)
-  }
-
-  function handleSave() {
-    setVisible(false)
-    setTimeout(() => onSave(start, end), 250)
-  }
-
   return (
-    <div
-      style={{
-        ...s.backdrop,
-        opacity:       visible ? 1 : 0,
-        pointerEvents: visible ? 'auto' : 'none',
-      }}
-      onClick={handleClose}
+    <PlannerBottomSheet
+      animated
+      closeDelayMs={250}
+      closeOnBackdrop
+      onClose={onClose}
+      title={`${meal.label} window`}
+      zIndex={200}
+      backdropStyle={s.backdrop}
+      sheetStyle={s.sheet}
+      headerStyle={s.headerWrap}
+      titleStyle={s.header}
+      closeStyle={s.hiddenClose}
     >
-      <div
-        style={{
-          ...s.sheet,
-          transform: visible ? 'translateY(0)' : 'translateY(100%)',
-        }}
-        onClick={e => e.stopPropagation()}
-      >
-        <h3 style={s.header}>{meal.label} window</h3>
+      {({ close }) => (
+        <>
+          <div style={s.fieldGroup}>
+            <label style={s.label}>Start time</label>
+            <input
+              type="time"
+              style={s.input}
+              value={start}
+              onChange={e => setStart(e.target.value)}
+            />
+          </div>
 
-        <div style={s.fieldGroup}>
-          <label style={s.label}>Start time</label>
-          <input
-            type="time"
-            style={s.input}
-            value={start}
-            onChange={e => setStart(e.target.value)}
-          />
-        </div>
+          <div style={s.fieldGroup}>
+            <label style={s.label}>End time</label>
+            <input
+              type="time"
+              style={s.input}
+              value={end}
+              onChange={e => setEnd(e.target.value)}
+            />
+          </div>
 
-        <div style={s.fieldGroup}>
-          <label style={s.label}>End time</label>
-          <input
-            type="time"
-            style={s.input}
-            value={end}
-            onChange={e => setEnd(e.target.value)}
-          />
-        </div>
-
-        <div style={s.actions}>
-          <button style={s.saveBtn}   onClick={handleSave}>Save window</button>
-          <button style={s.cancelBtn} onClick={handleClose}>Cancel</button>
-        </div>
-      </div>
-    </div>
+          <div style={s.actions}>
+            <button style={s.saveBtn} onClick={() => close(() => onSave(start, end))} type="button">Save window</button>
+            <button style={s.cancelBtn} onClick={() => close()} type="button">Cancel</button>
+          </div>
+        </>
+      )}
+    </PlannerBottomSheet>
   )
 }
 
 const s = {
   backdrop: {
-    position:       'fixed',
-    inset:          0,
     background:     'rgba(0,0,0,0.6)',
-    zIndex:         200,
-    transition:     'opacity 250ms ease',
-    display:        'flex',
-    alignItems:     'flex-end',
-    justifyContent: 'center',
   },
   sheet: {
     width:                '100%',
     maxWidth:             'var(--max-width)',
+    maxHeight:            'none',
+    overflowY:            'visible',
     background:           'var(--color-card)',
+    borderTop:            'none',
     borderTopLeftRadius:  '20px',
     borderTopRightRadius: '20px',
     padding:              '24px',
     paddingBottom:        'calc(24px + var(--safe-bottom))',
-    transition:           'transform 250ms var(--ease-out)',
     display:              'flex',
     flexDirection:        'column',
     gap:                  '16px',
+    boxShadow:            'none',
+  },
+  headerWrap: {
+    display:      'block',
+    marginBottom: 0,
   },
   header: {
+    marginBlockStart: '1em',
+    marginBlockEnd:   '1em',
     fontFamily: 'var(--font-display)',
     fontSize:   '20px',
+    fontWeight: 'bold',
     color:      'var(--color-text)',
     lineHeight: 1.2,
+  },
+  hiddenClose: {
+    display: 'none',
   },
   fieldGroup: {
     display:       'flex',
