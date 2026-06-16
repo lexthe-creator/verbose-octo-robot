@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 
 export function PlannerRow({ label, value, detail, percent }) {
   const detailIsLong = typeof detail === 'string' && detail.length > 18
@@ -124,6 +124,295 @@ export function PlannerBottomSheet({
         </div>
         {renderedChildren}
       </div>
+    </div>
+  )
+}
+
+export function PlannerSwipeRow({
+  mode = 'confirm',
+  direction = 'right',
+  threshold = 80,
+  revealWidth = 72,
+  revealThresholdRatio = 0.6,
+  autoActionThreshold = 180,
+  enableAutoAction = false,
+  inputMode = 'touch-and-mouse',
+  completed = false,
+  disabled = false,
+  actionLabel = 'Confirm',
+  revealActionLabel = 'Delete',
+  skipLabel = 'Skip',
+  hintLabel = 'swipe ->',
+  onAction,
+  onRevealAction,
+  onSkip,
+  renderAction,
+  children,
+  style,
+  contentStyle,
+  revealStyle,
+  actionStyle,
+}) {
+  const [offset, setOffset] = useState(0)
+  const [swiping, setSwiping] = useState(false)
+  const [revealed, setRevealed] = useState(false)
+  const startXRef = useRef(null)
+  const offsetRef = useRef(0)
+  const activePointerRef = useRef(null)
+  const autoActionCommittedRef = useRef(false)
+
+  const normalizedDirection = direction === 'left' ? 'left' : 'right'
+  const normalizedMode = ['confirm', 'remove', 'reveal-delete', 'immediate-delete'].includes(mode)
+    ? mode
+    : 'confirm'
+  const isRevealMode = normalizedMode === 'reveal-delete'
+  const canDrag = !completed && !disabled
+  const maxOffset = isRevealMode ? revealWidth : Math.max(threshold, revealWidth)
+  const revealedOffset = normalizedDirection === 'left' ? -revealWidth : revealWidth
+  const releaseThreshold = isRevealMode
+    ? Math.max(1, revealWidth * revealThresholdRatio)
+    : threshold
+
+  const commitAction = useCallback(() => {
+    if (disabled) return
+    onAction?.()
+  }, [disabled, onAction])
+
+  const commitRevealAction = useCallback(() => {
+    if (disabled) return
+    onRevealAction?.()
+  }, [disabled, onRevealAction])
+
+  function setSwipeOffset(nextOffset) {
+    offsetRef.current = nextOffset
+    setOffset(nextOffset)
+  }
+
+  function getDirectionalOffset(clientX) {
+    if (startXRef.current === null) return 0
+    const rawDelta = clientX - startXRef.current
+    const directionalDelta = normalizedDirection === 'left'
+      ? Math.min(0, rawDelta)
+      : Math.max(0, rawDelta)
+    const boundedMagnitude = Math.min(maxOffset, Math.abs(directionalDelta))
+    return normalizedDirection === 'left' ? -boundedMagnitude : boundedMagnitude
+  }
+
+  function resetSwipe() {
+    startXRef.current = null
+    activePointerRef.current = null
+    setSwiping(false)
+  }
+
+  function startSwipe(clientX, pointerId) {
+    if (!canDrag) return
+    startXRef.current = clientX
+    activePointerRef.current = pointerId
+    autoActionCommittedRef.current = false
+    setSwiping(true)
+    if (!isRevealMode) setRevealed(false)
+  }
+
+  function updateSwipe(clientX) {
+    if (!canDrag || startXRef.current === null) return
+    const nextOffset = getDirectionalOffset(clientX)
+    const magnitude = Math.abs(nextOffset)
+    setSwipeOffset(nextOffset)
+
+    if (enableAutoAction && !autoActionCommittedRef.current && magnitude >= autoActionThreshold) {
+      autoActionCommittedRef.current = true
+      if (isRevealMode) commitRevealAction()
+      else commitAction()
+    }
+  }
+
+  function finishSwipe() {
+    if (!canDrag) {
+      resetSwipe()
+      return
+    }
+
+    const magnitude = Math.abs(offsetRef.current)
+    if (isRevealMode) {
+      if (magnitude >= releaseThreshold) {
+        setRevealed(true)
+        setSwipeOffset(revealedOffset)
+      } else {
+        setRevealed(false)
+        setSwipeOffset(0)
+      }
+    } else if (magnitude >= releaseThreshold) {
+      commitAction()
+      setSwipeOffset(0)
+    } else {
+      setSwipeOffset(0)
+    }
+
+    resetSwipe()
+  }
+
+  function handlePointerDown(event) {
+    if (!canDrag) return
+    if (inputMode === 'touch-only' && event.pointerType === 'mouse') return
+    if (inputMode === 'mouse-only' && event.pointerType !== 'mouse') return
+    startSwipe(event.clientX, event.pointerId)
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+  }
+
+  function handlePointerMove(event) {
+    if (activePointerRef.current !== event.pointerId) return
+    updateSwipe(event.clientX)
+  }
+
+  function handlePointerUp(event) {
+    if (activePointerRef.current !== event.pointerId) return
+    finishSwipe()
+    event.currentTarget.releasePointerCapture?.(event.pointerId)
+  }
+
+  function handlePointerCancel(event) {
+    if (activePointerRef.current !== event.pointerId) return
+    setSwipeOffset(revealed ? revealedOffset : 0)
+    resetSwipe()
+  }
+
+  function revealForKeyboard() {
+    if (!isRevealMode) return
+    setRevealed(true)
+    setSwipeOffset(revealedOffset)
+  }
+
+  function handleKeyDown(event) {
+    if (disabled || completed) return
+
+    if (event.key === 'Escape' && isRevealMode && revealed) {
+      event.preventDefault()
+      setRevealed(false)
+      setSwipeOffset(0)
+      return
+    }
+
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      if (isRevealMode) {
+        if (revealed) commitRevealAction()
+        else revealForKeyboard()
+      } else {
+        commitAction()
+      }
+      return
+    }
+
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault()
+      if (isRevealMode) {
+        if (revealed) commitRevealAction()
+        else revealForKeyboard()
+      } else if (normalizedMode === 'remove' || normalizedMode === 'immediate-delete') {
+        commitAction()
+      }
+    }
+  }
+
+  const progress = Math.min(Math.abs(offset) / Math.max(1, releaseThreshold), 1)
+  const actionContext = {
+    progress,
+    revealed,
+    completed,
+    disabled,
+    mode: normalizedMode,
+    direction: normalizedDirection,
+  }
+  const renderedChildren = typeof children === 'function' ? children(actionContext) : children
+  const renderedAction = renderAction?.(actionContext)
+  const accessibleLabel = isRevealMode && revealed ? revealActionLabel : actionLabel
+
+  return (
+    <div
+      aria-disabled={disabled || undefined}
+      aria-label={accessibleLabel}
+      data-planner-swipe-mode={normalizedMode}
+      data-planner-swipe-revealed={revealed ? 'true' : 'false'}
+      onKeyDown={handleKeyDown}
+      role="group"
+      style={{ ...styles.swipeWrap, ...style }}
+      tabIndex={disabled ? -1 : 0}
+    >
+      {isRevealMode && (
+        <button
+          aria-label={revealActionLabel}
+          disabled={disabled}
+          onClick={commitRevealAction}
+          style={{
+            ...styles.swipeRevealAction,
+            ...(normalizedDirection === 'left' ? { right: 0 } : { left: 0 }),
+            width: `${revealWidth}px`,
+            ...revealStyle,
+          }}
+          type="button"
+        >
+          {revealActionLabel}
+        </button>
+      )}
+
+      <div
+        onPointerCancel={handlePointerCancel}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        style={{
+          ...styles.swipeContent,
+          transform: `translateX(${offset}px)`,
+          transition: swiping ? 'none' : 'transform 0.25s var(--ease-out)',
+          ...contentStyle,
+        }}
+      >
+        {renderedChildren}
+      </div>
+
+      <span aria-hidden="true" style={styles.swipeHint}>{hintLabel}</span>
+
+      {!isRevealMode && (
+        <button
+          aria-label={actionLabel}
+          disabled={disabled || completed}
+          onClick={commitAction}
+          style={styles.visuallyHiddenAction}
+          type="button"
+        >
+          {actionLabel}
+        </button>
+      )}
+
+      {isRevealMode && (
+        <button
+          aria-label={revealActionLabel}
+          disabled={disabled}
+          onClick={commitRevealAction}
+          style={styles.visuallyHiddenAction}
+          type="button"
+        >
+          {revealActionLabel}
+        </button>
+      )}
+
+      {onSkip && (
+        <button
+          aria-label={skipLabel}
+          disabled={disabled}
+          onClick={onSkip}
+          style={styles.visuallyHiddenAction}
+          type="button"
+        >
+          {skipLabel}
+        </button>
+      )}
+
+      {renderedAction && (
+        <div aria-hidden="true" style={{ ...styles.swipeActionSlot, ...actionStyle }}>
+          {renderedAction}
+        </div>
+      )}
     </div>
   )
 }
@@ -281,6 +570,64 @@ const styles = {
     fontSize:   '12px',
     fontWeight: 750,
     padding:    '4px 0',
+  },
+  swipeWrap: {
+    position:    'relative',
+    overflow:    'hidden',
+    userSelect:  'none',
+    touchAction: 'pan-y',
+    outline:     'none',
+  },
+  swipeContent: {
+    position:    'relative',
+    zIndex:      1,
+    touchAction: 'pan-y',
+  },
+  swipeRevealAction: {
+    position:       'absolute',
+    top:            0,
+    bottom:         0,
+    zIndex:         0,
+    border:         'none',
+    background:     'transparent',
+    color:          'var(--color-danger)',
+    fontFamily:     'var(--font-body)',
+    fontSize:       '12px',
+    fontWeight:     700,
+    cursor:         'pointer',
+    display:        'flex',
+    alignItems:     'center',
+    justifyContent: 'center',
+  },
+  swipeHint: {
+    position:      'absolute',
+    width:         '1px',
+    height:        '1px',
+    padding:       0,
+    margin:        '-1px',
+    overflow:      'hidden',
+    clip:          'rect(0, 0, 0, 0)',
+    whiteSpace:    'nowrap',
+    border:        0,
+  },
+  swipeActionSlot: {
+    position:      'absolute',
+    top:           0,
+    right:         0,
+    bottom:        0,
+    zIndex:        2,
+    pointerEvents: 'none',
+  },
+  visuallyHiddenAction: {
+    position:   'absolute',
+    width:      '1px',
+    height:     '1px',
+    padding:    0,
+    margin:     '-1px',
+    overflow:   'hidden',
+    clip:       'rect(0, 0, 0, 0)',
+    whiteSpace: 'nowrap',
+    border:     0,
   },
   optionGrid: {
     display:             'grid',

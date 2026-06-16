@@ -378,6 +378,19 @@ Phase 1G SwipeRow API planning review:
   `PlannerSwipeRow` does not exist. Do not migrate consumers until the shared
   primitive is built and each consumer has a targeted parity review.
 
+Phase 1H PlannerSwipeRow primitive implementation:
+- `PlannerSwipeRow` now exists in `src/components/planner/PlannerPrimitives.jsx`.
+- Implementation scope is primitive-only. No consumer migrated, and existing
+  `MorningIgnition`, `EodReflection`, `WeeklyPlanning`, `Finance`, and `Inbox`
+  swipe rows remain untouched.
+- Supported capabilities: right/left directional swipe handling, `confirm`,
+  `remove`, `reveal-delete`, and `immediate-delete` modes, configurable
+  threshold and reveal width, opt-in auto-action threshold, mouse/touch pointer
+  parity, keyboard action handling, Escape reveal reset, screen-reader labels,
+  and consumer-owned row content/action rendering.
+- Consumer migration remains blocked until each row receives a targeted parity
+  review against its current behavior and visual hierarchy.
+
 ## Responsibility Matrix
 
 | Screen | Owns | Does not own | Major actions |

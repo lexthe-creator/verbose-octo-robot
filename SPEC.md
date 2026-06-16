@@ -952,9 +952,10 @@ close timing, z-index/style variants, and callback-safe close helpers. Consumer
 migration still requires proven parity. SwipeRow consolidation, Finance
 redesign, and Health structural changes remain out of scope.
 
-SwipeRow consolidation remains documentation-only until the shared
-`PlannerSwipeRow` API is approved. The shared API must support the existing
-behavior matrix before any consumer migrates:
+Phase 1H implements the shared `PlannerSwipeRow` primitive behind the approved
+API. Consumer migration remains blocked until each row has its own targeted
+parity review. The shared primitive must support the existing behavior matrix
+before any consumer migrates:
 - right-swipe confirm
 - right-swipe remove
 - left reveal-delete
@@ -971,7 +972,8 @@ rendered row body supplied by the consumer. Each migration must preserve the
 consumer's current row hierarchy, timing, gesture direction, threshold, delete
 semantics, and visible row treatment.
 
-Recommended SwipeRow migration order after API approval:
+Recommended SwipeRow migration order after primitive verification and
+consumer-specific parity approval:
 1. Morning Ignition confirm row.
 2. EOD remove row.
 3. Weekly grocery row.
