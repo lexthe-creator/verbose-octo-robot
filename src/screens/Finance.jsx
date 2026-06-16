@@ -1,5 +1,6 @@
 // TODO V2: Twilio SMS pipeline
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
+import { PlannerBottomSheet } from '../components/planner/PlannerPrimitives.jsx'
 import { useSettings } from '../context/SettingsContext.jsx'
 import {
   useFinance,
@@ -202,24 +203,13 @@ const tx_s = {
 // ─── Add Transaction bottom sheet ─────────────────────────────────────────────
 
 function TransactionSheet({ onClose, onSave }) {
-  const [visible,  setVisible]  = useState(false)
   const [merchant, setMerchant] = useState('')
   const [amount,   setAmount]   = useState('')
   const [isIncome, setIsIncome] = useState(false)
   const [category, setCategory] = useState('Food')
   const [date,     setDate]     = useState(getTodayISO())
 
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setVisible(true))
-    return () => cancelAnimationFrame(id)
-  }, [])
-
-  function close() {
-    setVisible(false)
-    setTimeout(onClose, 250)
-  }
-
-  function handleSave() {
+  function handleSave(close) {
     if (!merchant.trim() || !amount) return
     const sign = isIncome ? 1 : -1
     onSave({
@@ -232,135 +222,144 @@ function TransactionSheet({ onClose, onSave }) {
   }
 
   return (
-    <div
-      style={{ ...sh.backdrop, opacity: visible ? 1 : 0, pointerEvents: visible ? 'auto' : 'none' }}
-      onClick={close}
+    <PlannerBottomSheet
+      animated
+      backdropStyle={sh.backdrop}
+      closeOnBackdrop
+      closeStyle={sh.hiddenClose}
+      headerStyle={sh.header}
+      onClose={onClose}
+      sheetStyle={sh.box}
+      title="Add Transaction"
+      titleStyle={sh.title}
+      zIndex={200}
     >
-      <div
-        style={{ ...sh.box, transform: visible ? 'translateY(0)' : 'translateY(100%)' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <h3 style={sh.title}>Add Transaction</h3>
-
-        <div style={sh.field}>
-          <label style={sh.label}>Merchant</label>
-          <input
-            type="text"
-            style={sh.input}
-            placeholder="e.g. Starbucks"
-            value={merchant}
-            onChange={e => setMerchant(e.target.value)}
-          />
-        </div>
-
-        <div style={sh.field}>
-          <label style={sh.label}>Amount</label>
-          <div style={sh.amountRow}>
+      {({ close }) => (
+        <>
+          <div style={sh.field}>
+            <label style={sh.label}>Merchant</label>
             <input
-              type="number"
-              style={{ ...sh.input, flex: 1 }}
-              placeholder="0.00"
-              value={amount}
-              onChange={e => setAmount(e.target.value)}
-              min="0"
-              step="0.01"
+              type="text"
+              style={sh.input}
+              placeholder="e.g. Starbucks"
+              value={merchant}
+              onChange={e => setMerchant(e.target.value)}
             />
-            <div style={sh.toggle}>
-              {['Spend', 'Income'].map(opt => {
-                const active = isIncome === (opt === 'Income')
+          </div>
+
+          <div style={sh.field}>
+            <label style={sh.label}>Amount</label>
+            <div style={sh.amountRow}>
+              <input
+                type="number"
+                style={{ ...sh.input, flex: 1 }}
+                placeholder="0.00"
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                min="0"
+                step="0.01"
+              />
+              <div style={sh.toggle}>
+                {['Spend', 'Income'].map(opt => {
+                  const active = isIncome === (opt === 'Income')
+                  return (
+                    <button
+                      key={opt}
+                      style={{
+                        ...sh.toggleBtn,
+                        background: active ? 'var(--color-accent-bg)' : 'transparent',
+                        color:      active ? 'var(--color-accent)'    : 'var(--color-muted)',
+                        border:     active ? '0.5px solid var(--color-accent)' : '0.5px solid transparent',
+                      }}
+                      onClick={() => setIsIncome(opt === 'Income')}
+                    >
+                      {opt}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div style={sh.field}>
+            <label style={sh.label}>Category</label>
+            <div style={sh.pillWrap}>
+              {CATEGORIES.map(cat => {
+                const active = category === cat
                 return (
                   <button
-                    key={opt}
+                    key={cat}
                     style={{
-                      ...sh.toggleBtn,
-                      background: active ? 'var(--color-accent-bg)' : 'transparent',
+                      ...sh.pill,
+                      background: active ? 'var(--color-accent-bg)' : 'var(--color-chart-bar)',
                       color:      active ? 'var(--color-accent)'    : 'var(--color-muted)',
-                      border:     active ? '0.5px solid var(--color-accent)' : '0.5px solid transparent',
+                      border:     active ? '0.5px solid var(--color-accent)' : 'var(--border)',
                     }}
-                    onClick={() => setIsIncome(opt === 'Income')}
+                    onClick={() => setCategory(cat)}
                   >
-                    {opt}
+                    {CATEGORY_EMOJI[cat]} {cat}
                   </button>
                 )
               })}
             </div>
           </div>
-        </div>
 
-        <div style={sh.field}>
-          <label style={sh.label}>Category</label>
-          <div style={sh.pillWrap}>
-            {CATEGORIES.map(cat => {
-              const active = category === cat
-              return (
-                <button
-                  key={cat}
-                  style={{
-                    ...sh.pill,
-                    background: active ? 'var(--color-accent-bg)' : 'var(--color-chart-bar)',
-                    color:      active ? 'var(--color-accent)'    : 'var(--color-muted)',
-                    border:     active ? '0.5px solid var(--color-accent)' : 'var(--border)',
-                  }}
-                  onClick={() => setCategory(cat)}
-                >
-                  {CATEGORY_EMOJI[cat]} {cat}
-                </button>
-              )
-            })}
+          <div style={sh.field}>
+            <label style={sh.label}>Date</label>
+            <input
+              type="date"
+              style={sh.input}
+              value={date}
+              onChange={e => setDate(e.target.value)}
+            />
           </div>
-        </div>
 
-        <div style={sh.field}>
-          <label style={sh.label}>Date</label>
-          <input
-            type="date"
-            style={sh.input}
-            value={date}
-            onChange={e => setDate(e.target.value)}
-          />
-        </div>
-
-        <button
-          style={{ ...sh.saveBtn, opacity: merchant.trim() && amount ? 1 : 0.45 }}
-          onClick={handleSave}
-        >
-          Save transaction
-        </button>
-      </div>
-    </div>
+          <button
+            style={{ ...sh.saveBtn, opacity: merchant.trim() && amount ? 1 : 0.45 }}
+            onClick={() => handleSave(close)}
+          >
+            Save transaction
+          </button>
+        </>
+      )}
+    </PlannerBottomSheet>
   )
 }
 
 const sh = {
   backdrop: {
-    position:       'fixed',
-    inset:          0,
     background:     'rgba(0,0,0,0.6)',
-    zIndex:         200,
-    transition:     'opacity 250ms ease',
-    display:        'flex',
-    alignItems:     'flex-end',
-    justifyContent: 'center',
   },
   box: {
     width:                '100%',
     maxWidth:             'var(--max-width)',
+    maxHeight:            'none',
+    overflowY:            'visible',
     background:           'var(--color-card)',
+    borderTop:            'none',
     borderTopLeftRadius:  '20px',
     borderTopRightRadius: '20px',
     padding:              '24px',
     paddingBottom:        'calc(24px + var(--safe-bottom))',
-    transition:           'transform 250ms var(--ease-out)',
     display:              'flex',
     flexDirection:        'column',
     gap:                  '16px',
+    boxShadow:            'none',
+  },
+  header: {
+    display:      'block',
+    marginBottom: 0,
   },
   title: {
-    fontFamily: 'var(--font-display)',
-    fontSize:   '22px',
-    color:      'var(--color-text)',
-    lineHeight: 1.2,
+    marginBlockStart: '1em',
+    marginBlockEnd:   '1em',
+    fontFamily:       'var(--font-display)',
+    fontSize:         '22px',
+    fontWeight:       'bold',
+    color:            'var(--color-text)',
+    lineHeight:       1.2,
   },
+  hiddenClose: { display: 'none' },
   field:    { display: 'flex', flexDirection: 'column', gap: '8px' },
   label:    { fontSize: '10px', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-muted)' },
   input:    { height: '42px', background: 'var(--color-chart-bar)', border: 'var(--border)', borderRadius: '10px', color: 'var(--color-text)', fontFamily: 'var(--font-body)', fontSize: '15px', padding: '0 12px', outline: 'none', width: '100%', boxSizing: 'border-box' },

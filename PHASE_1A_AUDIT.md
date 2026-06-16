@@ -111,7 +111,7 @@ Final agreed scope:
 | `PlannerBottomSheet` | `src/components/planner/PlannerPrimitives.jsx` | `PlanSetupSheet`, `LogWorkoutSheet` in `src/screens/health/HealthSheets.jsx` | Fixed bottom sheet, no enter/exit animation, no backdrop click close, z-index 180, planner background and border. | Visible title and close button. No `role="dialog"`, `aria-modal`, Escape close, focus trap, or labelled-by wiring. | Low for Health because it already consumes this primitive. Medium as a target because accessibility and animation must be added without breaking Health. |
 | `FuelEditSheet` | `src/components/FuelEditSheet.jsx` | `MorningIgnition.jsx` meal window editor | Own opacity and slide animation, backdrop click close, delayed save/close callback, z-index 200, card background, rounded top corners, two native time inputs. | Labels for inputs are visible. No dialog role, aria-modal, Escape close, focus trap, or explicit heading association before migration. | Migrated in Phase 1E after save timing, close timing, backdrop behavior, animation, z-index, and native time input parity were proven. Local animation/backdrop/sheet shell removed. |
 | `Nutrition` local `BottomSheet` | `src/screens/Nutrition.jsx` | Add food, edit food, save meal, add saved food, add saved meal, targets | Similar static sheet shell to PlannerBottomSheet, z-index 180, no animation, no backdrop close, multiple forms reuse one local shell. | Visible title and close button. No dialog role, aria-modal, Escape close, focus trap, or labelled-by wiring before migration. | Migrated in Phase 1B after shared style hooks preserved shell parity. Local implementation and orphaned styles removed. |
-| `Finance` `TransactionSheet` | `src/screens/Finance.jsx` | Add transaction flow | Own opacity and slide animation, backdrop click close, delayed close after save, z-index 200, rounded card surface, finance-specific form controls. | Visible labels. No dialog role, aria-modal, Escape close, focus trap, or heading association. | Medium. Component-level migration only; no Finance dashboard or hierarchy redesign. Approval required before consolidation. |
+| `Finance` `TransactionSheet` | `src/screens/Finance.jsx` | Add transaction flow | Own opacity and slide animation, backdrop click close, delayed close after save, z-index 200, rounded card surface, finance-specific form controls. | Visible labels. No dialog role, aria-modal, Escape close, focus trap, or heading association before migration. | Migrated in Phase 1F after animation, save/cancel/delete timing, backdrop behavior, Escape behavior, z-index, form state, validation, and layout parity were proven. Local animation/backdrop/sheet shell removed. |
 | `Settings` `StubSheet` | `src/screens/Settings.jsx` | Plaid and Google Calendar connection stubs | Own opacity and slide animation, backdrop click close, delayed close, z-index 200, rounded card surface. | Visible title/body/close. No dialog role, aria-modal, Escape close, focus trap, or heading association before migration. | Migrated in Phase 1D after shared animation, backdrop-close, delay, z-index, and layout override parity were proven. Local implementation and orphaned shell styles removed. |
 
 BottomSheet stop-gate conclusion:
@@ -220,6 +220,50 @@ Phase 1E migration decision:
 - Health structure: untouched.
 - Workout behavior: untouched.
 
+Phase 1F Finance TransactionSheet parity review:
+- Existing behavior: `+ Add` opens a bottom-aligned transaction sheet with
+  250ms opacity/slide animation, backdrop click close, z-index 200, card
+  background, 20px rounded top corners, full-width merchant/category/date/save
+  layout, and delayed close after save.
+- Save timing: valid save dispatches `ADD_TRANSACTION` immediately, then closes
+  after the same 250ms shell exit delay. Invalid save still does nothing and
+  leaves the sheet open.
+- Cancel timing: there is no visible cancel or close control in the Finance
+  transaction sheet; backdrop close remains the only cancel path and keeps the
+  250ms delayed close.
+- Delete timing: transaction deletion is owned by `TxRow`, not
+  `TransactionSheet`; Phase 1F does not touch swipe/delete behavior.
+- Backdrop behavior: backdrop click closes; clicks inside the sheet do not
+  propagate.
+- Escape behavior: existing Finance sheet did not close on Escape. Migration
+  keeps `closeOnEscape` disabled, so Escape behavior does not change.
+- Form state behavior: merchant, amount, Spend/Income, category, and date state
+  remain local to `TransactionSheet` and reset on a new mount exactly as before.
+- Validation behavior: save still requires `merchant.trim()` and `amount`; the
+  button opacity still reflects validity; no validation copy or disabled
+  semantics were added.
+- Layout requirements: Finance KPI cards, weekly chart, summary cards,
+  transaction hierarchy, `TxRow`, and reducer behavior are unchanged. Only the
+  sheet shell migrates.
+- Shared capability match: `PlannerBottomSheet` supports `animated`,
+  `closeDelayMs={250}`, `closeOnBackdrop`, `zIndex={200}`, card-surface style
+  overrides, hidden close control styling, and render-function children that can
+  call the shared delayed `close` helper after `ADD_TRANSACTION`.
+- Parity result: approved for migration. The only accessibility delta is an
+  improvement from shared dialog semantics and heading association.
+
+Phase 1F migration decision:
+- `Finance` `TransactionSheet`: migrate now. Finance-specific form controls,
+  validation, save payload shape, local state, dashboard layout, KPI cards,
+  chart, summaries, and transaction hierarchy are preserved.
+- Local Finance `TransactionSheet` `useEffect`, `requestAnimationFrame`,
+  `visible` state, local timeout close shell, fixed backdrop styles, and local
+  sheet transition styles were removed.
+- SwipeRow: untouched.
+- Health structure: untouched.
+- Projects: untouched.
+- Finance redesign: rejected.
+
 ### SwipeRow Implementations
 
 | Implementation | File location | Consumers | Behavioral differences | Accessibility behavior | Migration risk |
@@ -282,7 +326,7 @@ Phase 1B decision:
 | SectionHeader | Planned `PlannerSectionHeader`/`SectionHeader` in `PlannerPrimitives.jsx` | Local section headers in Plan, Tasks, Calendar, Nutrition, Health styles | Partially canonical for Health; broader migration deferred. |
 | PlannerRow | `PlannerRow` in `PlannerPrimitives.jsx` | Local task/commitment/transaction/project rows | Partially canonical for Health; broader migration deferred. |
 | ActionGroup | Planned in `PlannerPrimitives.jsx` | Local action clusters in Nutrition, Health, Plan, Finance, Settings | Deferred. |
-| BottomSheet | `PlannerBottomSheet` in `PlannerPrimitives.jsx` | Finance TransactionSheet | Nutrition migrated in Phase 1B; Settings migrated in Phase 1D; FuelEditSheet migrated in Phase 1E; remaining duplicate blocked by non-equivalent behavior and requires approval. |
+| BottomSheet | `PlannerBottomSheet` in `PlannerPrimitives.jsx` | None known after Phase 1F | Nutrition migrated in Phase 1B; Settings migrated in Phase 1D; FuelEditSheet migrated in Phase 1E; Finance TransactionSheet shell migrated in Phase 1F. |
 | SwipeRow | Planned in `PlannerPrimitives.jsx` | Morning SwipeRow, Inbox SwipeDeleteRow, EOD RemoveSwipeRow, Finance TxRow swipe, Weekly GroceryRow | Blocked by non-equivalent behavior; approval required. |
 | EmptyState | Planned in `PlannerPrimitives.jsx` | Local empty states in Nutrition, Inbox, Finance, Tasks, Plan, Calendar | Deferred. |
 
@@ -378,12 +422,14 @@ Dead Code Audit before closing the phase:
 Current status against metrics:
 - Responsibility Matrix: completed in this audit.
 - Component Authority Matrix: completed in this audit.
-- One BottomSheet implementation remains: not complete.
+- One BottomSheet implementation remains: complete for known audited
+  BottomSheet shells after Phase 1F.
 - One SwipeRow implementation remains: not complete.
 - No orphaned duplicate implementations: not complete.
 - No user-facing workflow changes: maintained for the Phase 1B equivalent
   Nutrition sheet migration, Phase 1C shared primitive expansion, and Phase 1D
-  Settings sheet migration, and Phase 1E FuelEditSheet migration.
+  Settings sheet migration, Phase 1E FuelEditSheet migration, and Phase 1F
+  Finance TransactionSheet shell migration.
 
 ## Final Review
 
@@ -409,12 +455,14 @@ Completed:
   `PlannerBottomSheet`.
 - FuelEditSheet local animation/backdrop/sheet shell and orphaned shell styles
   removed.
+- Phase 1F proved Finance TransactionSheet shell parity and migrated it to
+  `PlannerBottomSheet` without changing Finance layout or financial behavior.
+- Finance TransactionSheet local animation/backdrop/sheet shell and orphaned
+  shell styles removed.
 - Finance redesign rejected for Phase 1A.
 - Health structural changes rejected for Phase 1A.
 
 Deferred:
-- Finance TransactionSheet consolidation pending consumer-level parity proof;
-  Finance redesign remains rejected.
 - SwipeRow consolidation pending support for all current gesture variants and
   accessibility equivalents.
 - PageHeader, SectionHeader, ActionGroup, and EmptyState migration pending
@@ -433,15 +481,12 @@ Rejected:
 
 Approve the following deltas before implementation continues:
 
-1. Shared BottomSheet behavior should add Escape close and focus management
-   while preserving each consumer's current close/save timing.
-2. Shared BottomSheet should support both static planner sheets and animated
-   slide sheets so FuelEditSheet, Finance, and Settings can migrate without
-   losing visible behavior.
-3. Shared SwipeRow should support confirm, remove, reveal-delete,
+1. Shared BottomSheet should add focus management in a future accessibility
+   pass while preserving each consumer's current close/save timing.
+2. Shared SwipeRow should support confirm, remove, reveal-delete,
    immediate-delete, optional auto-delete, keyboard action, mouse/touch parity,
    and screen-reader labels.
-4. Finance migration is limited to component-level sheet/swipe extraction only,
+3. Finance migration remains limited to component-level sheet/swipe extraction,
    with no removal of cards, charts, summaries, or hierarchy.
-5. Health migration remains documentation-only unless a later Health boundary
+4. Health migration remains documentation-only unless a later Health boundary
    phase is approved.
