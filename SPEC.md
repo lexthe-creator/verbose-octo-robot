@@ -952,6 +952,32 @@ close timing, z-index/style variants, and callback-safe close helpers. Consumer
 migration still requires proven parity. SwipeRow consolidation, Finance
 redesign, and Health structural changes remain out of scope.
 
+SwipeRow consolidation remains documentation-only until the shared
+`PlannerSwipeRow` API is approved. The shared API must support the existing
+behavior matrix before any consumer migrates:
+- right-swipe confirm
+- right-swipe remove
+- left reveal-delete
+- left immediate-delete
+- optional auto-delete
+- mouse and touch parity
+- keyboard actions
+- screen-reader labels
+
+`PlannerSwipeRow` should be behavior-first, not a visual redesign. It should
+accept mode-specific action configuration, thresholds, optional auto-delete
+distance, completion/removal/delete callbacks, accessible action labels, and a
+rendered row body supplied by the consumer. Each migration must preserve the
+consumer's current row hierarchy, timing, gesture direction, threshold, delete
+semantics, and visible row treatment.
+
+Recommended SwipeRow migration order after API approval:
+1. Morning Ignition confirm row.
+2. EOD remove row.
+3. Weekly grocery row.
+4. Finance transaction row.
+5. Inbox delete row last because auto-delete is the highest-risk behavior.
+
 Finance is not being redesigned in Phase 1A. Only component-level migrations are
 allowed: shared headers, shared rows, shared sheets, and shared swipe actions.
 Removal of KPI cards, charts, summaries, dashboards, or financial hierarchy

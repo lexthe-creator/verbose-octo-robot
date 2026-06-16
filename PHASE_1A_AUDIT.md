@@ -296,6 +296,88 @@ Phase 1B decision:
 - `WeeklyPlanning` `GroceryRow`: defer until the shared primitive supports
   immediate swipe-left delete while preserving the check-toggle row behavior.
 
+Phase 1G SwipeRow API planning review:
+- Migration status: do not migrate yet. This phase is documentation-only and
+  does not touch Finance redesign, Health, Projects, row visual redesign, or any
+  local swipe implementation.
+- Current behavior inventory:
+  - `MorningIgnition` `SwipeRow`: right-swipe confirm, 80px threshold,
+    success-tint progress, terminal confirmed state, mouse and touch support,
+    hover-device confirm button, optional skip button, no gesture keyboard
+    equivalent on touch-only path.
+  - `EodReflection` `RemoveSwipeRow`: right-swipe remove, 80px threshold,
+    danger-tint progress, immediate `onRemove()` on release, mouse and touch
+    support, no keyboard or screen-reader action equivalent.
+  - `WeeklyPlanning` `GroceryRow`: left-swipe immediate delete, 72px threshold,
+    delete-zone opacity follows swipe progress, mouse and touch support, check
+    toggle remains inside the row, delete remains gesture-only.
+  - `Finance` `TxRow`: left reveal-delete, 72px delete zone, reveal at 60% of
+    delete width, touch support only, tap revealed delete zone to delete, no
+    auto-delete, 200ms exit translation, no keyboard or screen-reader action
+    equivalent.
+  - `Inbox` `SwipeDeleteRow`: left reveal-delete, 72px reveal threshold, 180px
+    optional auto-delete threshold, mouse and touch support, tap revealed delete
+    zone to confirm, 200ms opacity/translation exit, no semantic delete button
+    or keyboard equivalent.
+- Required shared capabilities:
+  - right-swipe confirm
+  - right-swipe remove
+  - left reveal-delete
+  - left immediate-delete
+  - optional auto-delete
+  - mouse and touch parity
+  - keyboard actions
+  - screen-reader labels
+- Proposed `PlannerSwipeRow` API:
+
+```jsx
+<PlannerSwipeRow
+  mode="confirm | remove | reveal-delete | immediate-delete"
+  direction="right | left"
+  threshold={80}
+  revealWidth={72}
+  revealThresholdRatio={0.6}
+  autoActionThreshold={180}
+  enableAutoAction={false}
+  inputMode="touch-and-mouse"
+  completed={false}
+  disabled={false}
+  actionLabel="Confirm"
+  revealActionLabel="Delete"
+  hintLabel="swipe ->"
+  onAction={handleAction}
+  onRevealAction={handleDelete}
+  onSkip={handleSkip}
+  renderAction={({ progress, revealed, completed }) => null}
+>
+  {rowContent}
+</PlannerSwipeRow>
+```
+
+- API notes:
+  - `mode` owns semantics. `confirm` and `remove` complete on threshold release;
+    `reveal-delete` snaps open and waits for `onRevealAction`; `immediate-delete`
+    fires on threshold release.
+  - `enableAutoAction` is opt-in and should be used only for Inbox parity.
+  - `actionLabel` and `revealActionLabel` are required for keyboard and
+    screen-reader equivalents.
+  - The consumer owns row content and any screen-specific controls, such as
+    Morning skip buttons or Weekly grocery check toggles.
+  - The shared primitive owns pointer normalization, mouse/touch parity,
+    keyboard action handling, threshold math, reveal state, exit timing hooks,
+    and accessible action surfaces.
+  - The shared primitive must not impose new row visuals. Per-consumer styles
+    should preserve the current row treatment during migration.
+- Safest migration order after API approval:
+  1. `MorningIgnition` confirm row.
+  2. `EodReflection` remove row.
+  3. `WeeklyPlanning` grocery row.
+  4. `Finance` transaction row.
+  5. `Inbox` delete row last because auto-delete is highest risk.
+- Stop-gate conclusion: parity is not yet implemented because
+  `PlannerSwipeRow` does not exist. Do not migrate consumers until the shared
+  primitive is built and each consumer has a targeted parity review.
+
 ## Responsibility Matrix
 
 | Screen | Owns | Does not own | Major actions |
